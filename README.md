@@ -84,12 +84,14 @@ and add `Posegraph.dll` under *Dev Plugin Locations*.
 ## Usage
 
 Copy an image and click the clipboard button in the main window to recognize it directly. The source PNG is saved
-in `Documents\Posegraph\Images` and opened through the library's recognition/cache flow; it remains available after restarting.
+in `Documents\Posegraph\Images`; if identical file content already exists there, the existing image is reused.
+It opens through the library's recognition/cache flow and remains available after restarting.
 
 1. Enter GPose and select the actor (or pick one in the actor list, which shows players, actors created in Brio
    and humanoid NPCs such as retainers).
-2. Open the library (pictures icon) and double-click an image, or drag images / folders onto the *Image* tab
-   (jpg, png, webp, bmp, gif first frame, tiff, avif).
+2. Open the library (pictures icon) and double-click an image, or drag an image onto the *Image* tab
+   (jpg, png, webp, bmp, gif first frame, tiff, avif). Dragged images are not added to the library; after recognition,
+   the folder + button saves the image to the library together with your 3D / tuning corrections.
 3. The first recognition loads the model (about 10–20 s); after that a recognition takes a few seconds.
    Results are cached by file content, so opening a recognized image again is instant.
 4. Check the overlay (*Image* tab: green = detected skeleton, orange = FFXIV skeleton) and the *3D* tab.
@@ -100,7 +102,8 @@ in `Documents\Posegraph\Images` and opened through the library's recognition/cac
 ### Library
 
 - Images live in `Documents\Posegraph\Images` (imports, folder imports up to 500 images, and clipboard pastes are copied
-  there). Existing folders can be added as sources without copying.
+  there; images already in the library are detected by content and not copied again). Existing folders can be added as
+  sources without copying.
 - Organize with subfolders, tags (search with `#tag`) and favorites; rename, move (also by dragging onto a folder) and
   delete to the Recycle Bin.
 - Batch-recognize a selection; recognized images show a green check. Recognition results are cached in

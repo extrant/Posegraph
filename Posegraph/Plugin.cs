@@ -60,6 +60,7 @@ public sealed class Plugin : IDalamudPlugin
                                      _main.OpenImage, _main.SaveToBrioAsync, () => _main.BackendOnline);
         _windows.AddWindow(_library);
         _main.ToggleLibrary = _library.Toggle;
+        _main.LibraryChanged = _library.Refresh;
         _dragDrop = dragDrop;
         _framework = framework;
         _clientState = clientState;
@@ -154,10 +155,10 @@ public sealed class Plugin : IDalamudPlugin
                 var what = m.Directories.Count > 0 ? Loc.F("{0} 张图片和 {1} 个文件夹", images, m.Directories.Count)
                          : images == 1 ? Path.GetFileName(m.Files.First(Library.ImageLibrary.IsImage))
                          : Loc.F("{0} 张图片", images);
-                // 图库窗口：只复制进当前文件夹；主窗口：复制进图库并打开第一张识别
+                // 图库窗口：查重后复制进当前文件夹；主窗口：直接识别第一张，不存入图库（识别后由用户决定是否存入）
                 ImGui.TextUnformatted(_library.IsOpen && _library.ExternalDragHovered
                     ? Loc.F("松开以导入到图库「{0}」：{1}", _library.FolderName, what)
-                    : Loc.F("松开以导入图库并识别：{0}", what));
+                    : Loc.F("松开以识别（不存入图库）：{0}", what));
                 return true;
             });
 

@@ -96,6 +96,9 @@ public sealed class LibraryWindow : Window, IDisposable
 
     public override void OnClose() => _library.Save();
 
+    /// <summary>图库内容在别处变了（主窗口存入了新图），下一帧重新列目录。</summary>
+    public void Refresh() => _refresh = true;
+
     private void SetStatus(string text, Vector4? color = null)
     {
         _status = text;
@@ -848,14 +851,18 @@ public sealed class LibraryWindow : Window, IDisposable
     {
         if (paths.Count == 0) return;
         var folder = _folder;
+        var root = CurrentRoot;
+        SetStatus(Loc.T("导入中（查重）…"), Yellow);
         _ = Task.Run(() =>
         {
             try
             {
-                var copied = _library.Import(paths, folder, out var skipped);
-                SetStatus(skipped > 0 ? Loc.F("已导入 {0} 张，超过上限跳过 {1} 张", copied.Count, skipped)
-                                      : Loc.F("已导入 {0} 张", copied.Count), skipped > 0 ? Yellow : Green);
-                _pendingSelection = copied.Where(p => string.Equals(Path.GetDirectoryName(p), folder.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase)).ToArray();
+                var r = _library.Import(paths, folder, root);
+                var text = Loc.F("已导入 {0} 张", r.Added.Count);
+                if (r.Duplicates.Count > 0) text += Loc.F("，{0} 张图库里已有（已跳过，已选中原图）", r.Duplicates.Count);
+                if (r.OverLimit > 0) text += Loc.F("，超过上限跳过 {0} 张", r.OverLimit);
+                SetStatus(text, r.Duplicates.Count > 0 || r.OverLimit > 0 ? Yellow : Green);
+                _pendingSelection = r.Selection.Where(p => string.Equals(Path.GetDirectoryName(p), folder.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase)).ToArray();
                 _refresh = true;
             }
             catch (Exception ex)
@@ -886,6 +893,7 @@ public sealed class LibraryWindow : Window, IDisposable
     private void PasteClipboard()
     {
         var folder = _folder;
+        var root = CurrentRoot;
         _ = Task.Run(async () =>
         {
             try
@@ -896,8 +904,10 @@ public sealed class LibraryWindow : Window, IDisposable
                     SetStatus(Loc.T("剪切板里没有图片"), Yellow);
                     return;
                 }
-                var path = _library.SaveClipboard(png, folder);
-                SetStatus(Loc.F("已保存 {0}", Path.GetFileName(path)), Green);
+                var path = _library.SaveClipboard(png, folder, root, out var duplicate);
+                SetStatus(duplicate ? Loc.F("图库里已有这张图：{0}", Path.GetRelativePath(root, path)) : Loc.F("已保存 {0}", Path.GetFileName(path)),
+                          duplicate ? Yellow : Green);
+                _pendingSelection = [path];
                 _refresh = true;
             }
             catch (Exception ex)

@@ -33,6 +33,17 @@ public sealed class LibraryIndex
 
 public sealed record FolderListing(string Path, string[] Folders, string[] Images);
 
+/// <summary>导入结果：新复制的、内容重复而跳过的（来源文件 → 图库里已有的那张）、超出数量上限跳过的张数。</summary>
+public sealed class ImportResult
+{
+    public List<string> Added { get; } = new();
+    public List<(string Source, string Existing)> Duplicates { get; } = new();
+    public int OverLimit { get; set; }
+
+    /// <summary>导入后要选中的：新复制的 + 已有的重复图。</summary>
+    public IEnumerable<string> Selection => Added.Concat(Duplicates.Select(d => d.Existing)).Distinct(StringComparer.OrdinalIgnoreCase);
+}
+
 /// <summary>一张图保存的修正：在 3D 页调好后存进识别缓存，下次打开这张图自动恢复。</summary>
 public sealed record SavedCorrection(string Preset, Backend.RetargetParams Params, DateTime SavedAt);
 
@@ -433,47 +444,84 @@ public sealed class ImageLibrary
     /// 复制进图库的 folder：文件直接复制；文件夹按原结构复制其中的图片（放进同名子文件夹）。
     /// 总数最多 MaxImportFiles 张，超出的跳过并通过 skipped 返回。返回复制后的新路径。
     /// </summary>
-    public List<string> Import(IEnumerable<string> paths, string folder, out int skipped)
+    /// <summary>来源 root 下所有图片的 内容哈希 → 路径（查重用；哈希有备忘，只有新文件或改过的文件才读盘）。</summary>
+    public Dictionary<string, string> ContentIndex(string root)
     {
-        var copied = new List<string>();
-        skipped = 0;
+        var index = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        if (!Directory.Exists(root)) return index;
+        var options = new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true, AttributesToSkip = FileAttributes.ReparsePoint | FileAttributes.Hidden | FileAttributes.System };
+        foreach (var file in Directory.EnumerateFiles(root, "*", options).Where(IsImage))
+        {
+            if (file[(root.TrimEnd('\\').Length + 1)..].Split('\\').Any(p => p.StartsWith('.'))) continue;
+            try { index.TryAdd(Hash(file), file); }
+            catch (IOException) { }
+        }
+        Save();
+        return index;
+    }
+
+    /// <summary>
+    /// 复制进图库的 folder：文件直接复制；文件夹按原结构复制其中的图片（放进同名子文件夹）。
+    /// 按内容查重：来源 root 里已有同样的图（不管叫什么、在哪个子文件夹）就不再复制，记进 Duplicates。
+    /// 总数最多 MaxImportFiles 张，超出的跳过。
+    /// </summary>
+    public ImportResult Import(IEnumerable<string> paths, string folder, string root)
+    {
+        var result = new ImportResult();
+        var known = ContentIndex(root);
         var options = new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true, AttributesToSkip = FileAttributes.ReparsePoint };
+
+        void CopyOne(string file, string target)
+        {
+            if (result.Added.Count >= MaxImportFiles)
+            {
+                result.OverLimit++;
+                return;
+            }
+            var bytes = File.ReadAllBytes(file);
+            var sha1 = Sha1(bytes);
+            if (known.TryGetValue(sha1, out var existing))
+            {
+                result.Duplicates.Add((file, existing));
+                return;
+            }
+            Directory.CreateDirectory(System.IO.Path.GetDirectoryName(target)!);
+            target = Unique(target);
+            File.WriteAllBytes(target, bytes);
+            File.SetLastWriteTimeUtc(target, File.GetLastWriteTimeUtc(file));
+            RememberHash(target, bytes);
+            known[sha1] = target;
+            result.Added.Add(target);
+        }
+
         foreach (var path in paths)
         {
             if (Directory.Exists(path))
             {
-                var baseDir = Unique(System.IO.Path.Combine(folder, System.IO.Path.GetFileName(path.TrimEnd('\\'))));
+                var baseDir = System.IO.Path.Combine(folder, System.IO.Path.GetFileName(path.TrimEnd('\\')));
                 foreach (var file in Directory.EnumerateFiles(path, "*", options).Where(IsImage))
-                {
-                    if (copied.Count >= MaxImportFiles) { skipped++; continue; }
-                    var target = System.IO.Path.Combine(baseDir, System.IO.Path.GetRelativePath(path, file));
-                    Directory.CreateDirectory(System.IO.Path.GetDirectoryName(target)!);
-                    File.Copy(file, target = Unique(target));
-                    copied.Add(target);
-                }
+                    CopyOne(file, System.IO.Path.Combine(baseDir, System.IO.Path.GetRelativePath(path, file)));
             }
             else if (File.Exists(path) && IsImage(path))
-            {
-                if (copied.Count >= MaxImportFiles) { skipped++; continue; }
-                // 已经在这个文件夹里的就不再复制一份
-                if (string.Equals(System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(path)), folder.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase))
-                {
-                    copied.Add(path);
-                    continue;
-                }
-                var target = Unique(System.IO.Path.Combine(folder, System.IO.Path.GetFileName(path)));
-                File.Copy(path, target);
-                copied.Add(target);
-            }
+                CopyOne(path, System.IO.Path.Combine(folder, System.IO.Path.GetFileName(path)));
         }
-        return copied;
+        Save();
+        return result;
     }
 
-    /// <summary>剪切板图片存成 PNG。</summary>
-    public string SaveClipboard(byte[] png, string folder)
+    /// <summary>剪切板图片存成 PNG；来源 root 里已有同样内容的图就不再存，返回已有的那张（duplicate = true）。</summary>
+    public string SaveClipboard(byte[] png, string folder, string root, out bool duplicate)
     {
+        if (ContentIndex(root).TryGetValue(Sha1(png), out var existing))
+        {
+            duplicate = true;
+            return existing;
+        }
+        duplicate = false;
         var path = Unique(System.IO.Path.Combine(folder, $"{Loc.T("剪切板")} {DateTime.Now:yyyyMMdd-HHmmss}.png"));
         File.WriteAllBytes(path, png);
+        RememberHash(path, png);
+        Save();
         return path;
     }
 
