@@ -32,7 +32,7 @@ from fastapi.responses import Response
 from starlette.concurrency import run_in_threadpool
 from pydantic import BaseModel
 
-from . import tuning
+from . import session_archive, tuning
 from .config import SERVICE_ROOT, settings
 from .estimators import create_estimator
 from . import RUNTIME_REQUIRED, __version__
@@ -225,19 +225,55 @@ async def create_session(request: Request, name: str = "image") -> dict:
                        "keypoints_2d": h.keypoints_2d, "focal_length": h.focal_length, "cam_t": h.cam_t,
                        "bbox": h.bbox, "image_size": np.array(result.image_size),
                        "vertices": h.extra["vertices"], "rest_vertices": h.extra["rest_vertices"]})
-    sid = uuid.uuid4().hex[:12]
-    session = Session(sid, name, result.image_size, _preview_png(rgb), humans, result.timings_ms["inference"])
-    _sessions[sid] = session
-    while len(_sessions) > MAX_SESSIONS:
-        _sessions.popitem(last=False)
+    session = _add_session(name, result.image_size, _preview_png(rgb), humans, result.timings_ms["inference"])
 
     if settings.save_sessions:   # 存一份 npz，命令行脚本（push_pose / preview_overlay / Blender 对比）可直接复用
         OUTPUTS.mkdir(parents=True, exist_ok=True)
         np.savez(OUTPUTS / f"{time.strftime('%Y%m%d-%H%M%S')}_{name}.npz", **humans[0],
                  faces=result.humans[0].extra["faces"])
-    return {"sessionId": sid, "name": name, "imageSize": list(result.image_size),
-            "inferenceMs": round(session.inference_ms), "device": result.device,
-            "humans": [{"bbox": [round(float(v), 1) for v in h["bbox"]]} for h in humans]}
+    return _session_info(session, result.device)
+
+
+def _add_session(name: str, image_size, preview_png: bytes, humans: list[dict], inference_ms: float) -> Session:
+    sid = uuid.uuid4().hex[:12]
+    session = Session(sid, name, tuple(image_size), preview_png, humans, inference_ms)
+    _sessions[sid] = session
+    while len(_sessions) > MAX_SESSIONS:
+        _sessions.popitem(last=False)
+    return session
+
+
+def _session_info(s: Session, device: str | None) -> dict:
+    return {"sessionId": s.id, "name": s.name, "imageSize": list(s.image_size),
+            "inferenceMs": round(s.inference_ms), "device": device,
+            "humans": [{"bbox": [round(float(v), 1) for v in h["bbox"]]} for h in s.humans]}
+
+
+@app.get("/sessions/{sid}/archive")
+def session_archive_get(sid: str) -> Response:
+    """会话存档（npz），插件存进图库的识别缓存。"""
+    s = _session(sid)
+    return Response(session_archive.pack(s.name, s.image_size, s.preview_png, s.humans, s.inference_ms),
+                    media_type="application/octet-stream")
+
+
+@app.post("/sessions/archive")
+async def session_archive_restore(request: Request, name: str | None = None) -> dict:
+    """从识别缓存恢复会话，不加载模型。"""
+    try:
+        a = session_archive.unpack(await request.body())
+    except ValueError as ex:
+        raise HTTPException(400, tr("识别缓存无法读取：{error}", error=ex))
+    if not a["humans"]:
+        raise HTTPException(400, tr("识别缓存无法读取：{error}", error="humans"))
+    session = _add_session(name or a["name"], a["image_size"], a["preview_png"], a["humans"], a["inference_ms"])
+    return _session_info(session, None)
+
+
+@app.delete("/sessions/{sid}")
+def session_delete(sid: str) -> dict:
+    _sessions.pop(sid, None)
+    return {"ok": True}
 
 
 def _estimate(data: bytes):
@@ -322,8 +358,6 @@ def _resolve_race(requested: str | None, ref: BrioPose | None) -> dict:
         warnings.append(tr("无法确定种族，按人族中原男计算") + (tr("（没有 {code} 的骨架数据）", code=requested) if requested else ""))
     info = races.describe(code)
     info.update(name=tr(info["name"]), group=tr(info["group"]))
-    if not info["supported"]:
-        warnings.append(tr("{name}尚未适配（目前只适配男性骨架），姿势可能明显不对", name=info["name"]))
     return {**info, "source": source, "warnings": warnings}
 
 

@@ -19,11 +19,8 @@ class RaceInfo:
     male: bool
     group: str          # 绑定姿势相同（只差耳朵等不写入的骨骼）的骨架归为一组
     validated: bool     # 游戏内实测过
-
-    @property
-    def supported(self) -> bool:
-        """女性骨架尚未适配：重定向规则（辅助骨、合理性阈值、手部补偿尺寸）都是按男性骨架调校的。"""
-        return self.male
+    # 女性骨架 2026-10-26 离线核对：游戏原版身体 + IVCS 骨架，骨段方向误差、合理性提示条数都与对应男性骨架组一致，
+    # Blender 里肩、腋下、肘、手抱头正常；重定向规则（辅助骨、合理性阈值）沿用男性的，尚待游戏内复测
 
 
 def _r(code, name, male, group, validated=False):
@@ -53,12 +50,14 @@ RACES: dict[str, RaceInfo] = {r.code: r for r in [
 
 DEFAULT_RACE = "c0101"
 
-# 推断用的骨段：大腿+小腿+脚踝、上臂+前臂、肩宽、髋→颈
+# 推断用的骨段：大腿+小腿+脚踝、上臂+前臂、锁骨（半肩宽）、脊柱、髋宽。每段都是父子骨骼间的距离之和，
+# 不随姿势变化（以前用髋→颈、左右肩直线距离，弯腰、耸肩时会变，动画中常推断错）
 _SEGMENTS = {
     "leg": [("j_asi_a_l", "j_asi_b_l"), ("j_asi_b_l", "j_asi_c_l"), ("j_asi_c_l", "j_asi_d_l")],
     "arm": [("j_ude_a_l", "j_ude_b_l"), ("j_ude_b_l", "j_te_l")],
-    "shoulder": [("j_ude_a_l", "j_ude_a_r")],
-    "torso": [("j_asi_a_l", "j_kubi")],
+    "shoulder": [("j_sebo_c", "j_sako_l"), ("j_sako_l", "j_ude_a_l")],
+    "torso": [("j_sebo_a", "j_sebo_b"), ("j_sebo_b", "j_sebo_c"), ("j_sebo_c", "j_kubi")],
+    "hip": [("j_kosi", "j_asi_a_l")],
 }
 
 
@@ -122,4 +121,4 @@ def describe(code: str) -> dict:
     if info is None:
         return {"code": code, "name": code, "group": "", "validated": False, "supported": False, "known": False}
     return {"code": code, "name": info.name, "group": info.group, "validated": info.validated,
-            "supported": info.supported, "known": True}
+            "supported": True, "known": True}

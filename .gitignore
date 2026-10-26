@@ -1,8 +1,16 @@
 # Python
 .venv/
+.venv-*/
 __pycache__/
 *.pyc
 *.egg-info/
+build/
+.pytest_cache/
+
+# Local credentials and environment overrides
+.env
+.env.*
+!.env.example
 
 # Backend: upstream source, model weights, outputs
 backend/third_party/

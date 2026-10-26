@@ -70,6 +70,24 @@ def ffxiv_extents(race: str) -> dict[str, dict[str, float]] | None:
     return data.get(race)
 
 
+def bust_scale(reference) -> float:
+    """游戏角色胸骨 j_mune 的缩放（胸围滑条、Customize+ 改的就是它）；读不到为 1。"""
+    if reference is None:
+        return 1.0
+    scales = [reference.get(n).scale for n in ("j_mune_l", "j_mune_r") if reference.get(n) is not None]
+    return float(np.clip(np.mean(scales), 0.5, 2.0)) if scales else 1.0
+
+
+def chest_for_bust(ext: dict, scale: float) -> dict:
+    """按胸骨缩放调整胸部尺寸：每放大 1，胸厚与中心前移各加 bust_slope（胸前表面前移，后背不动，宽度几乎不变）。
+    bust_slope 只有女性有（Blender 里把 j_mune 放大 1.5 倍量出来的）。"""
+    slope = ext.get("chest", {}).get("bust_slope")
+    if not slope or abs(scale - 1) < 1e-3:
+        return ext
+    d = slope * (scale - 1)
+    return {**ext, "chest": {**ext["chest"], "half_z": ext["chest"]["half_z"] + d, "cz": ext["chest"]["cz"] + d}}
+
+
 def mhr_extents(rest_vertices: np.ndarray, rest_coords: np.ndarray, names: list[str]) -> dict[str, dict[str, float]]:
     j = lambda n: rest_coords[names.index(n)]
     J = {"head": j("c_head"), "neck": j("c_neck"), "chest": j("c_spine3"), "hip": (j("l_upleg") + j("r_upleg")) / 2,

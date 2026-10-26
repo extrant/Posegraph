@@ -66,6 +66,12 @@ public class Configuration : IPluginConfiguration
     public string LastImageDir { get; set; } = "";
     public string ExportDir { get; set; } = "";
 
+    // ---- 图库
+    /// <summary>用户添加的文件夹来源（不复制文件）；自带图库（文档\Posegraph\Images）不在这里。</summary>
+    public List<Library.LibrarySource> LibrarySources { get; set; } = new();
+    public string LibraryFolder { get; set; } = "";
+    public float LibraryThumbSize { get; set; } = 120;
+
     /// <summary>新图默认使用的预设：photo / illustration。</summary>
     public string DefaultPreset { get; set; } = "photo";
 

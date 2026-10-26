@@ -57,7 +57,6 @@ EN = {
         "Game bone lengths differ from {name} by {pct}%, most likely a Brio pose left over from before a race change; using standard {name} lengths",
     "无法确定种族，按人族中原男计算": "Could not determine the race; using Midlander Hyur (M)",
     "（没有 {code} 的骨架数据）": " (no skeleton data for {code})",
-    "{name}尚未适配（目前只适配男性骨架），姿势可能明显不对": "{name} is not supported yet (only male skeletons are); the pose may be clearly wrong",
     "未检测到 IVCS 骨骼：手指第三节的弯曲已合并到第二节":
         "IVCS skeleton not detected: the bend of each finger's third joint has been merged into the second",
     # 设备
@@ -69,6 +68,7 @@ EN = {
     "device 只能是 auto / cuda / cpu": "device must be auto / cuda / cpu",
     "无法解码图片：{error}": "Cannot decode the image: {error}",
     "会话不存在（后端重启过？请重新识别）": "Session not found (backend restarted?); please recognize again",
+    "识别缓存无法读取：{error}": "Cannot read the recognition cache: {error}",
     "请求体为空": "Empty request body",
     "模型加载失败：{error}": "Model failed to load: {error}",
     "未检测到人物": "No person detected",

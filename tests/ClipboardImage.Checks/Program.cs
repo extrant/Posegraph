@@ -1,5 +1,7 @@
 using Dalamud.Plugin.Services;
-using Posegraph.UI;
+using Posegraph.Library;
+using Dalamud.Interface.Textures;
+using Dalamud.Interface.Textures.TextureWraps;
 
 // Deterministic provider checks: no game, desktop clipboard or temporary files.
 var png = Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=");
@@ -55,11 +57,11 @@ var checks = new (string Name, Func<Task> Run)[]
         await Throws<IOException>(() => ClipboardImage.ReadPngAsync(textures, readback));
         Assert(textures.Texture.DisposeCount == 1);
     }),
-    ("Missing PNG encoder fails before acquiring texture", async () =>
+    ("Missing PNG encoder disposes the acquired texture", async () =>
     {
         var textures = new Textures();
         await Throws<InvalidOperationException>(() => ClipboardImage.ReadPngAsync(textures, new Readback(png) { HasPng = false }));
-        Assert(textures.Created == 0);
+        Assert(textures.Created == 1 && textures.Texture.DisposeCount == 1);
     }),
 };
 foreach (var (name, run) in checks)
@@ -91,17 +93,22 @@ namespace Dalamud.Plugin.Services
     internal interface ITextureProvider
     {
         bool HasClipboardImage();
-        Task<Texture> CreateFromClipboardAsync(string debugName, CancellationToken cancellationToken);
+        Task<IDalamudTextureWrap> CreateFromClipboardAsync(string debugName, CancellationToken cancellationToken);
+        Task<IDalamudTextureWrap> CreateFromExistingTextureAsync(IDalamudTextureWrap source, TextureModificationArgs args,
+            bool leaveWrapOpen, string debugName, CancellationToken cancellationToken);
+        Task<IDalamudTextureWrap> CreateFromImageAsync(ReadOnlyMemory<byte> bytes, string debugName, CancellationToken cancellationToken);
     }
     internal interface ITextureReadbackProvider
     {
         IEnumerable<Encoder> GetSupportedImageEncoderInfos();
-        Task SaveToStreamAsync(Texture wrap, Guid containerGuid, Stream stream,
+        Task SaveToStreamAsync(IDalamudTextureWrap wrap, Guid containerGuid, Stream stream,
             IReadOnlyDictionary<string, object>? props, bool leaveWrapOpen, bool leaveStreamOpen, CancellationToken cancellationToken);
     }
     internal sealed record Encoder(Guid ContainerGuid, string[] MimeTypes);
-    internal sealed class Texture : IDisposable
+    internal sealed class Texture : IDalamudTextureWrap
     {
+        public int Width => 1;
+        public int Height => 1;
         public int DisposeCount;
         public void Dispose() => DisposeCount++;
     }
@@ -112,11 +119,15 @@ namespace Dalamud.Plugin.Services
         public Texture Texture = new();
         public Func<CancellationToken, Task<Texture>>? Create;
         public bool HasClipboardImage() { Checked++; return HasImage; }
-        public Task<Texture> CreateFromClipboardAsync(string debugName, CancellationToken cancellationToken)
+        public async Task<IDalamudTextureWrap> CreateFromClipboardAsync(string debugName, CancellationToken cancellationToken)
         {
             Created++;
-            return Create?.Invoke(cancellationToken) ?? Task.FromResult(Texture);
+            return await (Create?.Invoke(cancellationToken) ?? Task.FromResult(Texture));
         }
+        public Task<IDalamudTextureWrap> CreateFromExistingTextureAsync(IDalamudTextureWrap source, TextureModificationArgs args,
+            bool leaveWrapOpen, string debugName, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<IDalamudTextureWrap> CreateFromImageAsync(ReadOnlyMemory<byte> bytes, string debugName, CancellationToken cancellationToken)
+            => throw new NotSupportedException();
     }
     internal sealed class Readback(byte[] png) : ITextureReadbackProvider
     {
@@ -125,10 +136,10 @@ namespace Dalamud.Plugin.Services
         public int Encoded;
         public Action? BeforeWrite;
         public IEnumerable<Encoder> GetSupportedImageEncoderInfos() => HasPng ? [new(Png, ["IMAGE/PNG"])] : [];
-        public Task SaveToStreamAsync(Texture wrap, Guid containerGuid, Stream stream,
+        public Task SaveToStreamAsync(IDalamudTextureWrap wrap, Guid containerGuid, Stream stream,
             IReadOnlyDictionary<string, object>? props, bool leaveWrapOpen, bool leaveStreamOpen, CancellationToken cancellationToken)
         {
-            if (containerGuid != Png || props is not null || !leaveWrapOpen || !leaveStreamOpen || wrap.DisposeCount != 0)
+            if (containerGuid != Png || props is not null || !leaveWrapOpen || !leaveStreamOpen || ((Texture)wrap).DisposeCount != 0)
                 throw new InvalidOperationException("Incorrect encoder ownership/options");
             Encoded++;
             BeforeWrite?.Invoke();
@@ -136,4 +147,12 @@ namespace Dalamud.Plugin.Services
             return Task.CompletedTask;
         }
     }
+}
+namespace Dalamud.Interface.Textures
+{
+    internal struct TextureModificationArgs { public int NewWidth, NewHeight; }
+}
+namespace Dalamud.Interface.Textures.TextureWraps
+{
+    internal interface IDalamudTextureWrap : IDisposable { int Width { get; } int Height { get; } }
 }

@@ -1,7 +1,7 @@
 <Project Sdk="Dalamud.NET.SDK/15.0.0">
 
 	<PropertyGroup>
-		<Version>0.3.9.0</Version>
+		<Version>0.3.10.0</Version>
 		<Nullable>enable</Nullable>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 		<ImplicitUsings>enable</ImplicitUsings>

@@ -9,7 +9,7 @@ namespace Posegraph;
 /// </summary>
 public static class Races
 {
-    /// <summary>Validated：游戏内实测过；Supported：已适配（女性骨架尚未适配，重定向规则按男性骨架调校）。</summary>
+    /// <summary>Validated：游戏内实测过；Supported：已适配（女性骨架 2026-10-26 离线核对后已适配，待游戏内复测）。</summary>
     public sealed record Race(string Code, string Name, string Group, bool Validated, bool Supported = true);
 
     public static readonly Race[] All =
@@ -23,15 +23,15 @@ public static class Races
         new("c0901", "鲁加 男", "鲁加系男", false),
         new("c1501", "硌狮 男", "鲁加系男", false),
         new("c1101", "拉拉菲尔 男", "拉拉菲尔", false),
-        new("c0201", "人族中原 女", "中原系女", false, false),
-        new("c0401", "人族高地 女", "中原系女", false, false),
-        new("c1801", "维埃拉 女", "中原系女", false, false),
-        new("c0601", "精灵 女", "精灵系女", false, false),
-        new("c1001", "鲁加 女", "精灵系女", false, false),
-        new("c1601", "硌狮 女", "精灵系女", false, false),
-        new("c0801", "猫魅 女", "猫魅系女", false, false),
-        new("c1401", "敖龙 女", "猫魅系女", false, false),
-        new("c1201", "拉拉菲尔 女", "拉拉菲尔", false, false),
+        new("c0201", "人族中原 女", "中原系女", false),
+        new("c0401", "人族高地 女", "中原系女", false),
+        new("c1801", "维埃拉 女", "中原系女", false),
+        new("c0601", "精灵 女", "精灵系女", false),
+        new("c1001", "鲁加 女", "精灵系女", false),
+        new("c1601", "硌狮 女", "精灵系女", false),
+        new("c0801", "猫魅 女", "猫魅系女", false),
+        new("c1401", "敖龙 女", "猫魅系女", false),
+        new("c1201", "拉拉菲尔 女", "拉拉菲尔", false),
     ];
 
     public static Race? Find(string? code) => All.FirstOrDefault(r => r.Code == code);

@@ -6,6 +6,7 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="../../Posegraph/UI/ClipboardImage.cs" Link="ClipboardImage.cs" />
+    <Compile Include="../../Posegraph/Library/ClipboardImage.cs" Link="ClipboardImage.cs" />
+    <Compile Include="../../Posegraph/Library/TextureImages.cs" Link="TextureImages.cs" />
   </ItemGroup>
 </Project>

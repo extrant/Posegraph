@@ -21,9 +21,9 @@ Posegraph plugin (in game, ImGui)  ── HTTP (127.0.0.1) ──►  Posegraph 
 
 - **Photo and illustration support**, full or half body, fingers included. An *Illustration* preset tones down
   the exaggerated head/neck proportions of drawn art.
-- **All playable male races.** The race is read from the character's appearance (or chosen manually).
+- **All playable races, male and female.** The race is read from the character's appearance (or chosen manually).
   Midlander-type and Elezen males are verified in game; Lalafell and Roegadyn/Hrothgar had a body-proportion bug after changing race, fixed in 0.3.2.
-  Female skeletons are **not supported yet** (their data is included, but the retargeting rules are tuned for male skeletons).
+  Female skeletons were checked offline against the vanilla bodies with the IVCS skeleton and behave like the male ones; awaiting a retest in game.
 - **Live tuning without re-running the AI**: per-region amplitude (spine, neck, head, clavicle, wrist), hand contact
   compensation, gravity correction, ground snapping, helper-bone strength, and manual per-joint offsets in a 3D stick figure.
   Dragging a slider updates the preview; releasing it applies the pose (Brio's undo history stays clean).
@@ -83,17 +83,32 @@ and add `Posegraph.dll` under *Dev Plugin Locations*.
 
 ## Usage
 
+Copy an image and click the clipboard button in the main window to recognize it directly. The source PNG is saved
+in `Documents\Posegraph\Images` and opened through the library's recognition/cache flow; it remains available after restarting.
+
 1. Enter GPose and select the actor (or pick one in the actor list, which shows players, actors created in Brio
    and humanoid NPCs such as retainers).
-2. Click the folder icon or drag an image onto the *Image* tab (jpg, png, webp, bmp, gif first frame, tiff, avif).
-   Alternatively, copy an image and click the clipboard button. The image is encoded in memory; no temporary image file is written.
-   The retry button recognizes the same clipboard image again, even if the clipboard has since changed. No backend update is required.
+2. Open the library (pictures icon) and double-click an image, or drag images / folders onto the *Image* tab
+   (jpg, png, webp, bmp, gif first frame, tiff, avif).
 3. The first recognition loads the model (about 10–20 s); after that a recognition takes a few seconds.
+   Results are cached by file content, so opening a recognized image again is instant.
 4. Check the overlay (*Image* tab: green = detected skeleton, orange = FFXIV skeleton) and the *3D* tab.
 5. Tune on the *Tuning* tab, read the *Hints* tab, then **Apply** (▶). Use the camera button to match the photo camera,
-   ↶ to restore the pose from before the first apply, and the disk button to export a `.pose` file.
+   ↶ to restore the pose from before the first apply, and the disk button to export a `.pose` file or save it to the
+   Brio pose library.
 
-Status bar icons, left to right: Brio, GPose, IVCS (shown once the game pose has been read), backend, VRAM, RAM;
+### Library
+
+- Images live in `Documents\Posegraph\Images` (imports, folder imports up to 500 images, and clipboard pastes are copied
+  there). Existing folders can be added as sources without copying.
+- Organize with subfolders, tags (search with `#tag`) and favorites; rename, move (also by dragging onto a folder) and
+  delete to the Recycle Bin.
+- Batch-recognize a selection; recognized images show a green check. Recognition results are cached in
+  `Documents\Posegraph\Cache`.
+- *Save to the Brio pose library* writes `.pose` files with a preview image and tags to `Documents\Brio\Poses\Posegraph`,
+  where they show up in Brio's library.
+
+Status bar icons, left to right: Brio, GPose, IVCS (shown once an actor is selected in GPose), backend, VRAM, RAM;
 hover for details.
 
 ### Settings
@@ -114,7 +129,7 @@ hover for details.
 | Elezen ♂ | Elezen | verified in game |
 | Roegadyn-type ♂ | Roegadyn, Hrothgar | fixed in 0.3.2, awaiting a retest in game |
 | Lalafell | Lalafell ♂ / ♀ | fixed in 0.3.2, awaiting a retest in game |
-| Female skeletons | all | **not supported yet** |
+| Female skeletons | all | checked offline, awaiting a retest in game |
 
 If the detected race is wrong (race-changing mods, Customize+ scaling), choose it manually in the race list next to the actor list.
 The choice is remembered per actor for the GPose session; switching between actors does not clear their poses in Brio.

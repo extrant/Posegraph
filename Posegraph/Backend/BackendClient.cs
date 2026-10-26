@@ -42,16 +42,38 @@ public sealed class BackendClient(Func<int> port) : IDisposable
     public Task ConfigureAsync(Configuration c) => PostAsync("/model/config",
         new Dictionary<string, object> { ["device"] = c.BackendDevice, ["release_after"] = c.ReleaseAfter, ["mhr_on_cpu"] = c.MhrOnCpu });
 
-    public async Task<SessionInfo> CreateSessionAsync(byte[] image, string name, CancellationToken ct = default)
+    public async Task<SessionInfo> CreateSessionAsync(byte[] image, string name)
     {
         using var content = new ByteArrayContent(image);
         content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
-        using var resp = await _http.PostAsync(Url($"/sessions?name={Uri.EscapeDataString(name)}"), content, ct);
-        return (await ReadAsync<SessionInfo>(resp, ct))!;
+        using var resp = await _http.PostAsync(Url($"/sessions?name={Uri.EscapeDataString(name)}"), content);
+        return (await ReadAsync<SessionInfo>(resp))!;
     }
 
-    public Task<byte[]> SessionImageAsync(string sid, CancellationToken ct = default)
-        => _http.GetByteArrayAsync(Url($"/sessions/{sid}/image"), ct);
+    public Task<byte[]> SessionImageAsync(string sid) => _http.GetByteArrayAsync(Url($"/sessions/{sid}/image"));
+
+    /// <summary>会话存档（npz），存进图库的识别缓存。</summary>
+    public async Task<byte[]> SessionArchiveAsync(string sid)
+    {
+        using var resp = await _http.GetAsync(Url($"/sessions/{sid}/archive"));
+        await EnsureSuccessAsync(resp);
+        return await resp.Content.ReadAsByteArrayAsync();
+    }
+
+    /// <summary>从识别缓存恢复会话（不加载模型）。</summary>
+    public async Task<SessionInfo> RestoreSessionAsync(byte[] archive, string name)
+    {
+        using var content = new ByteArrayContent(archive);
+        content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+        using var resp = await _http.PostAsync(Url($"/sessions/archive?name={Uri.EscapeDataString(name)}"), content);
+        return (await ReadAsync<SessionInfo>(resp))!;
+    }
+
+    public async Task DeleteSessionAsync(string sid)
+    {
+        using var resp = await _http.DeleteAsync(Url($"/sessions/{sid}"));
+        await EnsureSuccessAsync(resp);
+    }
 
     public async Task<RetargetResult> RetargetAsync(string sid, int person, RetargetParams p, string? reference, string? race,
                                                     bool trustReference = false)
@@ -74,17 +96,26 @@ public sealed class BackendClient(Func<int> port) : IDisposable
     }
 
     /// <summary>非 2xx 时把后端 FastAPI 的 detail 作为异常信息抛出。</summary>
-    private static async Task<T?> ReadAsync<T>(HttpResponseMessage resp, CancellationToken ct = default)
+    private static async Task<T?> ReadAsync<T>(HttpResponseMessage resp)
     {
-        if (!resp.IsSuccessStatusCode)
-        {
-            var text = await resp.Content.ReadAsStringAsync(ct);
-            string detail = text;
-            try { detail = JsonDocument.Parse(text).RootElement.GetProperty("detail").ToString(); } catch { }
-            throw new InvalidOperationException(Loc.F("后端返回 {0}：{1}", (int)resp.StatusCode, detail));
-        }
-        return await resp.Content.ReadFromJsonAsync<T>(Json, ct);
+        await EnsureSuccessAsync(resp);
+        return await resp.Content.ReadFromJsonAsync<T>(Json);
+    }
+
+    private static async Task EnsureSuccessAsync(HttpResponseMessage resp)
+    {
+        if (resp.IsSuccessStatusCode) return;
+        var text = await resp.Content.ReadAsStringAsync();
+        string detail = text;
+        try { detail = JsonDocument.Parse(text).RootElement.GetProperty("detail").ToString(); } catch { }
+        throw new BackendException((int)resp.StatusCode, Loc.F("后端返回 {0}：{1}", (int)resp.StatusCode, detail));
     }
 
     public void Dispose() => _http.Dispose();
+}
+
+/// <summary>后端返回非 2xx。StatusCode 404 = 会话不存在（后端重启或会话被挤出），可从识别缓存恢复。</summary>
+public sealed class BackendException(int statusCode, string message) : InvalidOperationException(message)
+{
+    public int StatusCode { get; } = statusCode;
 }

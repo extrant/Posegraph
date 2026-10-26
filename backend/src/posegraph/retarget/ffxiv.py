@@ -96,8 +96,9 @@ class HelperRule:
 
     驱动量：driver 相对 base（缺省为 driver 的父骨骼）的旋转与绑定姿势的偏差，按 x 轴做"摆动·扭转"分解，
     特征 = [扭转角, 摆动 y, 摆动 z]（弧度）。
-    辅助骨：相对父骨骼绑定姿势，绕自身局部 axis 轴转动 coef · 特征 + intercept_deg。
-    系数来自游戏动画采样拟合（scripts/sample_frames.py，2026-10-24，598 帧抬手/转腕类动作）。
+    辅助骨：相对父骨骼绑定姿势，绕自身局部 axis 轴转动 coef · 特征 + cubic · 特征³ + intercept_deg。
+    系数来自游戏动画采样拟合（scripts/sample_frames.py）：2026-10-24 男性 598 帧抬手 / 转腕；
+    2026-10-26 中原男、中原女、精灵女、猫魅女、拉拉菲尔女各约 450 帧跪 / 坐 / 蹲（膝弯到 150°）。
     """
     helper: str
     driver: str
@@ -105,23 +106,74 @@ class HelperRule:
     coef: tuple[float, float, float]
     intercept_deg: float = 0.0
     base: str | None = None
+    cubic: tuple[float, float, float] = (0.0, 0.0, 0.0)
 
 
-def _side_rules(s: str, mirror: float) -> list[HelperRule]:
+# 膝 j_asi_b 分担大腿→小腿总弯曲的比例：弯得越深分担越多。男女相同（中原男与中原女 / 猫魅女拟合系数一致，
+# 四族合并 R² ≥ 0.993，平均误差 0.2~0.6°）；拉拉菲尔的绑定比例不同，约分担一半以上
+KNEE = (0.3002, 0.0198)
+KNEE_LALAFELL = (0.6859, -0.0281)
+
+
+def _side_rules(s: str, mirror: float, knee: tuple[float, float] = KNEE) -> list[HelperRule]:
     return [
-        # 肘：反向转动肘弯的一半（R² 0.999）
+        # 肘：反向转动肘弯的一半（R² 0.999，各种族相同）
         HelperRule(f"n_hhiji_{s}", f"j_ude_b_{s}", 2, (0, 0, -0.495)),
         HelperRule(f"n_hijisoubi_{s}", f"j_ude_b_{s}", 2, (0, 0, -0.495)),
-        # 腕：前臂末端分担手腕扭转的一半（R² 0.995）
+        # 腕：前臂末端分担手腕扭转的一半（R² 0.99，各种族相同）
         HelperRule(f"n_hte_{s}", f"j_te_{s}", 0, (0.5, 0, 0)),
-        # 肩：分担上臂扭转约一半，并随抬臂方向反扭（R² 0.91~0.93，左右镜像）
+        # 肩：分担上臂扭转约一半，并随抬臂方向反扭（抬手动作 R² 0.91~0.93，左右镜像；
+        # 跪坐类大幅摆臂时误差可达 30~60°，驱动关系更复杂，待查）
         HelperRule(f"n_hkata_{s}", f"j_ude_a_{s}", 0, (-0.47, -0.45, 0.18 * mirror), 10.3 * mirror),
-        # 膝：j_asi_b 承担大腿→小腿总弯曲的 36%（R² 0.99）
-        HelperRule(f"j_asi_b_{s}", f"j_asi_c_{s}", 2, (0, 0, 0.36), base=f"j_asi_a_{s}"),
+        HelperRule(f"j_asi_b_{s}", f"j_asi_c_{s}", 2, (0, 0, knee[0]), base=f"j_asi_a_{s}", cubic=(0, 0, knee[1])),
     ]
 
 
 HELPER_RULES: list[HelperRule] = _side_rules("l", 1.0) + _side_rules("r", -1.0)
+HELPER_RULES_LALAFELL: list[HelperRule] = _side_rules("l", 1.0, KNEE_LALAFELL) + _side_rules("r", -1.0, KNEE_LALAFELL)
+
+
+def _is_lalafell(race: str) -> bool:
+    return race in ("c1101", "c1201")
+
+
+def helper_rules(race: str) -> list[HelperRule]:
+    return HELPER_RULES_LALAFELL if _is_lalafell(race) else HELPER_RULES
+
+
+@dataclass(frozen=True)
+class HelperScaleRule:
+    """辅助骨缩放联动：游戏动画里肘、肩的辅助骨会随弯曲放大局部 Y / Z（X 不变），撑住关节处的体积，
+    不写的话弯肘时手肘被压扁。Y、Z 各自 = clip(1 + 系数 · 特征 + 常数, 1, 上限)，特征同 HelperRule。
+    以驱动骨的游戏缩放为底（Customize+ 改了手臂粗细也跟着走），不读辅助骨自己的游戏值——那可能是上次推送的结果。
+    男女通用：男性 598 帧采样与 PR #1（uiharuayako）的中原女 2670 帧采样拟合出的肘部系数一致。
+    """
+    helper: str
+    driver: str
+    y: tuple[float, float, float, float]    # 扭转、摆动 y、摆动 z 的系数（每弧度），常数
+    z: tuple[float, float, float, float]
+    y_max: float
+    z_max: float
+
+
+def _side_scale_rules(s: str, mirror: float, elbow: bool = True) -> list[HelperScaleRule]:
+    shoulder = (-0.0738 * mirror, -0.0716 * mirror, 0.0209, 0.0043)
+    return [
+        # 肘：Y = 1 + 弯曲角/180°、Z = 1 + 弯曲角/400°（R² 1.000，男女四族一致；弯曲角为负，伸直时不缩放）
+        *([HelperScaleRule(f"n_hhiji_{s}", f"j_ude_b_{s}", (0, 0, -1 / np.pi, 0), (0, 0, -0.45 / np.pi, 0), 1.8, 1.35)]
+          if elbow else []),
+        # 肩：随上臂扭转与抬臂放大，最多 1.2（R² 0.92，左右镜像）
+        HelperScaleRule(f"n_hkata_{s}", f"j_ude_a_{s}", shoulder, shoulder, 1.2, 1.2),
+    ]
+
+
+HELPER_SCALE_RULES: list[HelperScaleRule] = _side_scale_rules("l", 1.0) + _side_scale_rules("r", -1.0)
+# 拉拉菲尔的动画不缩放肘辅助骨（采样中始终为 1）
+HELPER_SCALE_RULES_LALAFELL: list[HelperScaleRule] = _side_scale_rules("l", 1.0, False) + _side_scale_rules("r", -1.0, False)
+
+
+def helper_scale_rules(race: str) -> list[HelperScaleRule]:
+    return HELPER_SCALE_RULES_LALAFELL if _is_lalafell(race) else HELPER_SCALE_RULES
 
 
 def _twist_swing_features(dev: R) -> np.ndarray:
@@ -543,8 +595,11 @@ def retarget(joint_global_rots: np.ndarray, joint_coords_cam: np.ndarray | None 
         G, P = forward_kinematics(sk, G_new)
     if compensate_hands and hand_strength > 0 and mhr_model is not None:
         extents = None
-        from .body import ffxiv_extents, mhr_extents
+        from .body import bust_scale, chest_for_bust, ffxiv_extents, mhr_extents
         ff_ext = ffxiv_extents(race)
+        if ff_ext is not None:
+            ff_ext = chest_for_bust(ff_ext, bust_scale(reference))
+            compensation["bust_scale"] = round(bust_scale(reference), 3)
         if ff_ext is not None and rest_vertices is not None:
             extents = (ff_ext, mhr_extents(rest_vertices, mhr_rest_pos, mhr_names))
         G_bind0, _ = forward_kinematics(sk)
@@ -574,16 +629,30 @@ def retarget(joint_global_rots: np.ndarray, joint_coords_cam: np.ndarray | None 
 
     # 辅助骨：按驱动骨相对绑定姿势的偏差计算，再做一次前向运动学
     G_bind, _ = forward_kinematics(load_ffxiv_skeleton(race))
-    for rule in HELPER_RULES:
+    rules = helper_rules(race)
+    for rule in rules:
         d, h = sk.index(rule.driver), sk.index(rule.helper)
         b = sk.index(rule.base) if rule.base else sk.parents[d]
-        dev = (G_bind[b].inv() * G_bind[d]).inv() * (G[b].inv() * G[d])
-        angle = helper_strength * (float(np.dot(rule.coef, _twist_swing_features(dev))) + np.radians(rule.intercept_deg))
+        f = _twist_swing_features((G_bind[b].inv() * G_bind[d]).inv() * (G[b].inv() * G[d]))
+        angle = helper_strength * (float(np.dot(rule.coef, f) + np.dot(rule.cubic, f ** 3)) + np.radians(rule.intercept_deg))
         rotvec = np.zeros(3)
         rotvec[rule.axis] = angle
         G_new[h] = G[sk.parents[h]] * sk.local_r[h] * R.from_rotvec(rotvec)
-    if HELPER_RULES:
+    if rules:
         G, P = forward_kinematics(sk, G_new)
+
+    def ref_scale(name: str) -> np.ndarray:
+        t = reference.get(name) if reference is not None else None
+        return t.scale if t is not None else np.ones(3)
+
+    helper_scales: dict[str, np.ndarray] = {}
+    for rule in helper_scale_rules(race):
+        d = sk.index(rule.driver)
+        p = sk.parents[d]
+        f = _twist_swing_features((G_bind[p].inv() * G_bind[d]).inv() * (G[p].inv() * G[d]))
+        grow = lambda c, top: float(np.clip(1 + np.dot(c[:3], f) + c[3], 1.0, top)) - 1
+        helper_scales[rule.helper] = ref_scale(rule.driver) * np.array(
+            [1.0, 1 + helper_strength * grow(rule.y, rule.y_max), 1 + helper_strength * grow(rule.z, rule.z_max)])
 
     if ground:
         body = [i for i, n in enumerate(sk.names) if n.startswith(("j_", "iv_asi_")) and not n.startswith(("j_sk_", "j_kami", "j_f_", "j_ex_"))]
@@ -595,14 +664,11 @@ def retarget(joint_global_rots: np.ndarray, joint_coords_cam: np.ndarray | None 
 
     # 输出：映射骨骼 + 祖先链（不含 n_root）
     keep: set[int] = set()
-    for i in [sk.index(m.ffxiv) for m in BONE_MAP] + [sk.index(r.helper) for r in HELPER_RULES]:
+    for i in [sk.index(m.ffxiv) for m in BONE_MAP] + [sk.index(r.helper) for r in rules]:
         while i >= 0 and i not in keep and sk.names[i] != "n_root":
             keep.add(i)
             i = sk.parents[i]
-    def scale_of(name: str) -> np.ndarray:
-        t = reference.get(name) if reference is not None else None
-        return t.scale if t is not None else np.ones(3)
-
+    scale_of = lambda name: helper_scales[name] if name in helper_scales else ref_scale(name)
     bones = {sk.names[i]: (P[i], G[i].as_quat(), scale_of(sk.names[i])) for i in sorted(keep)
              if ivcs or not sk.names[i].startswith("iv_")}
 

@@ -1,3 +1,4 @@
+using Dalamud.Bindings.ImGui;
 using Dalamud.Game.Command;
 using Dalamud.Interface.DragDrop;
 using Dalamud.Interface.Windowing;
@@ -19,6 +20,8 @@ public sealed class Plugin : IDalamudPlugin
     private readonly BridgeServer _server;
     private readonly WindowSystem _windows = new("Posegraph");
     private readonly MainWindow _main;
+    private readonly LibraryWindow _library;
+    private readonly IDragDropManager _dragDrop;
     private readonly IFramework _framework;
     private readonly IClientState _clientState;
     private readonly BrioBridge _brio;
@@ -34,7 +37,7 @@ public sealed class Plugin : IDalamudPlugin
         IClientState clientState,
         ITargetManager targetManager,
         ITextureProvider textures,
-        ITextureReadbackProvider textureReadback,
+        ITextureReadbackProvider readback,
         IDragDropManager dragDrop,
         IPluginLog log)
     {
@@ -50,9 +53,14 @@ public sealed class Plugin : IDalamudPlugin
         if (_config.AutoStartServer)
             TryStart();
 
-        _main = new MainWindow(_config, pi, clientState, textures, textureReadback, dragDrop, brio,
+        _main = new MainWindow(_config, pi, clientState, textures, readback, dragDrop, brio,
                                new PoseApplier(framework, clientState, targetManager, brio), _server);
         _windows.AddWindow(_main);
+        _library = new LibraryWindow(_config, pi, _main.Library, _main.Recognition, textures, readback, dragDrop, log,
+                                     _main.OpenImage, _main.SaveToBrioAsync, () => _main.BackendOnline);
+        _windows.AddWindow(_library);
+        _main.ToggleLibrary = _library.Toggle;
+        _dragDrop = dragDrop;
         _framework = framework;
         _clientState = clientState;
         _brio = brio;
@@ -60,6 +68,7 @@ public sealed class Plugin : IDalamudPlugin
         pi.UiBuilder.DisableGposeUiHide = true;
         ApplyUiHide(pi, _config);
         framework.Update += OnFrameworkUpdate;
+        pi.UiBuilder.Draw += DrawDragSource;
         pi.UiBuilder.Draw += _windows.Draw;
         pi.UiBuilder.OpenMainUi += ToggleManually;
         pi.UiBuilder.OpenConfigUi += _main.OpenSettings;
@@ -133,14 +142,35 @@ public sealed class Plugin : IDalamudPlugin
         _openedByGpose = true;
     }
 
+    /// <summary>
+    /// 把系统里拖动的图片 / 文件夹转成 ImGui 拖放负载（每帧一次，主窗口和图库窗口都用 CreateImGuiTarget 接收）。
+    /// </summary>
+    private void DrawDragSource()
+        => _dragDrop.CreateImGuiSource(LibraryWindow.ExternalDragLabel,
+            m => m.Files.Any(Library.ImageLibrary.IsImage) || m.Directories.Count > 0,
+            m =>
+            {
+                var images = m.Files.Count(Library.ImageLibrary.IsImage);
+                var what = m.Directories.Count > 0 ? Loc.F("{0} 张图片和 {1} 个文件夹", images, m.Directories.Count)
+                         : images == 1 ? Path.GetFileName(m.Files.First(Library.ImageLibrary.IsImage))
+                         : Loc.F("{0} 张图片", images);
+                // 图库窗口：只复制进当前文件夹；主窗口：复制进图库并打开第一张识别
+                ImGui.TextUnformatted(_library.IsOpen && _library.ExternalDragHovered
+                    ? Loc.F("松开以导入到图库「{0}」：{1}", _library.FolderName, what)
+                    : Loc.F("松开以导入图库并识别：{0}", what));
+                return true;
+            });
+
     public void Dispose()
     {
         _framework.Update -= OnFrameworkUpdate;
         _commands.RemoveHandler(Command);
         _pi.UiBuilder.Draw -= _windows.Draw;
+        _pi.UiBuilder.Draw -= DrawDragSource;
         _pi.UiBuilder.OpenMainUi -= ToggleManually;
         _pi.UiBuilder.OpenConfigUi -= _main.OpenSettings;
         _windows.RemoveAllWindows();
+        _library.Dispose();
         _main.Dispose();
         _server.Dispose();
         _pi.SavePluginConfig(_config);
