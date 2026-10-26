@@ -44,6 +44,7 @@ public sealed class MainWindow : Window, IDisposable
     private readonly IDalamudPluginInterface _pi;
     private readonly IClientState _clientState;
     private readonly ITextureProvider _textures;
+    private readonly ITextureReadbackProvider _textureReadback;
     private readonly IDragDropManager _dragDrop;
     private readonly BrioBridge _brio;
     private readonly PoseApplier _applier;
@@ -69,8 +70,11 @@ public sealed class MainWindow : Window, IDisposable
     // 会话
     private SessionInfo? _session;
     private string? _imagePath;
+    private byte[]? _clipboardPng;
     private IDalamudTextureWrap? _texture;
-    private IDalamudTextureWrap? _newTexture;
+    private readonly CancellationTokenSource _recognitionLifetime = new();
+    private Task<RecognizedImage?>? _recognitionTask;
+    private sealed record RecognizedImage(SessionInfo Session, IDalamudTextureWrap Texture, string? Path, byte[]? ClipboardPng);
     private int _person;
     private RetargetParams _params;
     private bool _paramsDirty;       // 参数可能变了：松手后与已保存的比较，不同就写入配置
@@ -113,6 +117,7 @@ public sealed class MainWindow : Window, IDisposable
     private int? _selectTab;
 
     public MainWindow(Configuration config, IDalamudPluginInterface pi, IClientState clientState, ITextureProvider textures,
+                      ITextureReadbackProvider textureReadback,
                       IDragDropManager dragDrop, BrioBridge brio, PoseApplier applier, BridgeServer server)
         : base("Posegraph###PosegraphMain")
     {
@@ -120,6 +125,7 @@ public sealed class MainWindow : Window, IDisposable
         _pi = pi;
         _clientState = clientState;
         _textures = textures;
+        _textureReadback = textureReadback;
         _dragDrop = dragDrop;
         _brio = brio;
         _applier = applier;
@@ -150,13 +156,30 @@ public sealed class MainWindow : Window, IDisposable
 
     public void Dispose()
     {
+        _recognitionLifetime.Cancel();
+        // A provider may finish after cancellation. Reclaim any unconsumed preview
+        // before disposing its HTTP client, without blocking Dalamud's draw thread.
+        var pending = _recognitionTask;
+        _recognitionTask = null;
+        if (pending is not null)
+            _ = pending.ContinueWith(task =>
+            {
+                if (task.IsCompletedSuccessfully) task.Result?.Texture.Dispose();
+                else _ = task.Exception;
+                _recognitionLifetime.Dispose();
+                _client.Dispose();
+            }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+        else
+        {
+            _recognitionLifetime.Dispose();
+            _client.Dispose();
+        }
         if (_config.StopBackendOnExit)
             _process.Stop();
         _process.Dispose();
-        _client.Dispose();
         _updater.Dispose();
         _texture?.Dispose();
-        _newTexture?.Dispose();
+        _clipboardPng = null;
     }
 
     private void SetStatus(string text, Vector4? color = null)
@@ -499,7 +522,14 @@ public sealed class MainWindow : Window, IDisposable
 
     // ------------------------------------------------------------------ 识别与重定向
 
-    private void Recognize(string path)
+    private void Recognize(string path) => Recognize(
+        async ct => await File.ReadAllBytesAsync(path, ct), Path.GetFileNameWithoutExtension(path), path);
+
+    private void RecognizeClipboard(byte[]? png = null) => Recognize(
+        ct => png is null ? ClipboardImage.ReadPngAsync(_textures, _textureReadback, ct) : Task.FromResult<byte[]?>(png),
+        Loc.T("剪切板图像"), null);
+
+    private void Recognize(Func<CancellationToken, Task<byte[]?>> readImage, string name, string? path)
     {
         if (_recognizing) return;
         if (!BackendOnline)
@@ -508,34 +538,61 @@ public sealed class MainWindow : Window, IDisposable
             return;
         }
         _recognizing = true;
-        _imagePath = path;
         SetStatus(ModelReady ? Loc.T("识别中…") : Loc.T("加载模型并识别中（约 10~20 秒）…"), Yellow);
-        _ = Task.Run(async () =>
+        var ct = _recognitionLifetime.Token;
+        // Start the clipboard provider on the UI thread; its asynchronous result
+        // is observed even when unloading cancels before this worker runs.
+        var input = readImage(ct);
+        _recognitionTask = Task.Run(async () =>
         {
+            var bytes = await input;
+            ct.ThrowIfCancellationRequested();
+            if (bytes is null) return null;
+            var info = await _client.CreateSessionAsync(bytes, name, ct);
+            var png = await _client.SessionImageAsync(info.SessionId, ct);
+            var tex = await _textures.CreateFromImageAsync(png, cancellationToken: ct);
             try
             {
-                var bytes = await File.ReadAllBytesAsync(path);
-                var info = await _client.CreateSessionAsync(bytes, Path.GetFileNameWithoutExtension(path));
-                var png = await _client.SessionImageAsync(info.SessionId);
-                var tex = await _textures.CreateFromImageAsync(png);
-                Interlocked.Exchange(ref _newTexture, tex)?.Dispose();
-                _session = info;
-                _person = 0;
-                _result = null;
-                _params.Offsets.Clear();   // 手动偏移只对当前图有意义
-                _selected = null;
-                SetStatus(Loc.F("识别完成（{0} {1:0.0} 秒）", DeviceLabel(info.Device), info.InferenceMs / 1000f), Green);
-                RequestRetarget(_config.PushAfterRecognize);
+                ct.ThrowIfCancellationRequested();
+                return new RecognizedImage(info, tex, path, path is null ? bytes : null);
             }
-            catch (Exception ex)
+            catch
             {
-                SetError(Loc.F("识别失败：{0}", ex.Message));
-            }
-            finally
-            {
-                _recognizing = false;
+                tex.Dispose();
+                throw;
             }
         });
+    }
+
+    private void PollRecognition()
+    {
+        if (_recognitionTask is not { IsCompleted: true } task) return;
+        try
+        {
+            if (task.GetAwaiter().GetResult() is not { } image)
+            {
+                SetError(Loc.T("剪切板中没有可识别的图像，请先复制图片"));
+                return;
+            }
+            _texture?.Dispose();
+            _texture = image.Texture;
+            _imagePath = image.Path;
+            _clipboardPng = image.ClipboardPng;
+            _session = image.Session;
+            _person = 0;
+            _result = null;
+            _params.Offsets.Clear();   // 手动偏移只对当前图有意义
+            _selected = null;
+            SetStatus(Loc.F("识别完成（{0} {1:0.0} 秒）", DeviceLabel(image.Session.Device), image.Session.InferenceMs / 1000f), Green);
+            RequestRetarget(_config.PushAfterRecognize);
+        }
+        catch (OperationCanceledException) when (_recognitionLifetime.IsCancellationRequested) { }
+        catch (Exception ex) { SetError(Loc.F("识别失败：{0}", ex.Message)); }
+        finally
+        {
+            _recognitionTask = null;
+            _recognizing = false;
+        }
     }
 
     /// <summary>预设的值：有保存过的用保存的，否则用内置预设。</summary>
@@ -743,11 +800,7 @@ public sealed class MainWindow : Window, IDisposable
 
     public override void Draw()
     {
-        if (Interlocked.Exchange(ref _newTexture, null) is { } tex)
-        {
-            _texture?.Dispose();
-            _texture = tex;
-        }
+        PollRecognition();
         PollHealth();
         RefreshActors();
         PersistParams();
@@ -786,8 +839,15 @@ public sealed class MainWindow : Window, IDisposable
                        !_recognizing))
             OpenImageDialog();
         ImGui.SameLine();
-        if (IconButton("##again", FontAwesomeIcon.Redo, Loc.T("重新识别当前图片"), _imagePath is not null && !_recognizing))
-            Recognize(_imagePath!);
+        if (IconButton("##clipboard", FontAwesomeIcon.Clipboard, Loc.T("识别剪切板中的图像"), !_recognizing))
+            RecognizeClipboard();
+        ImGui.SameLine();
+        if (IconButton("##again", FontAwesomeIcon.Redo, Loc.T("重新识别当前图片"),
+                       (_imagePath is not null || _clipboardPng is not null) && !_recognizing))
+        {
+            if (_imagePath is not null) Recognize(_imagePath);
+            else RecognizeClipboard(_clipboardPng);
+        }
         ImGui.SameLine();
 
         // 角色

@@ -34,6 +34,7 @@ public sealed class Plugin : IDalamudPlugin
         IClientState clientState,
         ITargetManager targetManager,
         ITextureProvider textures,
+        ITextureReadbackProvider textureReadback,
         IDragDropManager dragDrop,
         IPluginLog log)
     {
@@ -49,7 +50,7 @@ public sealed class Plugin : IDalamudPlugin
         if (_config.AutoStartServer)
             TryStart();
 
-        _main = new MainWindow(_config, pi, clientState, textures, dragDrop, brio,
+        _main = new MainWindow(_config, pi, clientState, textures, textureReadback, dragDrop, brio,
                                new PoseApplier(framework, clientState, targetManager, brio), _server);
         _windows.AddWindow(_main);
         _framework = framework;

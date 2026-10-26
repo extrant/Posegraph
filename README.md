@@ -86,6 +86,8 @@ and add `Posegraph.dll` under *Dev Plugin Locations*.
 1. Enter GPose and select the actor (or pick one in the actor list, which shows players, actors created in Brio
    and humanoid NPCs such as retainers).
 2. Click the folder icon or drag an image onto the *Image* tab (jpg, png, webp, bmp, gif first frame, tiff, avif).
+   Alternatively, copy an image and click the clipboard button. The image is encoded in memory; no temporary image file is written.
+   The retry button recognizes the same clipboard image again, even if the clipboard has since changed. No backend update is required.
 3. The first recognition loads the model (about 10–20 s); after that a recognition takes a few seconds.
 4. Check the overlay (*Image* tab: green = detected skeleton, orange = FFXIV skeleton) and the *3D* tab.
 5. Tune on the *Tuning* tab, read the *Hints* tab, then **Apply** (▶). Use the camera button to match the photo camera,

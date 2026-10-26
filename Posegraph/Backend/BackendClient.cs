@@ -42,15 +42,16 @@ public sealed class BackendClient(Func<int> port) : IDisposable
     public Task ConfigureAsync(Configuration c) => PostAsync("/model/config",
         new Dictionary<string, object> { ["device"] = c.BackendDevice, ["release_after"] = c.ReleaseAfter, ["mhr_on_cpu"] = c.MhrOnCpu });
 
-    public async Task<SessionInfo> CreateSessionAsync(byte[] image, string name)
+    public async Task<SessionInfo> CreateSessionAsync(byte[] image, string name, CancellationToken ct = default)
     {
         using var content = new ByteArrayContent(image);
         content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
-        using var resp = await _http.PostAsync(Url($"/sessions?name={Uri.EscapeDataString(name)}"), content);
-        return (await ReadAsync<SessionInfo>(resp))!;
+        using var resp = await _http.PostAsync(Url($"/sessions?name={Uri.EscapeDataString(name)}"), content, ct);
+        return (await ReadAsync<SessionInfo>(resp, ct))!;
     }
 
-    public Task<byte[]> SessionImageAsync(string sid) => _http.GetByteArrayAsync(Url($"/sessions/{sid}/image"));
+    public Task<byte[]> SessionImageAsync(string sid, CancellationToken ct = default)
+        => _http.GetByteArrayAsync(Url($"/sessions/{sid}/image"), ct);
 
     public async Task<RetargetResult> RetargetAsync(string sid, int person, RetargetParams p, string? reference, string? race,
                                                     bool trustReference = false)
@@ -73,16 +74,16 @@ public sealed class BackendClient(Func<int> port) : IDisposable
     }
 
     /// <summary>非 2xx 时把后端 FastAPI 的 detail 作为异常信息抛出。</summary>
-    private static async Task<T?> ReadAsync<T>(HttpResponseMessage resp)
+    private static async Task<T?> ReadAsync<T>(HttpResponseMessage resp, CancellationToken ct = default)
     {
         if (!resp.IsSuccessStatusCode)
         {
-            var text = await resp.Content.ReadAsStringAsync();
+            var text = await resp.Content.ReadAsStringAsync(ct);
             string detail = text;
             try { detail = JsonDocument.Parse(text).RootElement.GetProperty("detail").ToString(); } catch { }
             throw new InvalidOperationException(Loc.F("后端返回 {0}：{1}", (int)resp.StatusCode, detail));
         }
-        return await resp.Content.ReadFromJsonAsync<T>(Json);
+        return await resp.Content.ReadFromJsonAsync<T>(Json, ct);
     }
 
     public void Dispose() => _http.Dispose();
