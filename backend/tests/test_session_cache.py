@@ -155,7 +155,7 @@ class BatchSessionApiTests(unittest.TestCase):
     def test_more_than_eight_images_remain_selectable_without_reinference(self):
         calls = []
 
-        def estimate(data, hold=False, parallel=False):
+        def estimate(data, hold=False, parallel=False, boxes=None, labels=None):
             calls.append(data)
             marker = len(calls)
             human = HumanEstimate(

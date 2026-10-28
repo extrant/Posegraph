@@ -41,6 +41,15 @@ public sealed partial class MainWindow : Window, IDisposable
         ("wrist", "手腕", "手腕弯曲扭转"),
     ];
 
+    private static readonly (string Key, string Label, string Tip)[] FaceGroups =
+    [
+        ("eyes", "眼睑", "闭眼、睁大、眯眼"),
+        ("brows", "眉毛", "眉头、眉梢的高低和皱眉"),
+        ("mouth", "嘴部", "嘴角、嘴唇、脸颊、鼻翼跟着照片动的幅度（歪嘴、单侧嘴角都在这里）"),
+        ("jaw", "下巴", "张嘴的幅度"),
+        ("gaze", "视线", "眼球转动；侧脸时以看得见的那只眼为准，两眼同向"),
+    ];
+
     private readonly Configuration _config;
     private readonly IDalamudPluginInterface _pi;
     private readonly IClientState _clientState;
@@ -58,6 +67,26 @@ public sealed partial class MainWindow : Window, IDisposable
     /// <summary>打开 / 关闭图库窗口（由 Plugin 接上）。</summary>
     public Action? ToggleLibrary { get; set; }
 
+    /// <summary>打开 / 关闭灯光窗口（由 Plugin 接上）。</summary>
+    public Action? ToggleLighting { get; set; }
+
+    /// <summary>导出游戏表情数据（/posegraph facedump，由 Plugin 接上）。</summary>
+    public Action? DumpFaceData { get; set; }
+
+    /// <summary>打开 / 关闭构图与截图窗口（由 Plugin 接上）。</summary>
+    public Action? ToggleComposition { get; set; }
+
+    /// <summary>当前照片的尺寸（宽、高），构图框按它的比例；没有照片时为 null。</summary>
+    public int[]? PhotoSize => _session?.ImageSize;
+
+    /// <summary>当前照片的预览纹理和识别出的骨架（图片像素坐标），构图窗口叠在游戏画面上当参考。</summary>
+    public IDalamudTextureWrap? PhotoTexture => _session is null ? null : _texture;
+
+    public Segment[]? PhotoSkeleton => _session is null ? null : _result?.Overlay?.Mhr;
+
+    /// <summary>当前选中的角色（null 为 GPose 目标），灯光窗口照它打光。</summary>
+    public int? SelectedActor => _actor;
+
     /// <summary>主窗口关闭时（关闭按钮、指令、退出 GPose 自动关闭）调用：图库、角色列表跟着关（由 Plugin 接上）。</summary>
     public Action? Closed { get; set; }
 
@@ -68,6 +97,7 @@ public sealed partial class MainWindow : Window, IDisposable
 
     // 后端版本信息（读磁盘，2 秒刷新一次）
     private BackendUpdater.VersionInfo? _installedBackend;
+    private BackendUpdater.Component[] _missingComponents = [];
     private int? _packageRuntime;
     private bool _backendOutdated;
     private DateTime _lastVersionCheck = DateTime.MinValue;
@@ -120,8 +150,10 @@ public sealed partial class MainWindow : Window, IDisposable
     private sealed record ActorState(string? Race, string? RaceOverride, bool ResetPending);
 
     // 3D 视图
-    private float _yaw, _pitch = 0.15f, _zoom = 1f;
-    private bool _dragged;
+    private readonly Scene3D _stickView = new(0f, 0.15f, 3.2f);
+    private Vector3? _stickCenter;   // 3D 页上次对准的腰的位置（换图 / 换人时重新对准）
+    private int? _ringAxis;   // 正在拖的旋转环（0 绕左右轴、1 绕竖直轴、2 绕前后轴，同关节偏移的三个分量）
+    private Vector2 _ringTangent;   // 按下时环上那一点沿正方向转的屏幕方向（像素 / 弧度）
     private string? _selected;
 
     private string _statusText = Loc.T("就绪");
@@ -212,6 +244,7 @@ public sealed partial class MainWindow : Window, IDisposable
         _installedBackend = BackendUpdater.Installed(_config.BackendDir);
         _packageRuntime = BackendUpdater.PackageRuntime(_config.BackendDir);
         _backendOutdated = _packageRuntime is not null && BackendUpdater.NeedsUpdate(_config.BackendDir);
+        _missingComponents = _packageRuntime is not null ? BackendUpdater.MissingComponents(_config.BackendDir) : [];
     }
 
     private void PollHealth()
@@ -560,7 +593,11 @@ public sealed partial class MainWindow : Window, IDisposable
     /// <summary>note：识别完成时附在状态后面的提示。</summary>
     private void Recognize(string path, bool force = false, string? note = null)
     {
-        if (_recognizing) return;
+        if (_recognizing)
+        {
+            SetStatus(Loc.T("还在识别上一张，识别完再打开"), Yellow);
+            return;
+        }
         if (!BackendOnline)
         {
             SetError(Loc.T("后端离线：先点右上角电源按钮启动"));
@@ -582,6 +619,9 @@ public sealed partial class MainWindow : Window, IDisposable
                 Interlocked.Exchange(ref _newTexture, tex)?.Dispose();
                 _session = info;
                 _imageSha1 = sha1;
+                _sessionKey = sha1;
+                _mergeSession = false;
+                if (_paint is { } paint) foreach (var p in paint.People) p.Human = null;   // 之前的合并会话作废
                 _person = 0;
                 _result = null;
                 // 这张图在 3D 页保存过修正就恢复；否则用预设（手动偏移只对当前图有意义，不带过来）
@@ -600,6 +640,9 @@ public sealed partial class MainWindow : Window, IDisposable
                           + (fix is not null ? Loc.T("，已恢复保存的修正") : "") + aux
                           + (InLibrary ? "" : Loc.T("；未存入图库（工具栏的文件夹 + 按钮可存入）")) + (note ?? ""), Green);
                 RequestRetarget(_config.PushAfterRecognize);
+                // 合并模式：这张图涂过人就读回来（合并页开着时从识别缓存恢复多人结果）；没涂过时顺带找人提示。
+                // 不等它：找人在 CPU 上可能要排队，等的话这段时间拖进来的图都打不开
+                _ = LoadPaintAsync(path, sha1, info);
             }
             catch (Exception ex)
             {
@@ -680,6 +723,8 @@ public sealed partial class MainWindow : Window, IDisposable
         if (Math.Abs(_params.UprightMaxDeg - d.UprightMaxDeg) > 1e-4f) n++;
         if (_params.Ground != d.Ground) n++;
         if (Math.Abs(_params.HelperStrength - d.HelperStrength) > 1e-4f) n++;
+        if (Math.Abs(_params.FaceHead - d.FaceHead) > 1e-4f) n++;
+        n += FaceGroups.Count(g => Math.Abs(_params.FaceGain(g.Key) - 1f) > 1e-4f);
         return n;
     }
 
@@ -718,7 +763,7 @@ public sealed partial class MainWindow : Window, IDisposable
                 try
                 {
                     result = await _client.RetargetAsync(session.SessionId, _person, _params.Clone(), reference,
-                                                         _raceOverride ?? _detectedRace, trust, _useAux);
+                                                         _raceOverride ?? _detectedRace, trust, _useAux, OnionInputs());
                 }
                 catch (BackendException ex) when (ex.StatusCode == 404 && !restored && _imageSha1 is not null)
                 {
@@ -727,9 +772,9 @@ public sealed partial class MainWindow : Window, IDisposable
                 {
                     // 会话没了（后端重启过，或被批量识别挤出）：从识别缓存恢复后再算
                     restored = true;
-                    if (await Recognition.RestoreAsync(_imageSha1!, session.Name) is not { } info)
+                    if (await Recognition.RestoreAsync(_sessionKey ?? _imageSha1!, session.Name) is not { } info)
                         throw new InvalidOperationException(Loc.T("会话已失效且没有识别缓存，请重新识别"));
-                    if (_auxViews.Length > 0) await Recognition.AttachAuxAsync(info.SessionId, _imageSha1!);   // 融合结果在会话里，跟着丢了
+                    if (_auxViews.Length > 0 && !_mergeSession) await Recognition.AttachAuxAsync(info.SessionId, _imageSha1!);   // 融合结果在会话里，跟着丢了
                     if (session == _session) _session = info;
                     _rtPush |= push;
                     _rtDirty = true;
@@ -801,6 +846,7 @@ public sealed partial class MainWindow : Window, IDisposable
         if (error is null)
         {
             _pushedIndex = (await _applier.IdentifyAsync(_actor))?.Index;
+            RememberPushed(pose);
             SetStatus(status, Green);
         }
         else SetError(error);
@@ -832,7 +878,7 @@ public sealed partial class MainWindow : Window, IDisposable
             SetError(Loc.T("复刻镜头需要 Posegraph HTTP 服务（/posegraph on）"));
             return;
         }
-        SetStatus(Loc.T("复刻镜头中（约 10 秒，画面会跳动）…"), Yellow);
+        SetStatus(Loc.T("复刻镜头中…"), Yellow);
         _ = Run(async () =>
         {
             var r = await _client.CameraAsync(_session.SessionId, _person, _params.Clone(), _actor, _raceOverride ?? _detectedRace, _useAux);
@@ -924,26 +970,34 @@ public sealed partial class MainWindow : Window, IDisposable
         {
             if (Library.AuxCount(sha1) > 0) await Recognition.AttachAuxAsync(info.SessionId, sha1);
             var fix = Library.ReadCorrection(sha1);
-            var p = fix?.Params.Clone() ?? LoadParams(_preset);
-            if (await _applier.IdentifyAsync(actor) is not { } id) return Loc.T("找不到角色");
-            var race = (id.Key == _actorKey ? _raceOverride : _actorStates.GetValueOrDefault(id.Key)?.RaceOverride) ?? id.Race;
-            var trust = _cleanSignatures.Contains(id.Signature);
-            var reference = await _applier.GetPoseAsync(actor);
-            if (reference is not null) _backups.TryAdd(id.Signature, reference);
-            var r = await _client.RetargetAsync(info.SessionId, 0, p, reference, race, trust);
-            if (r.ReferenceStale && !trust && await _applier.ResetPoseAsync(actor))
-            {
-                _cleanSignatures.Add(id.Signature);
-                _backups.Remove(id.Signature);
-                reference = await _applier.GetPoseAsync(actor);
-                r = await _client.RetargetAsync(info.SessionId, 0, p, reference, race, true);
-            }
-            return await _applier.ApplyAsync(actor, r.Pose);
+            return await RetargetAndApplyAsync(actor, info.SessionId, 0, fix?.Params.Clone() ?? LoadParams(_preset));
         }
         finally
         {
             _ = _client.DeleteSessionAsync(info.SessionId).ContinueWith(_ => { });
         }
+    }
+
+    /// <summary>
+    /// 会话里的第 person 个人按参数 p 重定向并应用到角色：骨长按这个角色的游戏姿势；像换种族前残留的 Brio 姿势时先清除再算。
+    /// 返回错误信息，成功为 null（拆分模式、合并模式共用）。
+    /// </summary>
+    private async Task<string?> RetargetAndApplyAsync(int actor, string sid, int person, RetargetParams p)
+    {
+        if (await _applier.IdentifyAsync(actor) is not { } id) return Loc.T("找不到角色");
+        var race = (id.Key == _actorKey ? _raceOverride : _actorStates.GetValueOrDefault(id.Key)?.RaceOverride) ?? id.Race;
+        var trust = _cleanSignatures.Contains(id.Signature);
+        var reference = await _applier.GetPoseAsync(actor);
+        if (reference is not null) _backups.TryAdd(id.Signature, reference);
+        var r = await _client.RetargetAsync(sid, person, p, reference, race, trust);
+        if (r.ReferenceStale && !trust && await _applier.ResetPoseAsync(actor))
+        {
+            _cleanSignatures.Add(id.Signature);
+            _backups.Remove(id.Signature);
+            reference = await _applier.GetPoseAsync(actor);
+            r = await _client.RetargetAsync(sid, person, p, reference, race, true);
+        }
+        return await _applier.ApplyAsync(actor, r.Pose);
     }
 
     /// <summary>主窗口当前打开的图（角色列表里「用主窗口当前的图」）。</summary>
@@ -1030,6 +1084,8 @@ public sealed partial class MainWindow : Window, IDisposable
 
         DrawStatusBar();
         DrawToolbar();
+        PollBrioEdits();
+        DrawBrioEditsBanner();
 
         // 底栏：按钮一行 + 状态文字（按宽度换行，最多占四行）
         var statusH = ImGui.CalcTextSize(_statusText, false, ImGui.GetContentRegionAvail().X).Y;
@@ -1088,6 +1144,12 @@ public sealed partial class MainWindow : Window, IDisposable
         if (IconButton("##split", FontAwesomeIcon.Users, Loc.T("角色列表（拆分模式）：多个角色各绑一张图，一起应用"), ToggleSplit is not null))
             ToggleSplit!();
         ImGui.SameLine();
+        if (IconButton("##lighting", FontAwesomeIcon.Lightbulb, Loc.T("灯光：一键给当前角色打光，跟着脸和镜头摆"), ToggleLighting is not null))
+            ToggleLighting!();
+        ImGui.SameLine();
+        if (IconButton("##composition", FontAwesomeIcon.CropAlt, Loc.T("构图与截图：构图框、等效焦距、一键截图"), ToggleComposition is not null))
+            ToggleComposition!();
+        ImGui.SameLine();
         IconButton("##video", FontAwesomeIcon.Film, Loc.T("视频逐帧（预留）"), false);
         if (_recognizing || _rtBusy)
         {
@@ -1111,25 +1173,23 @@ public sealed partial class MainWindow : Window, IDisposable
         if (ImGui.IsItemHovered()) ImGui.SetTooltip(Loc.T("要摆姿势的角色"));
         ImGui.SameLine();
 
-        // 多人（预留）：目前整图按一个人识别
+        // 多人（合并模式）：编号与图像页的人物框、角色列表一致；切换时换成这个人的调整值和对应角色
         var humans = _session?.Humans.Length ?? 0;
         using (ImRaii.Disabled(humans <= 1))
         {
-            var personLabel = humans <= 1 ? Loc.T("1 人") : Loc.F("第 {0} 人", _person + 1);
+            var personLabel = humans <= 1 ? Loc.T("1 人") : Loc.F("第 {0} 人", PersonNumber(_person));
             ImGui.SetNextItemWidth(row * 0.2f);
             if (ImGui.BeginCombo("##person", UiText.ComboPreview(personLabel, row * 0.2f)))
             {
                 for (var i = 0; i < humans; i++)
-                    if (ImGui.Selectable(Loc.F("第 {0} 人", i + 1), _person == i))
-                    {
-                        _person = i;
-                        RequestRetarget(false);
-                    }
+                    if (ImGui.Selectable(Loc.F("第 {0} 人", PersonNumber(i)), _person == i) && i != _person)
+                        SwitchPerson(i);
                 ImGui.EndCombo();
             }
         }
         if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
-            ImGui.SetTooltip(Loc.T("图中人物（多人识别预留，目前整图按一个人处理）"));
+            ImGui.SetTooltip(humans <= 1 ? Loc.T("图中人物：一张图有多个人时，在角色列表的「合并」页找人并识别")
+                                         : Loc.T("切换编辑图中的第几个人（各人的调整值分开保存，切换时也切到这个人对应的角色）"));
         ImGui.SameLine();
         ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X);
         DrawRaceCombo();
@@ -1238,6 +1298,7 @@ public sealed partial class MainWindow : Window, IDisposable
             _config.ShowFfxivOverlay = showFf;
             _pi.SavePluginConfig(_config);
         }
+        DrawMergeHint();
 
         var avail = ImGui.GetContentRegionAvail();
         if (_texture is null || _session is null)
@@ -1256,7 +1317,10 @@ public sealed partial class MainWindow : Window, IDisposable
         ImGui.SetCursorScreenPos(origin);
         ImGui.InvisibleButton("##imageDrop", size);
         DropTarget();
+        DrawPeopleBoxes(origin, scale);
 
+        // 合并页开着、还没按人物框识别：整张图当一个人的骨架没有意义，不画
+        if (MergeEditing && !_mergeSession) return;
         if (_result?.Overlay is not { } ov) return;
         var dl = ImGui.GetWindowDrawList();
         if (showMhr) DrawSegments(dl, ov.Mhr, origin, scale, MhrGreen);
@@ -1347,10 +1411,18 @@ public sealed partial class MainWindow : Window, IDisposable
             _selectTab = 0;
     }
 
+    /// <summary>图库里拖出来的图（由 Plugin 接上）。</summary>
+    public Func<string[]>? LibraryDragged { get; set; }
+
+    /// <summary>系统拖来的图片 / 文件夹，或从图库拖来的图（打开第一张）。</summary>
     private void DropTarget()
     {
         if (_dragDrop.CreateImGuiTarget(DragLabel, out var files, out var dirs))
             OpenDropped(files, dirs);
+        if (!ImGui.BeginDragDropTarget()) return;
+        var payload = ImGui.AcceptDragDropPayload(LibraryWindow.InternalDragLabel, ImGuiDragDropFlags.None);
+        if (!payload.IsNull && LibraryDragged?.Invoke().FirstOrDefault(ImageLibrary.IsImage) is { } path) OpenImage(path);
+        ImGui.EndDragDropTarget();
     }
 
     // ---------------- 3D 火柴人
@@ -1370,6 +1442,117 @@ public sealed partial class MainWindow : Window, IDisposable
     }
 
     /// <summary>把当前的修正（预设、幅度、手动关节偏移等调整参数）存进这张图的识别缓存，下次打开这张图自动恢复。</summary>
+    // 面捕：按（会话，人物）取一次
+    private (string Sid, int Person)? _faceKey;
+    private FaceResult? _face;
+    private string? _faceError;
+
+    /// <summary>
+    /// 调整页的「面部表情」：后端用 MediaPipe 找脸得到的表情系数和置信度，置信度过低的不用。
+    /// 还没换算到 FF14 的脸部骨骼（要等表情采样，见 docs/face-sampling.md），先只显示识别结果。
+    /// </summary>
+    private void DrawFaceSection()
+    {
+        if (_session is not { } session) return;
+        if (!ImGui.CollapsingHeader(Loc.T("面部表情（测试）"))) return;
+        var key = (Sid: session.SessionId, Person: _person);
+        if (_faceKey != key)
+        {
+            (_faceKey, _face, _faceError) = (key, null, null);
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    var face = await _client.FaceAsync(key.Sid, key.Person);
+                    if (_faceKey == key) _face = face;
+                }
+                catch (Exception ex)
+                {
+                    if (_faceKey == key) _faceError = ex.Message;
+                }
+            });
+        }
+        if (_faceError is { } error) { ImGui.TextColored(Red, error); return; }
+        if (_face is not { } f) { ImGui.TextDisabled(Loc.T("正在找脸…")); return; }
+        if (!f.Available) { ImGui.TextColored(Yellow, f.Reason); return; }
+
+        var color = f.Used ? Green : Yellow;
+        ImGui.TextColored(color, Loc.F("置信度 {0:0%}", f.Confidence));
+        ImGui.SameLine();
+        ImGui.TextDisabled(f.Used ? Loc.T("可用") : Loc.F("不用：{0}", f.Reason));
+        DrawFaceApply(f.Used);
+        DrawFaceHead();
+        if (!f.Found) return;
+        ImGui.TextDisabled(Loc.F("头部朝向：左右 {0:0}°，上下 {1:0}°", f.YawDeg, f.PitchDeg));
+        var width = ImGui.GetContentRegionAvail().X;
+        foreach (var (name, value) in f.Blendshapes.OrderByDescending(kv => kv.Value).Take(8))
+        {
+            ImGui.ProgressBar(value, new Vector2(width, 0), $"{name}  {value:0.00}");
+        }
+    }
+
+    /// <summary>「套用到角色」：重定向时把照片表情换算成脸部骨骼一起应用；强度；结果（用的骨架 / 没套上的原因）。</summary>
+    private void DrawFaceApply(bool usable)
+    {
+        var apply = _params.Face;
+        using (ImRaii.Disabled(!usable && !apply))
+            if (ImGui.Checkbox(Loc.T("套用到角色"), ref apply))
+            {
+                _params.Face = apply;
+                RequestRetarget(_config.PushOnRelease);
+            }
+        ItemTip(Loc.T("把照片里的表情换算成游戏的脸部骨骼，和姿势一起应用。\n以中性脸为底换算，重复应用不会越叠越多；关掉后脸部骨骼不再改动（保持当前的样子）"));
+        if (!apply) return;
+        ImGui.SameLine();
+        var strength = _params.FaceStrength;
+        ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X - ImGui.CalcTextSize(Loc.T("强度")).X - ImGui.GetStyle().ItemInnerSpacing.X * 2);
+        if (ImGui.SliderFloat(Loc.T("强度"), ref strength, 0f, 2f, "%.2f")) _params.FaceStrength = strength;
+        if (ImGui.IsItemDeactivatedAfterEdit()) RequestRetarget(_config.PushOnRelease);
+        ItemTip(Loc.T("所有表情的幅度倍数：照片表情不明显时调大，夸张时调小"));
+        // 分项权重默认展开、用强调色：哪一块不像就单独调哪一块，比整体强度好用（用户特别要求突出）
+        ImGui.SetNextItemOpen(true, ImGuiCond.FirstUseEver);
+        bool open;
+        using (ImRaii.PushColor(ImGuiCol.Text, Blue))
+            open = ImGui.TreeNode(Loc.T("分项权重（推荐）：哪一块不像就单独调哪一块") + "###faceGains");
+        if (open)
+        {
+            foreach (var (key, label, tip) in FaceGroups)
+            {
+                var v = _params.FaceGain(key);
+                var before = v;
+                Slider($"{Loc.T(label)}##face{key}", ref v, 0, 2, "%.2f", 1, Loc.T(tip) + Loc.T("\n和上面的强度相乘；再大也不会超过游戏里这块能动的范围"));
+                if (v != before) _params.FaceGains[key] = v;
+            }
+            ImGui.TreePop();
+        }
+        if (_result?.Face is not { } info) return;
+        if (info.Applied)
+        {
+            var top = info.Channels?.OrderByDescending(kv => kv.Value).Take(4).Select(kv => $"{kv.Key} {kv.Value:0.00}") ?? [];
+            ImGui.TextDisabled(Loc.F("已套用（面部骨架 {0}）", info.Skeleton ?? "?") + (top.Any() ? "：" + string.Join("，", top) : Loc.T("：照片是无表情")));
+            return;
+        }
+        ImGui.TextColored(Yellow, info.Reason);
+        if (info.NeedsDump && DumpFaceData is not null)
+        {
+            ImGui.SameLine();
+            if (ImGui.SmallButton(Loc.T("导出游戏表情数据")))
+                DumpFaceData();
+            ItemTip(Loc.T("从游戏文件里导出各种族的表情动画（一两分钟，只需一次），导出后点「应用」重新套用"));
+        }
+    }
+
+    /// <summary>头部朝向跟面捕的脸走多少；不开表情也生效。下面显示脸和识别的头差多少度。</summary>
+    private void DrawFaceHead()
+    {
+        var w = _params.FaceHead;
+        Slider(Loc.T("头部跟脸##facehead"), ref w, 0, 1, "%.2f", 0.5f,
+               Loc.T("用面捕的脸部朝向修正头的朝向：整身识别时头只占很小一块，面捕专看脸，低头、侧脸的角度更准。\n0 = 只用整身识别的头，1 = 完全按脸；和识别差太多（45° 以上，多半认错了脸）时不改。不开表情也生效"));
+        _params.FaceHead = w;
+        if (_result?.HeadFromFaceDeg is { } diff && w > 0)
+            ImGui.TextDisabled(diff > 45 ? Loc.F("脸和识别的头差 {0:0}°，太多了，没改", diff) : Loc.F("脸和识别的头差 {0:0}°，已按权重修正", diff));
+    }
+
     private void DrawCorrectionBar()
     {
         var sha1 = _imageSha1;
@@ -1419,83 +1602,82 @@ public sealed partial class MainWindow : Window, IDisposable
         // 下方面板：没选关节时是一行勾选框（按控件行高留，按文字行高会被切掉一截）
         var panel = _selected is null ? ImGui.GetFrameHeightWithSpacing() : ImGui.GetFrameHeightWithSpacing() * 4 + 4;
         var size = new Vector2(avail.X, Math.Max(140, avail.Y - panel));
-        var origin = ImGui.GetCursorScreenPos();
-        ImGui.InvisibleButton("##stick", size);
         var io = ImGui.GetIO();
-        if (ImGui.IsItemActive() && ImGui.IsMouseDragging(ImGuiMouseButton.Left, 3))
-        {
-            _yaw += io.MouseDelta.X * 0.01f;
-            _pitch = Math.Clamp(_pitch + io.MouseDelta.Y * 0.01f, -1.5f, 1.5f);
-            _dragged = true;
-        }
-        if (ImGui.IsItemHovered() && io.MouseWheel != 0)
-            _zoom = Math.Clamp(_zoom * (1 + io.MouseWheel * 0.1f), 0.3f, 5f);
-        if (ImGui.IsItemHovered()) ImGui.SetTooltip(Loc.T("拖动旋转，滚轮缩放，点击关节选中；双击复位视角"));
-        if (ImGui.IsItemHovered() && ImGui.IsMouseDoubleClicked(ImGuiMouseButton.Left))
-            (_yaw, _pitch, _zoom) = (0, 0.15f, 1);
-
         var joints = stick.Joints.ToDictionary(j => j.Name);
         var center = joints.TryGetValue("j_kosi", out var hip) ? ToVec(hip.Pos) : Vector3.Zero;
-        var scale = size.Y / 2.1f * _zoom;
-        var mid = origin + size / 2;
-        Vector2 Project(Vector3 p)
+        // 换了图 / 人后把视图中心放回腰上（平移过的保留）
+        if (_stickCenter is not { } lastCenter || Vector3.Distance(lastCenter, center) > 0.3f)
         {
-            p -= center;
-            var (sy, cy) = MathF.SinCos(_yaw);
-            var (sp, cp) = MathF.SinCos(_pitch);
-            var x = p.X * cy + p.Z * sy;
-            var z = -p.X * sy + p.Z * cy;
-            var y = p.Y * cp - z * sp;
-            // 从角色正前方看：模型 +x（角色左侧）在屏幕右侧
-            return mid + new Vector2(x, -y) * scale;
+            _stickView.Target = center;
+            _stickCenter = center;
         }
+        _stickView.Begin("##stick", size);
+        var view = _stickView;
+        Vector2 Project(Vector3 p) => view.Project(p) ?? new Vector2(-1e5f);
+        // 朝向观察者的深度（正 = 离观察者更近），旋转环背面画淡一些
+        float Depth(Vector3 p) => -view.Depth(p);
 
-        if (ImGui.IsItemDeactivated())
+        // 旋转环（Brio 式）：选中关节上画三个环，按住环拖动就绕那根轴转（改的就是下面三个滑条的偏移）
+        var ringJoint = _selected is { } sel && joints.TryGetValue(sel, out var sj) ? ToVec(sj.Pos) : (Vector3?)null;
+        var ringRadius = ringJoint is { } rj ? RingPixels * ImGuiHelpers.GlobalScale / view.PixelsPerMeter(rj) : 0f;
+        var hoverRing = ringJoint is { } rc && _ringAxis is null && view.Hovered
+            ? HitRing(rc, ringRadius, ImGui.GetMousePos(), Project, Depth) : null;
+        if (view.Activated && hoverRing is { } ringHit)
+            (_ringAxis, _ringTangent) = (ringHit.Axis, ringHit.Tangent);
+        if (_ringAxis is { } axis && view.Active && _selected is { } ringBone)
         {
-            if (!_dragged)
+            if (io.MouseDelta != Vector2.Zero)
             {
-                var mouse = ImGui.GetMousePos();
-                var hit = stick.Joints.Select(j => (j.Name, D: Vector2.Distance(Project(ToVec(j.Pos)), mouse)))
-                    .Where(t => t.D < 10).OrderBy(t => t.D).Select(t => t.Name).FirstOrDefault();
-                _selected = hit;
+                var off = _params.Offsets.TryGetValue(ringBone, out var cur) ? (float[])cur.Clone() : new float[3];
+                var degrees = Vector2.Dot(io.MouseDelta, _ringTangent) / _ringTangent.LengthSquared() * 180f / MathF.PI;
+                off[axis] = Math.Clamp(off[axis] + degrees, -180f, 180f);
+                _params.Offsets[ringBone] = off;
+                RequestRetarget(false);
             }
-            _dragged = false;
+            view.Grab = true;
         }
+        if (view.Hovered && _ringAxis is null)
+            ImGui.SetTooltip(hoverRing is { } h
+                ? Loc.F("按住拖动：{0}", RingAxisNames[h.Axis])
+                : Loc.T("左键拖动旋转，右键 / 中键拖动平移，滚轮缩放，点击关节选中；双击复位视角\n选中关节后拖它上面的彩色环直接转动"));
 
-        var dl = ImGui.GetWindowDrawList();
-        dl.PushClipRect(origin, origin + size, true);
-        dl.AddRectFilled(origin, origin + size, ImGui.GetColorU32(new Vector4(0.08f, 0.08f, 0.1f, 0.85f)), 4);
+        var dl = view.DrawList;
 
         // 地面网格与朝向
         var floor = stick.Joints.Min(j => j.Pos[1]);
-        var grid = ImGui.GetColorU32(new Vector4(1, 1, 1, 0.12f));
-        for (var i = -3; i <= 3; i++)
-        {
-            var t = i * 0.25f;
-            dl.AddLine(Project(new Vector3(center.X + t, floor, center.Z - 0.75f)), Project(new Vector3(center.X + t, floor, center.Z + 0.75f)), grid);
-            dl.AddLine(Project(new Vector3(center.X - 0.75f, floor, center.Z + t)), Project(new Vector3(center.X + 0.75f, floor, center.Z + t)), grid);
-        }
-        var front = Project(new Vector3(center.X, floor, center.Z + 0.6f));
-        dl.AddLine(Project(new Vector3(center.X, floor, center.Z)), front, ImGui.GetColorU32(new Vector4(1, 1, 1, 0.35f)), 2);
-        dl.AddText(front, ImGui.GetColorU32(new Vector4(1, 1, 1, 0.5f)), Loc.T("前"));
+        view.Grid(new Vector3(center.X, floor, center.Z), 0.75f, 0.25f, new Vector4(1, 1, 1, 0.12f));
+        var front = new Vector3(center.X, floor, center.Z + 0.6f);
+        view.Line(new Vector3(center.X, floor, center.Z), front, new Vector4(1, 1, 1, 0.35f), 2);
+        view.Text(front, Loc.T("前"), new Vector4(1, 1, 1, 0.5f));
+
+        // 洋葱皮：其他人的骨架（半透明，颜色和人物列表一致），只看不能选
+        if (_mergeSession && _config.ShowOnion && _result.Onion is { } onion)
+            foreach (var other in onion)
+            {
+                var number = PersonNumber(other.Person) - 1;
+                var oc = PersonColor(number) with { W = 0.4f };
+                var byName = other.Joints.ToDictionary(j => j.Name);
+                foreach (var j in other.Joints)
+                    if (j.Parent is { } parentName && byName.TryGetValue(parentName, out var op))
+                        view.Line(ToVec(op.Pos), ToVec(j.Pos), oc, 2);
+                if (byName.TryGetValue("j_kao", out var head))
+                    view.Text(ToVec(head.Pos), (number + 1).ToString(), oc, new Vector2(6, -6));
+            }
 
         if (_config.ShowMhrInStick)
-        {
-            var mc = ImGui.GetColorU32(MhrGreen with { W = 0.6f });
             foreach (var s in stick.Mhr)
-                dl.AddLine(Project(new Vector3(s.A[0], s.A[1], s.A[2])), Project(new Vector3(s.B[0], s.B[1], s.B[2])), mc, 1.5f);
-        }
+                view.Line(new Vector3(s.A[0], s.A[1], s.A[2]), new Vector3(s.B[0], s.B[1], s.B[2]), MhrGreen with { W = 0.6f }, 1.5f);
 
         var severity = _result.Severity;
         foreach (var j in stick.Joints)
         {
             if (j.Parent is null || !joints.TryGetValue(j.Parent, out var parent)) continue;
             var color = j.Name.EndsWith("_l") ? Orange : j.Name.EndsWith("_r") ? new Vector4(0.35f, 0.65f, 1f, 1) : new Vector4(0.9f, 0.9f, 0.9f, 1);
-            dl.AddLine(Project(ToVec(parent.Pos)), Project(ToVec(j.Pos)), ImGui.GetColorU32(color), 3);
+            view.Line(ToVec(parent.Pos), ToVec(j.Pos), color, 3);
         }
         foreach (var j in stick.Joints)
         {
-            var p = Project(ToVec(j.Pos));
+            if (view.Project(ToVec(j.Pos)) is not { } p) continue;
             var level = severity.GetValueOrDefault(j.Name);
             var color = level == "bad" ? Red : level == "warn" ? Yellow : new Vector4(0.85f, 0.85f, 0.85f, 1);
             var radius = level is null ? 3f : 5f;
@@ -1505,12 +1687,96 @@ public sealed partial class MainWindow : Window, IDisposable
             if (j.Name == _selected)
                 dl.AddCircle(p, radius + 5, ImGui.GetColorU32(new Vector4(0.3f, 0.9f, 1f, 1)), 0, 2);
         }
-        dl.PopClipRect();
+        if (ringJoint is { } ring)
+            DrawRings(dl, ring, ringRadius, _ringAxis ?? hoverRing?.Axis, Project, Depth);
+
+        if (view.Deactivated)
+        {
+            if (_ringAxis is not null)
+            {
+                _ringAxis = null;
+                RequestRetarget(_config.PushOnRelease);
+            }
+            else if (!view.Dragged)
+            {
+                var mouse = ImGui.GetMousePos();
+                _selected = stick.Joints.Select(j => (j.Name, D: Vector2.Distance(Project(ToVec(j.Pos)), mouse)))
+                    .Where(t => t.D < 10).OrderBy(t => t.D).Select(t => t.Name).FirstOrDefault();
+            }
+        }
+        view.End();
 
         DrawJointPanel();
     }
 
     private static Vector3 ToVec(float[] p) => new(p[0], p[1], p[2]);
+
+    private const float RingPixels = 55f;   // 旋转环在屏幕上的半径
+    private const int RingSegments = 48;
+
+    private static readonly Vector4[] RingColors =
+        [new(0.95f, 0.35f, 0.35f, 1), new(0.4f, 0.9f, 0.4f, 1), new(0.35f, 0.6f, 1f, 1)];
+
+    private static string[] RingAxisNames => [Loc.T("前后俯仰（绕左右轴）"), Loc.T("水平转（绕竖直轴）"), Loc.T("侧倾（绕前后轴）")];
+
+    /// <summary>绕 axis 号轴（模型系 x / y / z）的环上第 k 个点。</summary>
+    private static Vector3 RingPoint(Vector3 c, float r, int axis, int k)
+    {
+        var (s, co) = MathF.SinCos(k * 2 * MathF.PI / RingSegments);
+        return axis switch
+        {
+            0 => c + r * new Vector3(0, co, s),
+            1 => c + r * new Vector3(s, 0, co),
+            _ => c + r * new Vector3(co, s, 0),
+        };
+    }
+
+    private static Vector3 AxisVector(int axis) => axis == 0 ? Vector3.UnitX : axis == 1 ? Vector3.UnitY : Vector3.UnitZ;
+
+    /// <summary>鼠标离哪个环最近（8 像素内，前半圈优先）；同时给出那一点按右手定则正向转动时在屏幕上的方向（每弧度多少像素）。</summary>
+    private static (int Axis, Vector2 Tangent)? HitRing(Vector3 c, float r, Vector2 mouse, Func<Vector3, Vector2> project, Func<Vector3, float> depth)
+    {
+        (int Axis, Vector2 Tangent)? best = null;
+        var bestScore = 8f;
+        for (var axis = 0; axis < 3; axis++)
+            for (var k = 0; k < RingSegments; k++)
+            {
+                var p = RingPoint(c, r, axis, k);
+                var q = RingPoint(c, r, axis, k + 1);
+                var a = project(p);
+                var b = project(q);
+                var ab = b - a;
+                var t = ab.LengthSquared() < 1e-6f ? 0 : Math.Clamp(Vector2.Dot(mouse - a, ab) / ab.LengthSquared(), 0, 1);
+                var d = Vector2.Distance(mouse, a + ab * t);
+                var score = d + (depth(p) < depth(c) ? 3f : 0f);
+                if (score >= bestScore) continue;
+                // 正向转动的切线：axis × (p - c)，投到屏幕；步长取小量再按弧度归一
+                var tangent3 = Vector3.Cross(AxisVector(axis), p - c);
+                var tangent = (project(p + tangent3 * 0.01f) - project(p)) / 0.01f;
+                if (tangent.LengthSquared() < 1e-4f) continue;   // 环正好侧对屏幕的那一点拖不动
+                bestScore = score;
+                best = (axis, tangent);
+            }
+        return best;
+    }
+
+    private static void DrawRings(ImDrawListPtr dl, Vector3 c, float r, int? active, Func<Vector3, Vector2> project, Func<Vector3, float> depth)
+    {
+        var front = depth(c);
+        for (var axis = 0; axis < 3; axis++)
+        {
+            var color = RingColors[axis];
+            var width = active == axis ? 3.5f : 2f;
+            for (var k = 0; k < RingSegments; k++)
+            {
+                var p = RingPoint(c, r, axis, k);
+                var q = RingPoint(c, r, axis, k + 1);
+                var back = depth((p + q) / 2) < front;
+                var alpha = active == axis ? 1f : back ? 0.25f : 0.85f;
+                dl.AddLine(project(p), project(q), ImGui.GetColorU32(color with { W = alpha }), width);
+            }
+        }
+    }
 
     private void DrawJointPanel()
     {
@@ -1521,6 +1787,18 @@ public sealed partial class MainWindow : Window, IDisposable
             {
                 _config.ShowMhrInStick = mhr;
                 _pi.SavePluginConfig(_config);
+            }
+            if (_mergeSession)
+            {
+                ImGui.SameLine();
+                var onion = _config.ShowOnion;
+                if (ImGui.Checkbox(Loc.T("洋葱皮"), ref onion))
+                {
+                    _config.ShowOnion = onion;
+                    _pi.SavePluginConfig(_config);
+                    RequestRetarget(false);
+                }
+                ItemTip(Loc.T("叠加其他人的骨架（半透明），按复刻站位摆在相对位置，方便对着别人调"));
             }
             ImGui.SameLine();
             ImGui.TextDisabled(Loc.T("黄/红点：超出游戏常见范围"));
@@ -1571,7 +1849,7 @@ public sealed partial class MainWindow : Window, IDisposable
 
     private static void ItemTip(string tip)
     {
-        if (ImGui.IsItemHovered()) ImGui.SetTooltip(tip);
+        if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled)) ImGui.SetTooltip(tip);
     }
 
     // ---------------- 调整页
@@ -1603,17 +1881,19 @@ public sealed partial class MainWindow : Window, IDisposable
 
     // 调整页滑杆的标签列宽（每帧按当前语言算一次）
     private float _sliderLabelW;
-    private static readonly string[] SliderLabels = ["强度##hand", "完全生效##near", "不再生效##far", "校正上限##upmax", "联动强度##helper"];
+    private static readonly string[] SliderLabels = ["头部跟脸##facehead", "强度##hand", "完全生效##near", "不再生效##far", "校正上限##upmax", "联动强度##helper",
+                                                     "俯仰##rootx", "水平转##rooty", "侧倾##rootz", "左右##offx", "上下##offy", "前后##offz"];
 
     private void DrawTuningTab()
     {
-        _sliderLabelW = AmplitudeGroups.Select(g => g.Label).Concat(SliderLabels)
+        _sliderLabelW = AmplitudeGroups.Select(g => g.Label).Concat(FaceGroups.Select(g => g.Label)).Concat(SliderLabels)
                                        .Max(l => ImGui.CalcTextSize(Loc.T(l).Split("##")[0]).X) + ImGui.GetStyle().ItemInnerSpacing.X;
         if (_session is not null)
         {
             DrawCorrectionBar();
             ImGui.Separator();
         }
+        DrawFaceSection();
         ImGui.SetNextItemWidth(110 * ImGuiHelpers.GlobalScale);
         var presetLabel = _preset == "illustration" ? Loc.T("插画") : Loc.T("照片");
         if (ImGui.BeginCombo("##preset", presetLabel))
@@ -1640,6 +1920,23 @@ public sealed partial class MainWindow : Window, IDisposable
             RequestRetarget(_config.PushOnRelease);
         }
 
+        if (ImGui.CollapsingHeader(Loc.T("整体旋转 / 位移"), ImGuiTreeNodeFlags.DefaultOpen))
+        {
+            // 整个角色绕髋部转、整体挪动（模型系）；人歪了、要抬高放低时用，复刻站位不会抵消
+            string[] rot = ["俯仰##rootx", "水平转##rooty", "侧倾##rootz"];
+            string[] rotTips = ["整个人前后倾（绕左右轴）", "整个人原地转向（绕竖直轴）", "整个人左右歪（绕前后轴）"];
+            float[] rotMax = [90, 180, 90];
+            for (var i = 0; i < 3; i++)
+                Slider(Loc.T(rot[i]), ref _params.RootRotation[i], -rotMax[i], rotMax[i], "%.0f°", 0, Loc.T(rotTips[i]));
+            string[] off = ["左右##offx", "上下##offy", "前后##offz"];
+            string[] offTips = ["整个人左右挪（角色自己的左右）", "整个人抬高 / 放低（坐在椅子上、抬起来的人）", "整个人前后挪（角色自己的前后）"];
+            for (var i = 0; i < 3; i++)
+            {
+                var cm = _params.RootOffset[i] * 100;
+                Slider(Loc.T(off[i]), ref cm, -100, 100, "%.0f cm", 0, Loc.T(offTips[i]));
+                _params.RootOffset[i] = cm / 100;
+            }
+        }
         if (ImGui.CollapsingHeader(Loc.T("幅度"), ImGuiTreeNodeFlags.DefaultOpen))
         {
             foreach (var (key, label, tip) in AmplitudeGroups)
@@ -1897,10 +2194,15 @@ public sealed partial class MainWindow : Window, IDisposable
         else if (_backendOutdated)
         {
             if (IconButton("##updateBackend", FontAwesomeIcon.CloudDownloadAlt,
-                           Loc.T("从 GitHub 下载同版本的后端源码（不到 1MB），只替换 backend\\src，Python、依赖和模型不动。会先停止后端，更新后自动启动")))
+                           Loc.T("从 GitHub 下载同版本的后端源码替换 backend\\src；新功能要的组件（面捕、深度图的 Python 包和模型）缺哪个补哪个，不用重新下载整个一键包。会先停止后端，更新后自动启动")))
                 UpdateBackend();
             ImGui.SameLine();
             ImGui.TextColored(Yellow, Loc.F("可更新到 {0}", BackendUpdater.PluginTag));
+            if (_missingComponents.Length > 0)
+                Wrapped(Loc.F("还缺组件：{0}（共约 {1:0} MB，更新时一起下载）", string.Join("、", _missingComponents.Select(c => c.Label)),
+                              _missingComponents.Sum(c => c.Size) / 1048576.0), Yellow);
+            else
+                Wrapped(Loc.T("这次更新会补齐新功能要的组件（面捕约 64 MB、深度图约 400 MB），已经有的不会重下"), ImGui.GetStyle().Colors[(int)ImGuiCol.TextDisabled]);
         }
         else
             ImGui.TextColored(Green, Loc.T("已是最新"));
@@ -1960,8 +2262,13 @@ public sealed partial class MainWindow : Window, IDisposable
             ImGui.EndCombo();
         }
         ItemTip(Loc.T("释放后显存/内存归还给游戏，下次识别重新加载（约 5~10 秒）。\nGPU 模式用过一次后，CUDA 运行时会常驻少量显存，直到后端退出"));
-        using (ImRaii.Disabled(_config.BackendDevice == "cpu"))
-            changed |= Check(Loc.T("GPU 模式下 MHR 放 CPU"), _config.MhrOnCpu, v => _config.MhrOnCpu = v, Loc.T("显存约省 750MB，结果一致，每张约慢 0.5 秒"));
+        // 快速识别删掉了 MHR 的修正形变权重，剩约 29MB，直接放显卡：这一项不再起作用
+        using (ImRaii.Disabled(_config.BackendDevice == "cpu" || _config.FastRecognition))
+            changed |= Check(Loc.T("GPU 模式下 MHR 放 CPU"), _config.MhrOnCpu, v => _config.MhrOnCpu = v,
+                             _config.FastRecognition ? Loc.T("快速识别开着时 MHR 只有约 29MB，直接放显卡，这一项不起作用")
+                                                     : Loc.T("显存约省 750MB，结果一致，每张约慢 0.5 秒"));
+        changed |= Check(Loc.T("快速识别"), _config.FastRecognition, v => _config.FastRecognition = v, Loc.T("移植自 Fast SAM 3D Body：左右手合成一批识别，MHR 不算修正形变（只影响网格表面，骨架不变）。\nRTX 4060 笔记本实测：单人每张约 1.3 秒 → 0.6 秒，两人约 1.7 秒 → 0.8 秒；显存多约 0.1GB，内存少约 0.6GB。\n和关掉时的结果差别：关节平均约 3mm、画面上约 3px，肉眼基本看不出。CPU 模式只快约 10%。\n改了要重新加载模型；已识别过的图片读的是缓存"));
+        changed |= Check(Loc.T("深度辅助识别"), _config.UseDepth, v => _config.UseDepth = v, Loc.T("用 MoGe 估照片的深度：镜头焦距更准、多人时按前后关系修正遮罩和远近、看得见地面时按地面扶正（斜拍、俯拍更稳）。\n代价（RTX 4060 笔记本实测）：单人每张多约 0.5 秒，「识别后立即释放」时含重新加载约多 2 秒；多人带遮罩时遮罩改动大还会再识别一遍，最多多约 6 秒；显存峰值多约 1.3GB，内存多约 2GB。\nCPU 模式每张多约 10～20 秒。\n已识别过的图片读的是缓存，改了要点「重新识别」才看得到区别"));
         changed |= DrawRecognitionConcurrencySettings();
         return changed;
     }

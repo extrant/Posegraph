@@ -1,6 +1,6 @@
 [project]
 name = "posegraph"
-version = "0.4.0"
+version = "0.5.0"
 description = "Posegraph backend: image -> 3D human pose -> FFXIV Brio pose"
 requires-python = ">=3.11,<3.12"
 dependencies = [
@@ -34,6 +34,17 @@ sam3d = [
     "tqdm",
 ]
 
+# 面捕（face.py，可选）：mediapipe 默认依赖 opencv-contrib-python，和 opencv-python 冲突，
+# 所以用 pip install --no-deps mediapipe 再装这里其余几个；模型 face_landmarker.task 放 checkpoints/face/
+face = [
+    "absl-py",
+    "flatbuffers",
+]
+
+# 深度（depth.py，合并模式）：MoGe 依赖 numpy>=2 / opencv-python-headless，和本项目的 opencv-python 冲突，
+# 用 pip install --no-deps git+https://github.com/microsoft/MoGe.git 加上 MoGe pyproject 里固定版本的 utils3d_moge、pipeline；
+# 模型 Ruicheng/moge-2-vitb-normal 的 model.pt 放 checkpoints/moge/
+
 [build-system]
 requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
@@ -42,5 +53,5 @@ build-backend = "setuptools.build_meta"
 where = ["src"]
 
 [tool.setuptools.package-data]
-"posegraph" = ["version.json"]
+"posegraph" = ["version.json", "components.json", "data/*.npy"]
 "posegraph.retarget" = ["data/*.json"]

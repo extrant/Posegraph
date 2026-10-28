@@ -315,6 +315,29 @@ public sealed class ImageLibrary
         lock (_lock) _cached!.Remove(sha1);
     }
 
+    // ------------------------------------------------------------------ 每张图涂的人（合并模式，MaskDocument.Save）
+
+    private string PaintPath(string sha1) => System.IO.Path.Combine(CacheDir, sha1 + ".paint");
+
+    public byte[]? ReadPaint(string sha1)
+    {
+        try { return File.Exists(PaintPath(sha1)) ? File.ReadAllBytes(PaintPath(sha1)) : null; }
+        catch { return null; }
+    }
+
+    public void WritePaint(string sha1, byte[] data)
+    {
+        Directory.CreateDirectory(CacheDir);
+        var tmp = $"{PaintPath(sha1)}.{Guid.NewGuid():N}.tmp";
+        File.WriteAllBytes(tmp, data);
+        File.Move(tmp, PaintPath(sha1), true);
+    }
+
+    public void DeletePaint(string sha1)
+    {
+        try { File.Delete(PaintPath(sha1)); } catch { }
+    }
+
     // ------------------------------------------------------------------ 每张图保存的修正
 
     private string FixPath(string sha1) => System.IO.Path.Combine(CacheDir, sha1 + ".fix.json");

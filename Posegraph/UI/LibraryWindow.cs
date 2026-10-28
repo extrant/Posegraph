@@ -190,10 +190,18 @@ public sealed class LibraryWindow : Window, IDisposable
             if (body)
             {
                 using (var left = ImRaii.Child("##sources", new Vector2(170 * ImGuiHelpers.GlobalScale, 0), true))
-                    if (left) DrawSources();
+                    if (left)
+                    {
+                        DrawSources();
+                        ExternalDropZone("##sourcesDrop");
+                    }
                 ImGui.SameLine();
                 using (var grid = ImRaii.Child("##grid", Vector2.Zero, false))
-                    if (grid) DrawGrid();
+                    if (grid)
+                    {
+                        DrawGrid();
+                        ExternalDropZone("##gridDrop");
+                    }
             }
         }
         DrawFooter();
@@ -640,6 +648,21 @@ public sealed class LibraryWindow : Window, IDisposable
     /// 从系统拖进来的图片 / 文件夹：复制到当前文件夹（不识别）。整个窗口都能接收：
     /// 在最前面放一个铺满窗口的隐形按钮作拖放目标，之后的控件照常画在它上面。
     /// </summary>
+    /// <summary>
+    /// 子区域（文件夹树、图片网格）里也放一个接收系统拖放的隐形按钮，盖住整个子区域：
+    /// 子窗口挡在主窗口的拖放目标上面，只在主窗口放的话拖到图片网格上松手没反应。只在拖动时才画，平时不挡点击。
+    /// </summary>
+    private void ExternalDropZone(string id)
+    {
+        if (!_dragDrop.IsDragging) return;
+        var start = ImGui.GetCursorPos();
+        ImGui.SetCursorScreenPos(ImGui.GetWindowPos());
+        ImGui.InvisibleButton(id, Vector2.Max(ImGui.GetWindowSize(), new Vector2(1, 1)));
+        if (_dragDrop.CreateImGuiTarget(ExternalDragLabel, out var files, out var dirs))
+            Import([.. files, .. dirs]);
+        ImGui.SetCursorPos(start);
+    }
+
     private void DrawExternalDrop()
     {
         ExternalDragHovered = false;

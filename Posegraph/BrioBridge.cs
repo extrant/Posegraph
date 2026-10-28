@@ -55,4 +55,12 @@ public sealed class BrioBridge(IDalamudPluginInterface pi)
             _setModelTransform.Invoke(actor, position, rotation, scale, false);
         return true;
     }
+
+    /// <summary>角色现在的模型位置、旋转、缩放（合并模式复刻站位读这个，和 SetModelTransform 一致）。</summary>
+    public (System.Numerics.Vector3? Position, System.Numerics.Quaternion? Rotation, System.Numerics.Vector3? Scale) GetModelTransform(IGameObject actor)
+        => _getModelTransform.Invoke(actor);
+
+    /// <summary>移动角色（合并模式复刻站位）：世界坐标与旋转，缩放不变。</summary>
+    public bool SetModelTransform(IGameObject actor, System.Numerics.Vector3 position, System.Numerics.Quaternion rotation)
+        => _setModelTransform.Invoke(actor, position, rotation, null, false);
 }

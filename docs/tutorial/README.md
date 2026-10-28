@@ -40,8 +40,12 @@ The UI screenshots are made with the [offline screenshot tool](../../tools/UiPre
 9. [Extra views: fixing front/back depth](#9-extra-views-fixing-frontback-depth)
 10. [Several characters: the character list](#10-several-characters-the-character-list)
 11. [Camera matching, export and restore](#11-camera-matching-export-and-restore)
-12. [Updates](#12-updates)
-13. [FAQ](#13-faq)
+12. [Facial expressions (beta)](#12-facial-expressions-beta)
+13. [Keeping Brio edits in the library](#13-keeping-brio-edits-in-the-library)
+14. [Lighting](#14-lighting)
+15. [Framing and screenshots](#15-framing-and-screenshots)
+16. [Updates](#16-updates)
+17. [FAQ](#17-faq)
 
 ---
 
@@ -79,7 +83,7 @@ VRAM and RAM. All green means you're ready. Hover over an icon for details.
 
 ![Main window](images/en/tut-empty.png)
 
-The toolbar has three rows: status and the backend switch; tools (library, save to library, extra views, character list);
+The toolbar has three rows: status and the backend switch; tools (library, save to library, extra views, character list, lighting, composition and screenshots);
 and the **character to pose**, the person in the image and the **race skeleton**. The race is detected from the
 character's appearance, so you rarely need to change it.
 
@@ -107,8 +111,11 @@ Tips:
 
 ![3D tab](images/en/tut-3d.png)
 
-- Drag to rotate, scroll to zoom, double-click to reset the view. Looking from the side reveals depth problems you can't see in the photo.
-- **Click a joint** to select it; sliders for that joint (manual offsets) appear below.
+- Drag to rotate, scroll to zoom, drag with the right or middle button to pan, double-click to reset the view. Looking from the side reveals depth problems you can't see in the photo.
+- **Click a joint** to select it: three rotation rings appear on it (red, green and blue, one per axis; drag a ring to rotate, like in Brio), and sliders for that joint (manual offsets) appear below.
+
+![Rotation rings](images/en/tut-rings.png)
+
 - Yellow / red dots mark joints whose angles are outside the usual in-game range and may clip.
 - When you're happy, click **Save correction** at the top left: the offsets and the Tuning tab's values are stored with this
   image and restored the next time you open it.
@@ -122,6 +129,7 @@ Tips:
 - **Stance**: gravity correction (straightens the body when the photo's camera is tilted) and snapping to the ground.
   **Turn off snapping for jumps and mid-air poses.**
 - **Helper bones**: how strongly the skin helpers at elbows, knees, shoulders etc. follow.
+- **Whole-body rotation / offset**: when the whole person leans or needs raising or lowering (someone sitting on a chair), rotate around the hips or move everything; camera matching doesn't undo it.
 - New images start from the defaults; keep this image's values with **Save correction** at the top, which also tells you about unsaved changes.
 
 ## 7. Hints tab
@@ -171,6 +179,7 @@ When generating a side view with AI, ask for "exactly the same pose, the same ha
 ## 10. Several characters: the character list
 
 The "character list" button in the second toolbar row opens this window, docked to the right of the main window.
+"Merge" at the top (splitting the people of one image across several characters) is still being polished; it's grayed out in this version and opens in the next one.
 
 ![Character list](images/en/tut-split.png)
 
@@ -197,20 +206,80 @@ After matching, the status line shows the camera position and framing error (0.4
 
 ![Camera matching](images/ingame-arms-open.jpg)
 
-## 12. Updates
+## 12. Facial expressions (beta)
+
+Turns the expression in the photo into the game's face bones: eyes closing or squinting, brows, mouth corners, open or crooked
+mouths and gaze follow the photo's actual amount, up to what each part of the face can move in game, so nothing gets distorted.
+
+1. **The first time**, type `/posegraph facedump` in game (or click "Export game expression data" in the facial expression section)
+   to export the game's own expression animations once (a minute or two).
+2. On the Tuning tab open **Facial expression (test)**, tick **Apply to character**, then apply.
+3. **Per-part weights (recommended)**: eyelids, brows, mouth, jaw and gaze can be tuned separately. Adjust just the part that looks off,
+   which works better than the overall "Strength": e.g. raise "Jaw" if the mouth doesn't open enough, lower "Gaze" if the eyes wander. Right-click a slider to reset it to 1.
+4. **Head follows face**: face capture corrects the head direction, so tilted and turned heads are more accurate. 0.5 by default (half each);
+   0 uses only the whole-body recognition, 1 follows the face fully. This works even with expressions off, and shows how far the face and the recognized head differ.
+
+Not possible yet: sticking out the tongue (the game's animations never move it, and face capture can't measure it); a one-eyed wink and a
+squinting smile are sometimes confused. Face capture rarely finds faces in illustrations and then simply isn't used.
+
+## 13. Keeping Brio edits in the library
+
+If you rotate bones in Brio after applying a pose, the main window shows "Detected N bones changed in Brio" under the toolbar:
+
+- **Keep as correction and save to library** turns the edits into joint offsets on the 3D tab (the same thing as dragging bones there)
+  and saves them in this image's correction. They come back the next time you open the image, re-applying after changing Tuning values
+  no longer wipes them, and you can keep fine-tuning them on the 3D tab.
+- **Ignore** takes the current pose as the new baseline; you'll be told again only after further edits.
+
+Only body bone rotations are kept. Face bones and bone positions or scale are not; helper bones such as shoulders and elbows follow their
+main bones automatically, so edits to helper bones alone can't be kept either.
+
+## 14. Lighting
+
+The light bulb button in the second toolbar row. Click a setup to light the current character (loop, Rembrandt, butterfly, split,
+backlight and more, 11 in total). Lights are placed relative to the face and the camera; with "Follow camera" on they turn with the camera.
+
+![Lighting](images/en/tut-lighting.png)
+
+- The three sliders at the top adjust overall brightness, warmth and light distance.
+- **3D lighting**: a separate 3D view showing every light, the character and the camera. Drag a light to move it, drag its rings to rotate it;
+  switch between camera view, front, side and top. The ball at the top right previews the lighting ratio.
+- The buttons below select a light; "Adjust each light" lets you solo or mute a light and change its color, intensity and angle.
+- Lights are removed automatically when you leave GPose.
+
+## 15. Framing and screenshots
+
+The crop button in the second toolbar row.
+
+![Composition and screenshots](images/en/tut-composition.png)
+
+- **Show framing guide** draws a frame of the chosen aspect ratio over the game, dims the outside and can add guides such as the rule of thirds; switch between landscape and portrait.
+- **Fit to photo** takes the ratio and orientation from the photo. "Photo reference" overlays the photo inside the frame so you can line up the camera; you can also overlay the skeleton recognized from it.
+- In GPose it shows and sets the **equivalent full-frame focal length** (the 35 mm, 85 mm photographers talk about).
+- **Screenshot** captures the game's own render inside the frame, saved to Documents\Posegraph\Screenshots by default; the button next to it opens the folder.
+
+## 16. Updates
 
 - **Plugin**: updates automatically through the plugin repository. The changelog pops up the first time you open the main window after an update.
-- **Backend**: after a plugin update the Settings tab shows the backend version. When it's older, click the download
-  button next to it; only the backend code is replaced (under 1 MB) — Python, dependencies and the model stay.
-  If GitHub is unreachable, fill in a download mirror prefix.
+- **Backend**: after a plugin update the Settings tab shows the backend version. When it's older, click the download button next to it:
+  it downloads the matching backend code and **adds whichever components new features need (face capture about 64 MB, depth about 400 MB)**,
+  verifying each download, so you never need the whole package again. The backend is stopped first and restarted afterwards; if the new
+  version doesn't start, the old one is restored. If GitHub is unreachable or slow, fill in a download mirror prefix; if a download breaks,
+  just click again — finished components aren't downloaded twice.
 
 ![Changelog](images/en/tut-changelog.png)
 
-## 13. FAQ
+## 17. FAQ
 
 **Recognition is slow / not enough VRAM**
 Keep the device on Auto; with less than 3 GB of VRAM it uses the CPU automatically. CPU recognition takes about 10–20 s
 per image, and recognized images are cached. Setting "Unload model" to "Keep loaded" saves the loading time but keeps the VRAM or RAM in use.
+"Fast recognition" is on by default (about 0.6 s for one person). "Depth-assisted recognition" makes the focal length and floor more accurate
+but adds about 0.5 s per image and about 1.3 GB of peak VRAM; turn it off if your machine is tight.
+
+**The backend closes right after starting, and the log says "Cannot create thread" or "System error #1455"**
+Windows has run out of memory including virtual memory (the game alone takes over 10 GB). Enlarge the page file or set it to
+system-managed, or restart the game and close programs you don't need before recognizing.
 
 **Hands go into the body / don't reach the head**
 "Hand contact compensation" on the Tuning tab keeps contact; try a larger "Full effect" distance. Otherwise select the joint on the 3D tab and adjust it by hand.

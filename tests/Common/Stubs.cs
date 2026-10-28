@@ -15,4 +15,6 @@ public sealed class Configuration
     public string BackendDevice { get; set; } = "auto";
     public int ReleaseAfter { get; set; }
     public bool MhrOnCpu { get; set; } = true;
+    public bool FastRecognition { get; set; } = true;
+    public bool UseDepth { get; set; } = true;
 }

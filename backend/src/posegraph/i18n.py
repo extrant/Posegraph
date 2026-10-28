@@ -23,6 +23,21 @@ def tr(text: str, **kwargs) -> str:
 
 
 EN = {
+    # 面捕（face.py）
+    "面捕组件没装（mediapipe 或 face_landmarker 模型）": "Face capture is not installed (mediapipe or the face_landmarker model)",
+    "还没有游戏表情数据：在游戏里输入 /posegraph facedump 导出一次": "No game expression data yet: type /posegraph facedump in game once to export it",
+    "姿势里没有头部骨骼": "The pose has no head bone",
+    "左眼闭": "Left eye closed", "右眼闭": "Right eye closed", "左眼睁大": "Left eye wide", "右眼睁大": "Right eye wide",
+    "左眼眯": "Left eye squint", "右眼眯": "Right eye squint", "左眉头高(cm)": "Left inner brow up (cm)", "右眉头高(cm)": "Right inner brow up (cm)",
+    "左嘴角上(cm)": "Left mouth corner up (cm)", "右嘴角上(cm)": "Right mouth corner up (cm)",
+    "左嘴角外(cm)": "Left mouth corner out (cm)", "右嘴角外(cm)": "Right mouth corner out (cm)",
+    "上唇上提(cm)": "Upper lip up (cm)", "下唇下拉(cm)": "Lower lip down (cm)", "下巴张开(cm)": "Jaw open (cm)", "嘴偏向左(cm)": "Mouth shifted left (cm)",
+    "头不在画面里": "The head is outside the image",
+    "脸太小": "The face is too small",
+    "没找到脸（插画、遮挡或背对）": "No face found (illustration, covered, or facing away)",
+    "找到的脸不是这个人的（可能是旁边的人）": "The face found belongs to someone else (probably the person next to them)",
+    "侧脸太多": "The face is turned too far to the side",
+    "置信度太低": "Confidence too low",
     # 合理性提示（tuning.LIMITS 与组合检查）
     "腰部转动过大": "Waist rotation too large",
     "胸背单节转动过大，躯干可能折角": "Chest/back segment rotation too large; the torso may kink",
@@ -72,6 +87,13 @@ EN = {
     "请求体为空": "Empty request body",
     "模型加载失败：{error}": "Model failed to load: {error}",
     "未检测到人物": "No person detected",
+    "找不到人物检测模型：{path}": "Person detection model not found: {path}",
+    "后端缺少人物检测组件（onnxruntime），请更新一键包": "The backend is missing the person detection component (onnxruntime); update the backend package",
+    "人物框格式不对，应为 x1,y1,x2,y2;…": "Invalid person boxes; expected x1,y1,x2,y2;…",
+    "人物框太小或超出图片范围": "A person box is too small or outside the image",
+    "人物遮罩要和人物框、遮罩尺寸一起给": "Person masks need person boxes and the mask size",
+    "人物遮罩不对：{error}": "Invalid person masks: {error}",
+    "kind 只能是 auto / photo / anime": "kind must be auto / photo / anime",
     "剩余显存 {free} MB，只够 {n} 路": "{free} MB of VRAM free, enough for {n} at once",
     "可用内存 {free} MB，只够 {n} 路": "{free} MB of RAM available, enough for {n} at once",
     "CPU {cores} 线程，最多 {n} 路": "{cores} CPU threads, at most {n} at once",

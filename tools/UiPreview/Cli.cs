@@ -43,6 +43,7 @@ public static class Cli
         Console.Error.WriteLine("[cli] 初始化 ImGui");
         using var host = new Host(new Vector2(1600, 1000), scale);
         Tutorial.Register(Scenes.All);
+        MergeScenes.Register(Scenes.All);
         var app = new App(host, lang, demo);
         foreach (var name in scenes.SelectMany(s => s == "all" ? Scenes.All.Keys.Where(k => !k.StartsWith("bench-")).ToList() : [s]))
         {
@@ -67,6 +68,7 @@ public sealed class App
     public MainWindow Main { get; }
     public LibraryWindow Library { get; }
     public SplitWindow Split { get; }
+    public MaskEditorWindow Masks { get; }
     public UpdateWindow Update { get; }
     public bool Gposing { get; set; }
 
@@ -118,8 +120,25 @@ public sealed class App
         Split = new SplitWindow(Config, pi, Main, Library, Main.Library, aux, textures, dragDrop, log);
         Main.ToggleLibrary = Library.Toggle;
         Main.ToggleSplit = Split.Toggle;
+        Main.MergeListOpen = () => Split.IsOpen && Config.SplitMerge;   // 与 Plugin 一样接上合并模式
+        Main.ShowPeopleList = Split.ShowMerge;
+        Masks = new MaskEditorWindow(Main, textures);
+        Main.MaskEditor = Masks;
         Update = new UpdateWindow(Config, pi, textures);
+        Lighting = new Posegraph.Lighting.LightingService(framework, clientState, new PoseApplier(framework, clientState, targets, brio), Config);
+        LightingWindow = new LightingWindow(Lighting, Config, pi, () => null, () => Gposing);
+        Main.ToggleLighting = LightingWindow.Toggle;
+        Composition = new CompositionWindow(Config, pi, framework, clientState, textures, readback, () => [535, 758], () => null,
+                                    () => [new Posegraph.Backend.Segment([150, 120], [180, 400], "c"),
+                                           new Posegraph.Backend.Segment([180, 400], [120, 700], "l"),
+                                           new Posegraph.Backend.Segment([180, 400], [330, 690], "r")]);
+        Main.ToggleComposition = Composition.Toggle;
     }
+
+    public CompositionWindow Composition { get; }
+
+    public Posegraph.Lighting.LightingService Lighting { get; }
+    public LightingWindow LightingWindow { get; }
 
     /// <summary>画 frames 帧，最后一帧按 windows 的矩形（并集，加 margin）裁切保存。</summary>
     public void Shot(string path, Action draw, string[] windows, int frames = 4, float margin = 16)

@@ -22,6 +22,8 @@ class Session:
     inference_ms: float
     fused: dict | None = None
     views: list | None = None
+    scene: object | None = None   # 多人场景的共同重力校正与是否都在地上（floor.Scene），算过一次就记下
+    faces: dict | None = None     # 面捕结果（人物序号 → face.FaceResult），第一次问到时才算
 
 
 class SessionCache(MutableMapping[str, Session]):

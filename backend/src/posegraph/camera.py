@@ -2,12 +2,14 @@
 
 1. photo_camera_in_world：SAM 3D Body 给出拍摄相机相对人物的位置（cam_t）与焦距，
    经站姿重力校正、两套骨架的髋部对齐与体型比例缩放，再经角色的模型世界变换，得到 FFXIV 世界中的目标机位
-2. solve_gpose_camera：GPose 相机是绕注视点的轨道相机，内部公式（俯仰随距离变化等）不透明，
-   因此用 Posegraph 读回的视图/投影矩阵做闭环求解：
-   - Angle(水平, 俯仰) + Distance 决定相机位置
-   - Pan(水平, 垂直) + Roll 让相机原地转动视线（实测只带来几厘米位移）
-   - Zoom 只改视角（非线性）
-   三组分别用有限差分高斯-牛顿迭代，交替两轮。
+2. solve_gpose_camera：按游戏内校准（scripts/camera_calibrate.py，2026-10-27）得出的换算直接算出参数，再小幅修正：
+   - 相机位置 = 轴心 + Distance × 方向(水平角 Angle.x，俯仰 -Angle.y)，轴心固定（误差 1～2mm；|Angle.y| 超过约 1.4 时不准）
+   - Pan、Roll 只转视线不动位置：视线的世界偏航 = 基准偏航 - Pan.x，滚转 = -Roll（都精确）；
+     俯仰 ≈ 基准俯仰 + Pan.y（略不对称，±0.3 时差约 1°，修正一步）。基准视线（Pan=Roll=0）并不正对轴心，读一次即可
+   - 垂直视角 ≈ 常数 + Zoom（弧度），下限约 12.6°
+   - 大幅移动时游戏会平滑过渡约 0.6 秒：每次设置后等到相机不再移动再读（原来固定等 0.15 秒会读到过渡中的值，
+     导致迭代很多次、画面一顿一顿）
+   通常 3～4 次设置就到位（原来的有限差分迭代最多约 150 次）。
 """
 
 from __future__ import annotations
@@ -29,6 +31,14 @@ class CameraTarget:
     forward: np.ndarray   # 视线方向（单位向量）
     up: np.ndarray        # 上方向（单位向量）
     fov_y_deg: float
+    aspect: float = 16 / 9   # 照片宽高比
+
+
+def game_fov_y(target: CameraTarget, game_aspect: float) -> float:
+    """游戏该用的垂直视角（弧度）：照片整张放进游戏画面。照片比游戏画面窄（竖构图、4:3 等）时上下对齐，
+    左右多出来的是构图框外；照片更宽（21:9 等）时改成左右对齐、上下留边，否则照片两侧会被裁掉、人显得太大。"""
+    half = np.tan(np.radians(target.fov_y_deg) / 2)
+    return float(2 * np.arctan(half * max(1.0, target.aspect / game_aspect)))
 
 
 @dataclass
@@ -38,6 +48,8 @@ class CameraState:
     up: np.ndarray
     fov_y_deg: float
     raw: dict
+    frame: int | None = None   # 游戏帧号（插件给的；旧版插件没有）
+    aspect: float = 16 / 9     # 游戏画面宽高比
 
 
 def photo_camera_in_world(z, rt, model_position: np.ndarray, model_rotation: np.ndarray,
@@ -61,106 +73,130 @@ def photo_camera_in_world(z, rt, model_position: np.ndarray, model_rotation: np.
         forward=q.apply(up_rot.apply([0.0, 0.0, -1.0])),
         up=q.apply(up_rot.apply([0.0, 1.0, 0.0])),
         fov_y_deg=float(np.degrees(2 * np.arctan(h / 2 / float(z["focal_length"])))),
+        aspect=w / h,
     )
 
 
 def read_state(client: BridgeClient) -> CameraState:
-    c = client.get_camera()["camera"]
+    r = client.get_camera()
+    c = r["camera"]
     V = np.array(c["view"])  # 行向量约定：3×3 的列为相机轴（右、上、后）在世界中的方向
-    fov = float(np.degrees(2 * np.arctan(1 / c["projection"][1][1])))
-    return CameraState(np.array(c["position"]), -V[:3, 2], V[:3, 1], fov, c)
+    P = c["projection"]
+    fov = float(np.degrees(2 * np.arctan(1 / P[1][1])))
+    return CameraState(np.array(c["position"]), -V[:3, 2], V[:3, 1], fov, c, r.get("frame"), float(P[1][1] / P[0][0]))
 
 
 def _angle_between(a: np.ndarray, b: np.ndarray) -> float:
     return float(np.arccos(np.clip(a @ b / np.linalg.norm(a) / np.linalg.norm(b), -1, 1)))
 
 
-def solve_gpose_camera(client: BridgeClient, target: CameraTarget, rounds: int = 2,
-                       settle: float = 0.15, log=print) -> dict:
-    state = read_state(client)
-    params = {"ax": state.raw["angle"][0], "ay": state.raw["angle"][1], "dist": state.raw["distance"],
-              "px": state.raw["pan"][0], "py": state.raw["pan"][1], "roll": state.raw["roll"], "zoom": state.raw["zoom"]}
+MAX_PITCH_PARAM = 1.4      # |Angle.y| 再大时轴心会偏（相机接近正上 / 正下）
+MIN_FOV_RAD = 0.22         # Zoom 再小视角不再变小（约 12.6°）
 
-    def apply(p: dict) -> CameraState:
+
+def _direction(yaw: float, elevation: float) -> np.ndarray:
+    return np.array([np.sin(yaw) * np.cos(elevation), np.sin(elevation), np.cos(yaw) * np.cos(elevation)])
+
+
+def _view_angles(forward: np.ndarray, up: np.ndarray) -> np.ndarray:
+    """相机朝向的世界角（偏航、俯仰、滚转），与 GPose 的 Pan / Roll 同一种分解（相机看 -z，先偏航再俯仰再滚转）。"""
+    back = -forward / np.linalg.norm(forward)
+    right = np.cross(up, back)
+    right /= np.linalg.norm(right)
+    return R.from_matrix(np.column_stack([right, np.cross(back, right), back])).as_euler("YXZ")
+
+
+def _wrap(a: float) -> float:
+    return float((a + np.pi) % (2 * np.pi) - np.pi)
+
+
+SETTLE_FRAMES = 3   # 相机隔这么多帧都没动才算停稳
+
+
+def _settled(client: BridgeClient, timeout: float = 2.5, step: float = 0.03) -> CameraState:
+    """设置后等相机停下来（游戏对大幅移动会平滑过渡约 0.6 秒）：隔 SETTLE_FRAMES 帧读回，位置差 < 0.5mm、视线差 < 0.02°。
+    按帧号比，不按时间：游戏帧率低时（开着很多窗口、3D 预览），间隔 50ms 的两次读数可能是同一帧，会在过渡中途误判停稳。
+    旧版插件不带帧号时退回按时间（每次间隔 step）。"""
+    end = time.monotonic() + timeout
+    time.sleep(step)
+    last = read_state(client)
+    while time.monotonic() < end:
+        time.sleep(step)
+        s = read_state(client)
+        if s.frame is not None and last.frame is not None and s.frame - last.frame < SETTLE_FRAMES:
+            continue
+        if np.linalg.norm(s.position - last.position) < 5e-4 and _angle_between(s.forward, last.forward) < np.radians(0.02):
+            return s
+        last = s
+    return last
+
+
+def solve_gpose_camera(client: BridgeClient, target: CameraTarget, log=print) -> dict:
+    state = read_state(client)
+    raw = state.raw
+    p = {"ax": raw["angle"][0], "ay": raw["angle"][1], "dist": raw["distance"],
+         "px": 0.0, "py": 0.0, "roll": 0.0, "zoom": raw["zoom"]}
+    moves = 0
+
+    def apply() -> CameraState:
+        nonlocal moves
+        moves += 1
         client.set_camera(angle=[p["ax"], p["ay"]], distance=p["dist"], pan=[p["px"], p["py"]],
                           roll=p["roll"], zoom=p["zoom"], delimit=True)
-        time.sleep(settle)
-        return read_state(client)
+        return _settled(client)
 
-    # 初值：从当前注视点指向目标位置的水平方位与距离
-    look_at = np.array(state.raw["lookAt"])
-    d = target.position - look_at
-    params["ax"] = float(np.arctan2(d[0], d[2]))
-    params["dist"] = float(np.linalg.norm(d))
-    params.update(px=0.0, py=0.0, roll=0.0)
+    def pivot_of(s: CameraState) -> np.ndarray:
+        r = s.raw
+        return s.position - r["distance"] * _direction(r["angle"][0], -r["angle"][1])
 
-    def residual_position(s: CameraState):
-        return s.position - target.position
+    def place(pivot: np.ndarray) -> None:
+        d = target.position - pivot
+        p["dist"] = float(np.linalg.norm(d))
+        p["ax"] = float(np.arctan2(d[0], d[2]))
+        p["ay"] = float(np.clip(-np.arcsin(np.clip(d[1] / p["dist"], -1, 1)), -MAX_PITCH_PARAM, MAX_PITCH_PARAM))
 
-    def residual_orientation(s: CameraState):
-        return np.concatenate([s.forward - target.forward, (s.up - target.up) * 0.5])
+    fov_offset = np.radians(state.fov_y_deg) - raw["zoom"]
+    goal = _view_angles(target.forward, target.up)
+    target_fov = max(game_fov_y(target, state.aspect), MIN_FOV_RAD)
 
-    def residual_fov(s: CameraState):
-        return np.array([s.fov_y_deg - target.fov_y_deg])
+    # 1. 位置与视角：按轴心直接算（当前相机接近正上 / 正下时轴心不准，到位后再算一次）
+    place(pivot_of(state))
+    p.update(px=0.0, py=0.0, roll=0.0, zoom=float(target_fov - fov_offset))
+    s = apply()
+    if np.linalg.norm(s.position - target.position) > 0.02:
+        place(pivot_of(s))
+        s = apply()
 
-    def gauss_newton(keys, residual_fn, steps, iters=6, tol=1e-3):
-        nonlocal params
-        s = apply(params)
-        r = residual_fn(s)
-        for _ in range(iters):
-            if np.linalg.norm(r) < tol:
-                break
-            J = np.zeros((len(r), len(keys)))
-            for j, k in enumerate(keys):
-                probe = dict(params)
-                probe[k] += steps[j]
-                J[:, j] = (residual_fn(apply(probe)) - r) / steps[j]
-            delta, *_ = np.linalg.lstsq(J, -r, rcond=None)
-            trial = dict(params)
-            for j, k in enumerate(keys):
-                trial[k] += float(delta[j])
-            s_trial = apply(trial)
-            r_trial = residual_fn(s_trial)
-            if np.linalg.norm(r_trial) < np.linalg.norm(r):
-                params, s, r = trial, s_trial, r_trial
-            else:  # 步长过大：减半再试一次
-                for j, k in enumerate(keys):
-                    trial[k] = params[k] + float(delta[j]) / 2
-                s_half = apply(trial)
-                r_half = residual_fn(s_half)
-                if np.linalg.norm(r_half) < np.linalg.norm(r):
-                    params, s, r = trial, s_half, r_half
-                else:
-                    break
-        apply(params)
-        return s
+    # 2. 视线：基准视线（Pan=Roll=0）读到了，Pan.x、Roll 直接算；Pan.y 先按 1:1，再按实际俯仰修正
+    base = _view_angles(s.forward, s.up)
+    p["px"] = _wrap(base[0] - goal[0])
+    p["roll"] = float(-goal[2])
+    p["py"] = float(goal[1] - base[1])
+    s = apply()
+    for _ in range(2):
+        now = _view_angles(s.forward, s.up)
+        pitch_error = goal[1] - now[1]
+        fov_error = target_fov - np.radians(s.fov_y_deg)
+        if abs(pitch_error) < np.radians(0.1) and abs(fov_error) < np.radians(0.2):
+            break
+        p["py"] += float(pitch_error)
+        if abs(fov_error) >= np.radians(0.2) and target_fov > MIN_FOV_RAD:
+            p["zoom"] += float(fov_error)
+        s = apply()
 
-    # 俯仰初值：Angle.y 到实际俯仰的映射非线性，且某些区间相机高度会饱和（梯度为零，迭代推不动），先粗扫
-    best = None
-    for ay in np.arange(-1.4, 1.41, 0.1):
-        params["ay"] = float(ay)
-        err = np.linalg.norm(residual_position(apply(params)))
-        if best is None or err < best[0]:
-            best = (err, float(ay))
-    params["ay"] = best[1]
-
-    for i in range(rounds):
-        s = gauss_newton(["ax", "ay", "dist"], residual_position, [0.02, 0.02, 0.05])
-        s = gauss_newton(["px", "py", "roll"], residual_orientation, [0.02, 0.02, 0.02])
-        s = gauss_newton(["zoom"], residual_fov, [0.02], iters=8, tol=0.05)
-        log(f"第 {i + 1} 轮：位置误差 {np.linalg.norm(s.position - target.position) * 100:.1f}cm，"
-            f"视线误差 {np.degrees(_angle_between(s.forward, target.forward)):.2f}°，"
-            f"上方向误差 {np.degrees(_angle_between(s.up, target.up)):.2f}°，"
-            f"视角 {s.fov_y_deg:.1f}°/{target.fov_y_deg:.1f}°")
     final = read_state(client)
-    return {
-        "params": params,
+    result = {
+        "params": p,
+        "moves": moves,
         "position_error_cm": float(np.linalg.norm(final.position - target.position) * 100),
         "forward_error_deg": float(np.degrees(_angle_between(final.forward, target.forward))),
         "up_error_deg": float(np.degrees(_angle_between(final.up, target.up))),
         "fov_deg": final.fov_y_deg,
-        "target_fov_deg": target.fov_y_deg,
+        "target_fov_deg": float(np.degrees(target_fov)),
     }
+    log(f"{moves} 次设置：位置误差 {result['position_error_cm']:.1f}cm，视线误差 {result['forward_error_deg']:.2f}°，"
+        f"上方向误差 {result['up_error_deg']:.2f}°，视角 {final.fov_y_deg:.1f}°/{np.degrees(target_fov):.1f}°")
+    return result
 
 
 _FRAMING_PAIRS = [("j_kao", "c_head"), ("j_ude_a_l", "l_uparm"), ("j_ude_a_r", "r_uparm"), ("j_te_l", "l_wrist"),
@@ -171,7 +207,8 @@ _FRAMING_PAIRS = [("j_kao", "c_head"), ("j_ude_a_l", "l_uparm"), ("j_ude_a_r", "
 def framing_error(client: BridgeClient, z, pose, mhr_names: list[str], actor: int | None = None) -> float:
     """构图检查：游戏相机下角色关节的屏幕位置 vs 照片中对应关节，返回平均偏差（占画面高度的比例）。
     只统计照片画面内的关节（半身照里画面外的腿是模型猜的）。
-    坐标以画面半高为单位、原点在中心，与窗口/照片的宽高比无关。pose 为游戏当前姿势（BrioPose）。"""
+    坐标以游戏画面半高为单位、原点在中心；照片比游戏画面宽时照片按宽度放进画面（见 game_fov_y），换算时一并缩小。
+    pose 为游戏当前姿势（BrioPose）。"""
     cam = client.get_camera()["camera"]
     V, Pm = np.array(cam["view"]), np.array(cam["projection"])
     aspect = Pm[1][1] / Pm[0][0]
@@ -180,6 +217,7 @@ def framing_error(client: BridgeClient, z, pose, mhr_names: list[str], actor: in
     mp, mq, ms = vec(m["Position"]), R.from_quat(vec(m["Rotation"])), vec(m["Scale"])
     W, H = (int(v) for v in z["image_size"])
     f = float(z["focal_length"])
+    fit = min(1.0, aspect / (W / H))   # 照片半高占游戏画面半高的比例
     jc = z["joint_coords"] + z["cam_t"]
     diffs = []
     for ff, mh in _FRAMING_PAIRS:
@@ -189,5 +227,5 @@ def framing_error(client: BridgeClient, z, pose, mhr_names: list[str], actor: in
         photo = np.array([f * p[0] / p[2], -f * p[1] / p[2]]) / (H / 2)
         if abs(photo[0]) > W / H or abs(photo[1]) > 1:
             continue
-        diffs.append(np.linalg.norm(game - photo))
+        diffs.append(np.linalg.norm(game - photo * fit))
     return float(np.mean(diffs) / 2)

@@ -64,6 +64,9 @@ public sealed class BackendProcess : IDisposable
         psi.Environment["POSEGRAPH_DEVICE"] = c.BackendDevice;
         psi.Environment["POSEGRAPH_RELEASE_AFTER"] = c.ReleaseAfter.ToString();
         psi.Environment["POSEGRAPH_MHR_ON_CPU"] = c.MhrOnCpu ? "1" : "0";
+        psi.Environment["POSEGRAPH_USE_DEPTH"] = c.UseDepth ? "1" : "0";
+        psi.Environment["POSEGRAPH_FAST"] = c.FastRecognition ? "1" : "0";
+        psi.Environment["POSEGRAPH_FACE_DUMP"] = FaceAnimationDump.OutputDir;
         psi.Environment["POSEGRAPH_MIN_FREE_VRAM_MB"] = SystemProbe.RequiredVramMB.ToString();
 
         _log.Clear();

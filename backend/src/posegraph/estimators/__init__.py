@@ -16,5 +16,7 @@ def create_estimator(name: str = "sam3d_body") -> PoseEstimator:
             precision=settings.precision,
             mhr_on_cpu=settings.mhr_on_cpu,
             min_free_vram_mb=settings.min_free_vram_mb,
+            fast=settings.fast,
+            backbone_scale=settings.backbone_scale,
         )
     raise ValueError(f"未知的估计器：{name}")

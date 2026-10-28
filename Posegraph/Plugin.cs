@@ -23,6 +23,7 @@ public sealed class Plugin : IDalamudPlugin
     private readonly LibraryWindow _library;
     private readonly AuxViewsMenu _auxMenu;
     private readonly SplitWindow _split;
+    private readonly MaskEditorWindow _masks;
     private readonly UpdateWindow _update;
     private bool _changelogChecked;   // 本次加载后第一次打开主窗口时检查一次是否要弹更新日志
     private readonly IDragDropManager _dragDrop;
@@ -31,7 +32,13 @@ public sealed class Plugin : IDalamudPlugin
     private readonly BrioBridge _brio;
     private bool _wasGposing;
     private bool _autoOpenDone;    // 本次 GPose 已处理过自动打开（手动关掉后不再弹出）
-    private bool _openedByGpose;   // 当前窗口是进入 GPose 时自动打开的：退出 GPose 时自动关闭
+    private readonly Lighting.LightingService _lighting;
+    private readonly LightingWindow _lightingWindow;
+    private readonly CompositionWindow _composition;
+    private bool _openedByGpose;
+    private bool _shotRequested;
+    private readonly IDataManager _data;
+    private bool _faceDumping;   // 当前窗口是进入 GPose 时自动打开的：退出 GPose 时自动关闭
 
     public Plugin(
         IDalamudPluginInterface pi,
@@ -43,8 +50,10 @@ public sealed class Plugin : IDalamudPlugin
         ITextureProvider textures,
         ITextureReadbackProvider readback,
         IDragDropManager dragDrop,
+        IDataManager data,
         IPluginLog log)
     {
+        _data = data;
         _pi = pi;
         _commands = commands;
         _chat = chat;
@@ -57,8 +66,8 @@ public sealed class Plugin : IDalamudPlugin
         if (_config.AutoStartServer)
             TryStart();
 
-        _main = new MainWindow(_config, pi, clientState, textures, readback, dragDrop, brio,
-                               new PoseApplier(framework, clientState, targetManager, brio), _server);
+        var applier = new PoseApplier(framework, clientState, targetManager, brio);
+        _main = new MainWindow(_config, pi, clientState, textures, readback, dragDrop, brio, applier, _server);
         _windows.AddWindow(_main);
         _auxMenu = new AuxViewsMenu(_config, _main.Library, _main.Recognition, textures, readback, log);
         _main.AuxMenu = _auxMenu;
@@ -68,11 +77,26 @@ public sealed class Plugin : IDalamudPlugin
         _split = new SplitWindow(_config, pi, _main, _library, _main.Library, _auxMenu, textures, dragDrop, log);
         _windows.AddWindow(_split);
         _main.ToggleSplit = _split.Toggle;
+        _main.MergeListOpen = () => _split.IsOpen && _split.MergeMode;
+        _main.ShowPeopleList = _split.ShowMerge;
+        _masks = new MaskEditorWindow(_main, textures);
+        _windows.AddWindow(_masks);
+        _main.MaskEditor = _masks;
         _update = new UpdateWindow(_config, pi, textures);
         _windows.AddWindow(_update);
         _main.ShowChangelog = () => _update.IsOpen = true;
         _main.ToggleLibrary = _library.Toggle;
-        _main.Closed = () => _library.IsOpen = _split.IsOpen = false;
+        _lighting = new Lighting.LightingService(framework, clientState, applier, _config);
+        _lightingWindow = new LightingWindow(_lighting, _config, pi, () => _main.SelectedActor, () => clientState.IsGPosing);
+        _windows.AddWindow(_lightingWindow);
+        _main.ToggleLighting = _lightingWindow.Toggle;
+        _composition = new CompositionWindow(_config, pi, framework, clientState, textures, readback, () => _main.PhotoSize,
+                                             () => _main.PhotoTexture, () => _main.PhotoSkeleton);
+        _windows.AddWindow(_composition);
+        _main.ToggleComposition = _composition.Toggle;
+        _main.DumpFaceData = DumpFaceAnimations;
+        _main.LibraryDragged = () => _library.DraggedImages;
+        _main.Closed = () => _library.IsOpen = _split.IsOpen = _masks.IsOpen = _lightingWindow.IsOpen = _composition.IsOpen = false;
         // 消息里可能有花括号（后端返回的 JSON），按参数传，不当成日志模板
         _main.Recognition.Log = (message, ex) =>
         {
@@ -89,6 +113,8 @@ public sealed class Plugin : IDalamudPlugin
         ApplyUiHide(pi, _config);
         framework.Update += OnFrameworkUpdate;
         pi.UiBuilder.Draw += DrawDragSource;
+        pi.UiBuilder.Draw += _composition.DrawOverlay;
+        pi.UiBuilder.Draw += DrawPendingShot;
         pi.UiBuilder.Draw += _windows.Draw;
         pi.UiBuilder.Draw += _auxMenu.DrawDialogs;
         pi.UiBuilder.OpenMainUi += ToggleManually;
@@ -96,7 +122,7 @@ public sealed class Plugin : IDalamudPlugin
 
         _commands.AddHandler(Command, new CommandInfo(OnCommand)
         {
-            HelpMessage = Loc.T("打开主界面；on / off / status：开关或查看本地 HTTP 服务"),
+            HelpMessage = Loc.T("打开主界面；on / off / status：开关或查看本地 HTTP 服务；shot：截图（可绑到宏）"),
         });
     }
 
@@ -137,6 +163,12 @@ public sealed class Plugin : IDalamudPlugin
             case "off":
                 _server.Stop();
                 break;
+            case "shot":
+                _shotRequested = true;   // 截图要读 ImGui 视口：放到下一次绘制里做
+                return;
+            case "facedump":
+                DumpFaceAnimations();
+                return;
         }
         _chat.Print(_server.IsRunning
             ? Loc.F("[Posegraph] 运行中：http://127.0.0.1:{0}/", _server.Port)
@@ -168,6 +200,36 @@ public sealed class Plugin : IDalamudPlugin
         _openedByGpose = true;
     }
 
+    /// <summary>开发用：导出游戏自带的面部表情动画（见 FaceAnimationDump），不需要进 GPose。</summary>
+    private void DumpFaceAnimations()
+    {
+        if (_faceDumping) return;
+        _faceDumping = true;
+        _chat.Print(Loc.T("[Posegraph] 开始导出面部表情动画，约需一两分钟，期间游戏可能会短暂卡顿"));
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await FaceAnimationDump.RunAsync(_data, _framework, message => _log.Info("{Message}", message));
+                _chat.Print(Loc.F("[Posegraph] 面部表情动画已导出到 {0}", FaceAnimationDump.OutputDir));
+            }
+            catch (Exception ex)
+            {
+                _log.Error(ex, "facedump");
+                _chat.PrintError(Loc.F("[Posegraph] 导出失败：{0}", ex.Message));
+            }
+            finally { _faceDumping = false; }
+        });
+    }
+
+    private void DrawPendingShot()
+    {
+        if (!_shotRequested) return;
+        _shotRequested = false;
+        if (_clientState.IsGPosing) _composition.Shoot();
+        else _chat.PrintError(Loc.T("[Posegraph] 进入 GPose 后才能截图"));
+    }
+
     /// <summary>
     /// 把系统里拖动的图片 / 文件夹转成 ImGui 拖放负载（每帧一次，主窗口和图库窗口都用 CreateImGuiTarget 接收）。
     /// </summary>
@@ -190,15 +252,19 @@ public sealed class Plugin : IDalamudPlugin
     public void Dispose()
     {
         _framework.Update -= OnFrameworkUpdate;
+        _lighting.Dispose();
         _commands.RemoveHandler(Command);
         _pi.UiBuilder.Draw -= _windows.Draw;
         _pi.UiBuilder.Draw -= _auxMenu.DrawDialogs;
         _pi.UiBuilder.Draw -= DrawDragSource;
+        _pi.UiBuilder.Draw -= _composition.DrawOverlay;
+        _pi.UiBuilder.Draw -= DrawPendingShot;
         _pi.UiBuilder.OpenMainUi -= ToggleManually;
         _pi.UiBuilder.OpenConfigUi -= _main.OpenSettings;
         _windows.RemoveAllWindows();
         _library.Dispose();
         _split.Dispose();
+        _masks.Dispose();
         _update.Dispose();
         _auxMenu.Dispose();
         _main.Dispose();

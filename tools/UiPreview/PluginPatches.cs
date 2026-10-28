@@ -47,3 +47,29 @@ internal static class IdentifyPatch
         return false;
     }
 }
+
+// 选了具体角色时主窗口会异步读这个角色的身份和游戏姿势（要读游戏内存）：离线时当作读不到姿势，按标准骨长计算
+[HarmonyPatch(typeof(PoseApplier), nameof(PoseApplier.IdentifyAsync))]
+internal static class IdentifyAsyncPatch
+{
+    private static bool Prefix(int? actor, ref Task<PoseApplier.ActorIdentity?> __result)
+    {
+        if (App.FakeActors is not { } actors) return true;
+        var name = actors.FirstOrDefault(a => a.Index == actor).Name;
+        __result = Task.FromResult<PoseApplier.ActorIdentity?>(actor is { } index
+            ? new PoseApplier.ActorIdentity(index, $"{index}:{name}", $"{index}:{name}:c0101", "c0101", true)
+            : null);
+        return false;
+    }
+}
+
+[HarmonyPatch(typeof(PoseApplier), nameof(PoseApplier.GetPoseAsync))]
+internal static class GetPoseAsyncPatch
+{
+    private static bool Prefix(ref Task<string?> __result)
+    {
+        if (App.FakeActors is null) return true;
+        __result = Task.FromResult<string?>(null);
+        return false;
+    }
+}

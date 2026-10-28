@@ -49,6 +49,25 @@ public sealed class PoseApplier(IFramework framework, IClientState clientState, 
         return ok;
     }
 
+    /// <summary>角色现在的模型变换（合并模式复刻站位）；读不到为 null。</summary>
+    public Task<Backend.ModelPose?> GetTransformAsync(int actor) => framework.RunOnFrameworkThread(() =>
+    {
+        if (!clientState.IsGPosing || Resolve(actor) is not { } a) return null;
+        var (position, rotation, scale) = brio.GetModelTransform(a);
+        if (position is not { } p || rotation is not { } r) return null;
+        var s = scale ?? System.Numerics.Vector3.One;
+        return new Backend.ModelPose([p.X, p.Y, p.Z], [r.X, r.Y, r.Z, r.W], [s.X, s.Y, s.Z]);
+    });
+
+    /// <summary>把角色移到世界坐标 position、朝向 rotation（合并模式复刻站位），等几帧让 Brio 读到的位置刷新。</summary>
+    public async Task<bool> MoveAsync(int actor, System.Numerics.Vector3 position, System.Numerics.Quaternion rotation)
+    {
+        var ok = await framework.RunOnFrameworkThread(() =>
+            clientState.IsGPosing && Resolve(actor) is { } a && brio.SetModelTransform(a, position, rotation));
+        if (ok) await framework.DelayTicks(FreezeSettleTicks);
+        return ok;
+    }
+
     /// <summary>冻结动画、等几帧再导入（否则待机动画会让姿势漂移），之后再应用一次。返回错误信息，成功为 null。</summary>
     public async Task<string?> ApplyAsync(int? actor, string poseJson)
     {

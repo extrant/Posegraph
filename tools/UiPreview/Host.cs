@@ -103,6 +103,7 @@ public sealed unsafe class Host : IDisposable
         if (window.Position is { } pos) ImGui.SetNextWindowPos(pos, window.PositionCondition);
         if (window.Size is { } size) ImGui.SetNextWindowSize(size * Current.Scale, window.SizeCondition);
         if (window.SizeConstraints is { } c) ImGui.SetNextWindowSizeConstraints(c.MinimumSize * Current.Scale, c.MaximumSize * Current.Scale);
+        if (window.BgAlpha is { } alpha) ImGui.SetNextWindowBgAlpha(alpha);
         var open = true;
         if (ImGui.Begin(window.WindowName, ref open, window.Flags))
             window.Draw();

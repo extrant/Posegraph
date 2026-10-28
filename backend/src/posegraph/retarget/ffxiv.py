@@ -328,6 +328,7 @@ class RetargetResult:
     # 补偿信息：l/r → {weight, shift_cm}；head_shift_cm；upright_deg（站姿重力校正角，未校正时缺省）
     hand_compensation: dict[str, dict[str, float]] | None = None
     upright_rotation: np.ndarray | None = None   # 站姿重力校正旋转（xyzw，MHR 模型系），供预览/相机复刻使用
+    root_offset: np.ndarray | None = None        # 调整页的整体位移（米，模型系）：复刻站位按位移前的位置算，不抵消它
 
 
 # 末端补偿：手腕到部位（头/胸/髋）距离 ≤ NEAR 时完全按部位相对位置放置，≥ FAR 时只复制角度，中间平滑过渡
@@ -528,7 +529,8 @@ def retarget(joint_global_rots: np.ndarray, joint_coords_cam: np.ndarray | None 
              hand_strength: float = 1.0, hand_near: float = HAND_CONTACT_NEAR, hand_far: float = HAND_CONTACT_FAR,
              upright_max_deg: float = UPRIGHT_MAX_DEG, helper_strength: float = 1.0,
              rest_vertices: np.ndarray | None = None, reference_lengths: bool = True,
-             ivcs: bool = True) -> RetargetResult:
+             ivcs: bool = True, upright_override: R | None = None, root_rotation: tuple[float, float, float] = (0.0, 0.0, 0.0),
+             root_offset: tuple[float, float, float] = (0.0, 0.0, 0.0)) -> RetargetResult:
     """joint_global_rots: (127,3,3) SAM 3D Body 输出 pred_global_rots；
     joint_coords_cam: (127,3) pred_joint_coords（相机系，仅用于自检）；
     rest_coords / rest_rots: 该人物体型下的零姿态（缺省用平均体型 mhr_rest.json，骨段方向会有几度系统误差）；
@@ -540,6 +542,9 @@ def retarget(joint_global_rots: np.ndarray, joint_coords_cam: np.ndarray | None 
     compensate_head: 头部末端补偿（只转 j_kubi），默认关闭——头相对双肩的位移主要来自上背弯曲，
     只靠离头很近的 j_kubi 去补需要转 40~60°，头颈之间会出现明显折角（游戏实测“头严重偏移”）；
     upright: 站姿重力校正，vertices_cam 为 MHR 网格顶点（相机系，用于估算重心，缺省用关节）；
+    upright_override: 直接用这个重力校正（合并模式整个场景共用的：深度找到的地面，见 floor.py），不再按站姿估算；
+    root_rotation / root_offset: 调整页的整体旋转（度，模型系 xyz，绕髋部转）和整体位移（米，贴地之后加上去，
+    复刻站位时不会被抵消，见 placement）；
     distribute_neck: 按游戏动画习惯重新分配胸→颈→头的转动（见 NECK_KUBI_SHARE），默认关闭；
     photo: (焦距, cam_t, (宽, 高))，用于判断脚是否在画面内——脚在画面外（半身照）时脚是模型猜的，不做重力校正；
     neck_scale: 颈部幅度，按比例缩放颈 j_kubi、头 j_kao 相对上一级的转动（方向不变）。
@@ -563,12 +568,21 @@ def retarget(joint_global_rots: np.ndarray, joint_coords_cam: np.ndarray | None 
     mhr_model = joint_coords_cam * flip if joint_coords_cam is not None else None
 
     upright_rot = None
-    if upright and mhr_model is not None and not (photo is not None and not _feet_in_frame(mhr_names, joint_coords_cam, *photo)):
+    if upright and upright_override is not None and mhr_model is not None:   # 调整页关掉重力校正时也不用场景的
+        upright_rot = upright_override
+        posed = upright_rot * posed
+        mhr_model = upright_rot.apply(mhr_model)
+    elif upright and mhr_model is not None and not (photo is not None and not _feet_in_frame(mhr_names, joint_coords_cam, *photo)):
         upright_rot = _upright_rotation(mhr_names, mhr_model, vertices_cam * flip if vertices_cam is not None else None,
                                         upright_max_deg)
         if upright_rot is not None:
             posed = upright_rot * posed
             mhr_model = upright_rot.apply(mhr_model)
+
+    if any(root_rotation) and mhr_model is not None:
+        manual = R.from_euler("xyz", root_rotation, degrees=True)
+        posed = manual * posed
+        mhr_model = manual.apply(mhr_model)
 
     G_new: list[R | None] = [None] * len(sk.names)
     for m in BONE_MAP:
@@ -661,6 +675,9 @@ def retarget(joint_global_rots: np.ndarray, joint_coords_cam: np.ndarray | None 
         P = P.copy()
         P[1:, 1] -= drop  # n_root 不动，其余整体平移
         compensation["ground_drop_cm"] = round(float(drop) * 100, 1)
+    if any(root_offset):
+        P = P.copy()
+        P[1:] += np.asarray(root_offset, dtype=float)   # n_root 不动，其余整体平移
 
     # 输出：映射骨骼 + 祖先链（不含 n_root）
     keep: set[int] = set()
@@ -689,14 +706,15 @@ def retarget(joint_global_rots: np.ndarray, joint_coords_cam: np.ndarray | None 
             b = model[mhr_names.index(m.mhr_tip)] - model[mhr_names.index(m.mhr)]
             cos = np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
             errors[m.ffxiv] = float(np.degrees(np.arccos(np.clip(cos, -1, 1))))
-    return RetargetResult(bones=bones, segment_error_deg=errors,
+    return RetargetResult(bones=bones, segment_error_deg=errors, root_offset=np.asarray(root_offset, dtype=float),
                           all_rotations={n: G[i].as_quat() for i, n in enumerate(sk.names)},
                           all_positions={n: P[i] for i, n in enumerate(sk.names)},
                           hand_compensation=compensation,
                           upright_rotation=upright_rot.as_quat() if upright_rot is not None else None)
 
 
-def to_brio_pose_json(result: RetargetResult) -> str:
+def to_brio_pose_json(result: RetargetResult, extra: dict | None = None) -> str:
+    """extra：额外写进去的骨骼（如脸部骨骼，见 face_rig），格式同 result.bones。"""
     fmt = lambda v: ", ".join(f"{float(x):.7g}" for x in v)
     doc = {
         "FileExtension": ".pose",
@@ -705,7 +723,7 @@ def to_brio_pose_json(result: RetargetResult) -> str:
         "ModelDifference": {"Position": "0, 0, 0", "Rotation": "0, 0, 0, 1", "Scale": "0, 0, 0"},
         "ModelAbsoluteValues": {"Position": "0, 0, 0", "Rotation": "0, 0, 0, 1", "Scale": "1, 1, 1"},
         "Bones": {name: {"Position": fmt(p), "Rotation": fmt(q), "Scale": fmt(sc)}
-                  for name, (p, q, sc) in result.bones.items()},
+                  for name, (p, q, sc) in {**result.bones, **(extra or {})}.items()},
         "MainHand": {}, "OffHand": {}, "Prop": {}, "Ornament": {},
         "Position": "0, 0, 0", "Rotation": "0, 0, 0, 1", "Scale": "1, 1, 1",
     }

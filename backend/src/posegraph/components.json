@@ -1,0 +1,29 @@
+{
+  "tag": "backend-components-1",
+  "components": [
+    {
+      "id": "face",
+      "name": "面捕（表情、头部朝向）",
+      "nameEn": "Face capture (expressions, head direction)",
+      "check": [
+        "python/Lib/site-packages/mediapipe/__init__.py",
+        "backend/checkpoints/face/face_landmarker.task"
+      ],
+      "url": "https://github.com/extrant/Posegraph/releases/download/backend-components-1/posegraph-face-1.zip",
+      "size": 66564098,
+      "sha256": "ac62fb58b2a7600f73c48f08811e6bd15a47f1104fb8dd1f00b9f6fd24604721"
+    },
+    {
+      "id": "depth",
+      "name": "深度图（镜头焦距、地面）",
+      "nameEn": "Depth (camera focal length, floor)",
+      "check": [
+        "python/Lib/site-packages/moge/__init__.py",
+        "backend/checkpoints/moge/model.pt"
+      ],
+      "url": "https://github.com/extrant/Posegraph/releases/download/backend-components-1/posegraph-depth-1.zip",
+      "size": 419807657,
+      "sha256": "23e387d0008c7065fd5573d7b7fec8b28ca7997a899fff4efb4e1eabd80b03bf"
+    }
+  ]
+}

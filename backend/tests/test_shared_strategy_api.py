@@ -234,9 +234,10 @@ class SharedStrategyApiTests(unittest.TestCase):
                         release.set()
 
     def test_create_session_forwards_hold_and_parallel_query(self):
-        for query, expected in (("hold=true", (b"image", True, False)),
-                                ("hold=true&parallel=true", (b"image", True, True)),
-                                ("name=x", (b"image", False, False))):
+        for query, expected in (("hold=true", (b"image", True, False, None, None)),
+                                ("hold=true&parallel=true", (b"image", True, True, None, None)),
+                                ("name=x", (b"image", False, False, None, None)),
+                                ("boxes=1,2,30,40", (b"image", False, False, "1,2,30,40", None))):
             with self.subTest(query=query), \
                     patch.object(service, "_estimate", side_effect=service.HTTPException(422, "fake result")) as estimate, \
                     TestClient(service.app) as client:

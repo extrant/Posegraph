@@ -38,6 +38,12 @@ class RetargetParams(BaseModel):
     upright_max_deg: float = UPRIGHT_MAX_DEG
     ground: bool = True
     helper_strength: float = 1.0
+    root_rotation: list[float] = Field(default_factory=lambda: [0.0, 0.0, 0.0])   # 整体旋转（度，模型系 xyz，绕髋部）
+    root_offset: list[float] = Field(default_factory=lambda: [0.0, 0.0, 0.0])     # 整体位移（米，模型系 xyz）
+    face: bool = False              # 把照片表情套到脸部骨骼（face_rig.py）
+    face_strength: float = 1.0      # 表情强度（各通道权重乘这个数）
+    face_gains: dict[str, float] = Field(default_factory=dict)   # 分组权重 face_rig.FACE_GROUPS → 倍数（眼睑、眉、嘴、下巴、视线）
+    face_head: float = 0.5          # 头部朝向跟面捕的脸走多少（0 = 只用 SAM，1 = 完全按脸；不开表情也生效）
 
 
 # 预设：插画的头颈比例夸张，识别容易把头颈角度估大（游戏实测 0.7 合适）
@@ -49,9 +55,10 @@ PRESETS: dict[str, RetargetParams] = {
 
 def run(human: dict, image_size: tuple[int, int], params: RetargetParams,
         reference: BrioPose | None = None, race: str = DEFAULT_RACE, reference_lengths: bool = True,
-        ivcs: bool = True) -> RetargetResult:
+        ivcs: bool = True, upright_override=None) -> RetargetResult:
     """human：会话里保存的单人识别结果（键同 image_to_pose 的 npz）；race：骨架编号（见 retarget/races.py）；
-    reference_lengths：False 时骨长用该骨架的绑定骨长（游戏骨长不可信时）；ivcs：游戏角色是否加载了 IVCS 骨骼。"""
+    reference_lengths：False 时骨长用该骨架的绑定骨长（游戏骨长不可信时）；ivcs：游戏角色是否加载了 IVCS 骨骼；
+    upright_override：合并模式整个场景共用的重力校正（floor.scene），代替单人站姿估算。"""
     amp = {bone: k for group, k in params.amplitude.items() for bone in AMPLITUDE_GROUPS.get(group, ())}
     return retarget(human["joint_global_rots"], human["joint_coords"], human["rest_joint_coords"],
                     human["rest_joint_rots"], reference=reference, race=race, vertices_cam=human.get("vertices"),
@@ -60,7 +67,9 @@ def run(human: dict, image_size: tuple[int, int], params: RetargetParams,
                     upright=params.upright, upright_max_deg=params.upright_max_deg, ground=params.ground,
                     amplitude=amp, offsets={k: tuple(v) for k, v in params.offsets.items()},
                     hand_strength=params.hand_strength, hand_near=params.hand_near, hand_far=params.hand_far,
-                    helper_strength=params.helper_strength, reference_lengths=reference_lengths, ivcs=ivcs)
+                    helper_strength=params.helper_strength, reference_lengths=reference_lengths, ivcs=ivcs,
+                    upright_override=upright_override,
+                    root_rotation=tuple(params.root_rotation), root_offset=tuple(params.root_offset))
 
 
 # ---------------------------------------------------------------- 合理性检查

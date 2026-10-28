@@ -1,9 +1,10 @@
 """连续采样游戏内角色的骨骼姿势（用于拟合辅助骨联动规律）。
 
-    .venv/Scripts/python scripts/sample_frames.py [--actor N] [--seconds 30] [--hz 10]
+    .venv/Scripts/python scripts/sample_frames.py [--actor N] [--seconds 30] [--hz 10] [--label 名称]
 
-角色需处于播放动画状态（未冻结）。采样期间让角色做抬手、转腕、弯肘等动作。
-输出 outputs/samples/<时间>.jsonl，每行一帧 Brio pose JSON 的 Bones 字段。
+角色需处于播放动画状态（未冻结）。采样期间让角色做抬手、转腕、弯肘等动作（或表情动作，见 docs/face-sampling.md）。
+输出 outputs/samples/<时间>[-<label>].jsonl，每行一帧 Brio pose JSON 的 Bones 字段（含 j_f_ 脸部骨骼）；
+同名 .meta.json 记下标签、种族（RaceSexId）、脸型（FaceID）。
 """
 
 from __future__ import annotations
@@ -24,13 +25,19 @@ def main() -> None:
     ap.add_argument("--actor", type=int)
     ap.add_argument("--seconds", type=float, default=30)
     ap.add_argument("--hz", type=float, default=10)
+    ap.add_argument("--label", help="这段采样做的是什么（如 smile、blink），写进文件名和 .meta.json")
     args = ap.parse_args()
 
     from posegraph.bridge import BridgeClient
 
     client = BridgeClient()
-    out = ROOT / "outputs" / "samples" / f"{time.strftime('%Y%m%d-%H%M%S')}.jsonl"
+    name = time.strftime("%Y%m%d-%H%M%S") + (f"-{args.label}" if args.label else "")
+    out = ROOT / "outputs" / "samples" / f"{name}.jsonl"
     out.parent.mkdir(parents=True, exist_ok=True)
+    first = json.loads(client.get_pose(args.actor))
+    meta = {"label": args.label, "actor": args.actor, "hz": args.hz,
+            **{k: first.get(k) for k in ("RaceSexId", "FaceID", "ModelId")}}
+    out.with_suffix(".meta.json").write_text(json.dumps(meta, ensure_ascii=False, indent=1), encoding="utf-8")
     frames, last = 0, None
     end = time.monotonic() + args.seconds
     with out.open("w", encoding="utf-8") as f:

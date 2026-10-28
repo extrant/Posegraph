@@ -5,8 +5,52 @@
   },
   "entries": [
     {
+      "version": "0.5.0",
+      "date": "2026-10-28",
+      "title": {
+        "zh": "面部表情、灯光、构图截图与更快的识别",
+        "en": "Facial expressions, lighting, framing & screenshots, faster recognition"
+      },
+      "items": {
+        "zh": [
+          "后端更新会自动补齐新功能要的组件（面捕约 64 MB、深度图约 400 MB）：老一键包在设置页点一次「更新后端」就行，不用重新下载整个一键包。下载慢可以填下载加速前缀，断了重试时已下好的组件不用重下",
+          "面部表情（测试）：照片里的表情换算成游戏的脸部骨骼——闭眼、眯眼、挑眉、嘴角、张嘴、歪嘴、视线都按照片的实际幅度还原，最多到游戏里这块脸能动的极限。第一次用要在游戏里输入 /posegraph facedump 导出一次游戏表情数据（一两分钟）",
+          "分项权重：眼睑、眉毛、嘴部、下巴、视线可以分开调，哪一块不像就单独调哪一块（调整页「面部表情」里，默认展开）",
+          "头部朝向跟脸：用面捕修正头的朝向，低头、侧脸的角度更准（默认一半，调整页「面部表情」里的「头部跟脸」滑条，不开表情也生效）",
+          "Brio 改动收进图库：应用姿势后在 Brio 里手动改了骨骼，主窗口会提示「检测到在 Brio 里改了 N 根骨骼」，点「收进修正并存进图库」就变成这张图的修正，下次打开自动套上，改别的调整值重新应用时也不会被冲掉",
+          "灯光：工具栏灯泡按钮，一键给当前角色打光（11 套方案），灯跟着脸和镜头摆；独立的 3D 灯光视图里可以拖动、旋转每盏灯，单独看某一盏或关掉某一盏",
+          "构图与截图：构图框（横竖构图、遮暗框外、三分线等参考线）、等效全画幅焦距、按原图比例一键适配，可叠加原图做参考；一键截图直接存进 Posegraph",
+          "复刻镜头更稳：按帧等镜头稳定，低帧率时不再偶尔复刻歪；宽幅照片的视场角更准",
+          "深度图（MoGe-2）：识别时顺带估计镜头焦距和地面，人物站位、镜头复刻更准；设置页「深度辅助识别」可以关掉（关掉更快、更省显存）",
+          "识别更快：移植 Fast SAM 3D Body，单人识别约快一倍（GPU 约 0.6 秒，设置页「快速识别」）",
+          "3D 页：骨骼旋转环（像 Brio 一样选轴直接拖）；右键 / 中键拖动平移视图",
+          "调整页新增「整体旋转 / 位移」：整个人歪了、要抬高放低时用",
+          "并行识别（实验）：批量识别时按显存余量开几路同时识别，失败自动退回逐张",
+          "修复：图库图片多时缩略图可能把游戏冲崩；连本机后端不再走系统代理；后端解码不了的图片改用 Windows 解码重试；3D 页底部勾选框被切掉一截、英文界面下拉框文字被截断",
+          "合并模式（一张图多人）还在打磨，这一版先关着，下个版本开放"
+        ],
+        "en": [
+          "Backend updates now add the components new features need (face capture about 64 MB, depth about 400 MB): older one-click packages just click \"Update backend\" once on Settings, no need to download the whole package again. Set a download prefix if it's slow; finished components aren't downloaded again when you retry",
+          "Facial expressions (beta): the photo's expression is turned into the game's face bones. Eyes closing or squinting, brows, mouth corners, open or crooked mouths and gaze follow the photo's actual amount, up to what each part of the face can move in game. The first time, type /posegraph facedump in game to export the game's expression data once (a minute or two)",
+          "Per-part weights: eyelids, brows, mouth, jaw and gaze can be tuned separately, so you only adjust the part that looks off (under Facial expressions on the Tuning tab, expanded by default)",
+          "Head follows face: face capture corrects the head direction, so tilted and turned heads are more accurate (half by default; the \"Head follows face\" slider under Facial expressions, works even with expressions off)",
+          "Keep Brio edits in the library: if you change bones in Brio after applying, the main window says how many bones you changed; \"Keep as correction and save to library\" stores them with the image, so they come back next time and re-applying after other tweaks no longer wipes them",
+          "Lighting: the light bulb on the toolbar lights the current character in one click (11 setups) and keeps the lights placed relative to the face and camera; a separate 3D lighting view lets you drag and rotate each light, solo it or mute it",
+          "Framing & screenshots: a framing box (landscape or portrait, dim outside, thirds and other guides), equivalent full-frame focal length, one-click fit to the photo's aspect, an optional photo overlay for reference, and one-click screenshots saved into Posegraph",
+          "Steadier camera matching: waits for the camera by frames, so low frame rates no longer occasionally match it crooked; wide photos get a more accurate field of view",
+          "Depth (MoGe-2): recognition also estimates the camera focal length and the floor, making placement and camera matching more accurate; turn off \"Depth-assisted recognition\" on Settings for speed and less VRAM",
+          "Faster recognition: ported from Fast SAM 3D Body, single-person recognition is about twice as fast (about 0.6 s on GPU, \"Fast recognition\" on Settings)",
+          "3D tab: rotation rings on bones (pick an axis and drag, like Brio); pan the view with the right or middle mouse button",
+          "Tuning tab: new \"Whole-body rotation / offset\" for when the whole person leans or needs raising or lowering",
+          "Parallel recognition (experimental): batch recognition runs several at once based on free VRAM and falls back to one by one on failure",
+          "Fixes: library thumbnails could crash the game with many images; the local backend no longer goes through the system proxy; images the backend can't decode are retried via Windows; the 3D tab's bottom checkbox was cut off and dropdown text was truncated in English",
+          "Merge mode (several people in one image) is still being polished and stays off in this version; it opens in the next one"
+        ]
+      }
+    },
+    {
       "version": "0.4.0",
-      "date": "",
+      "date": "2026-10-26",
       "title": {
         "zh": "拆分模式、辅助视角与新界面",
         "en": "Split mode, extra views and a new look"

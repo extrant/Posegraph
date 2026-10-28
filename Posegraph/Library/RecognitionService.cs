@@ -56,15 +56,15 @@ public sealed partial class RecognitionService(ImageLibrary library, BackendClie
     /// <summary>识别失败的详细信息写进 Dalamud 日志（/xllog）：文件真实格式、后端报错、转码重试的经过（由 Plugin 接上）。</summary>
     public Action<string, Exception?>? Log { get; set; }
 
-    private async Task<SessionInfo> CreateAsync(byte[] bytes, string name, bool parallel = false)
+    private async Task<SessionInfo> CreateAsync(byte[] bytes, string name, bool parallel = false, string? boxes = null, MaskData? masks = null)
     {
         var hold = Volatile.Read(ref _batches) > 0;
         if (hold) Interlocked.Exchange(ref _held, 1);
         try
         {
-            return await client.CreateSessionAsync(bytes, name, hold, parallel);
+            return await client.CreateSessionAsync(bytes, name, hold, parallel, boxes, masks);
         }
-        catch (BackendException ex) when (ex.StatusCode == 400)
+        catch (BackendException ex) when (ex.StatusCode == 400 && !IsBoxError(ex))
         {
             // 后端解码不了（HEIC、JPEG XL 等改了扩展名的图）：Windows 能解码的话转成 PNG 再试一次，解不了就报原来的错
             Log?.Invoke($"[识别] {name}：{ex.Message}；实际内容：{ImageFormat.Describe(bytes)}", null);
@@ -76,7 +76,7 @@ public sealed partial class RecognitionService(ImageLibrary library, BackendClie
             Log?.Invoke($"[识别] {name}：已用 Windows 解码转成 PNG（{png.Length} 字节），重试", null);
             try
             {
-                return await client.CreateSessionAsync(png, name, hold, parallel);
+                return await client.CreateSessionAsync(png, name, hold, parallel, boxes, masks);
             }
             catch (Exception retry)
             {
@@ -89,6 +89,11 @@ public sealed partial class RecognitionService(ImageLibrary library, BackendClie
             throw;   // LogFailure 总是返回 false，这里不会进来：只是在不改变异常的前提下记一笔
         }
     }
+
+    /// <summary>400 是人物框不对（不是图片解码不了）：转码重试没用。</summary>
+    private static bool IsBoxError(BackendException ex)
+        => ex.Message.Contains("人物框") || ex.Message.Contains("人物遮罩")
+           || ex.Message.Contains("person box", StringComparison.OrdinalIgnoreCase) || ex.Message.Contains("person mask", StringComparison.OrdinalIgnoreCase);
 
     private bool LogFailure(string name, byte[] bytes, Exception ex)
     {
@@ -135,6 +140,58 @@ public sealed partial class RecognitionService(ImageLibrary library, BackendClie
         return (info, sha1);
     }
 
+    /// <summary>
+    /// 合并模式：只识别这些人物框（一张图多人，boxes 见 BackendClient.FormatBoxes）。识别缓存按「图片内容 + 框」记，
+    /// 同一张图同样的框再打开不重跑模型。masks：遮罩编辑器改过的人物遮罩（一起作为提示，缓存键也算上它）。
+    /// 返回会话、缓存键（会话丢了时用它恢复）与图片内容哈希。
+    /// </summary>
+    public async Task<(SessionInfo Info, string Key, string Sha1)> OpenPeopleAsync(string path, string boxes, MaskData? masks = null)
+        => await OpenPeopleAsync(path, boxes, masks, cacheOnly: false) ?? throw new InvalidOperationException();
+
+    /// <summary>cacheOnly：只读识别缓存，没有缓存返回 null，不跑模型（重新打开图时恢复上次的多人结果）。</summary>
+    public async Task<(SessionInfo Info, string Key, string Sha1)?> OpenPeopleAsync(string path, string boxes, MaskData? masks, bool cacheOnly)
+    {
+        var bytes = await File.ReadAllBytesAsync(path);
+        var sha1 = library.RememberHash(path, bytes);
+        // 缓存键：图片 + 框（+ 遮罩：改过遮罩的识别结果不一样）
+        var tag = masks is null ? boxes : $"{boxes}|{masks.Width}x{masks.Height}|{Convert.ToHexString(System.Security.Cryptography.SHA1.HashData(masks.Labels))}";
+        var key = $"{sha1}-m{Convert.ToHexString(System.Security.Cryptography.SHA1.HashData(System.Text.Encoding.UTF8.GetBytes(tag)))[..10]}";
+        var name = Path.GetFileNameWithoutExtension(path);
+        var count = boxes.Split(';', StringSplitOptions.RemoveEmptyEntries).Length;
+        if (library.ReadCache(key) is { } archive)
+        {
+            try
+            {
+                var restored = await client.RestoreSessionAsync(archive, name);
+                if (restored.Humans.Length == count) return (restored, key, sha1);
+                // 人数不对：旧后端忽略了人物框、把整张图当一个人存下的缓存，作废重新识别
+                library.DeleteCache(key);
+                _ = client.DeleteSessionAsync(restored.SessionId).ContinueWith(_ => { });
+            }
+            catch (BackendException ex) when (ex.StatusCode == 400)
+            {
+                library.DeleteCache(key);
+            }
+        }
+        if (cacheOnly) return null;
+        var info = await CreateAsync(bytes, name, boxes: boxes, masks: masks);
+        if (info.Humans.Length != count)
+        {
+            // 旧后端不认识 boxes 参数，会把整张图当一个人识别：不能当成多人结果用，也不写缓存
+            _ = client.DeleteSessionAsync(info.SessionId).ContinueWith(_ => { });
+            throw new InvalidOperationException(Loc.T("后端不支持多人识别：请在设置页更新后端，然后重启后端"));
+        }
+        try
+        {
+            library.WriteCache(key, await client.SessionArchiveAsync(info.SessionId));
+        }
+        catch
+        {
+            // 缓存写不进去不影响这次使用
+        }
+        return (info, key, sha1);
+    }
+
     private readonly ConcurrentDictionary<string, AuxView> _views = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>辅助视角图上次融合时识别出的视角（菜单里显示）；还没融合过返回 null。</summary>
@@ -165,7 +222,7 @@ public sealed partial class RecognitionService(ImageLibrary library, BackendClie
         }
     }
 
-    /// <summary>会话丢了（后端重启、被挤出）时用缓存恢复；没有缓存返回 null。</summary>
+    /// <summary>会话丢了（后端重启、被挤出）时用缓存恢复；没有缓存返回 null。key：图片内容哈希，合并模式是 OpenPeopleAsync 给的键。</summary>
     public async Task<SessionInfo?> RestoreAsync(string sha1, string name)
         => library.ReadCache(sha1) is { } archive ? await client.RestoreSessionAsync(archive, name) : null;
 

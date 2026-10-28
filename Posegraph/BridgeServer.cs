@@ -12,7 +12,7 @@ namespace Posegraph;
 ///   GET  /actors            Brio 管理的 GPose 角色列表
 ///   GET  /pose?actor=N      取角色当前姿势（Brio pose JSON），N 为 ObjectIndex，省略则用 GPose 目标
 ///   POST /pose?actor=N      应用姿势，请求体为 Brio pose JSON；默认先冻结动画，freeze=0 可跳过
-///   GET  /camera            读取 GPose 相机参数、视图/投影矩阵，以及 GPose 目标的世界位置与朝向
+///   GET  /camera            读取 GPose 相机参数、视图/投影矩阵、帧号（判断相机停稳用），以及 GPose 目标的世界位置与朝向
 ///   POST /camera            写入相机参数 {distance, angle[2], pan[2], roll, zoom, delimit}
 /// </summary>
 public sealed class BridgeServer(IFramework framework, IClientState clientState, ITargetManager targetManager, BrioBridge brio, IPluginLog log) : IDisposable
@@ -23,6 +23,7 @@ public sealed class BridgeServer(IFramework framework, IClientState clientState,
 
     private HttpListener? _listener;
     private CancellationTokenSource? _cts;
+    private long _frame;   // 游戏帧号：后端连读相机时据此判断两次读数是不是同一帧（帧率低时按时间间隔判断会误判「已停稳」）
 
     public bool IsRunning => _listener?.IsListening == true;
     public int? Port { get; private set; }
@@ -36,12 +37,14 @@ public sealed class BridgeServer(IFramework framework, IClientState clientState,
         _listener = listener;
         _cts = new CancellationTokenSource();
         Port = port;
+        framework.Update += CountFrame;
         _ = Task.Run(() => AcceptLoop(listener, _cts.Token));
         log.Info(Loc.F("Posegraph HTTP 已启动：http://127.0.0.1:{0}/", port));
     }
 
     public void Stop()
     {
+        framework.Update -= CountFrame;
         _cts?.Cancel();
         try { _listener?.Close(); } catch { }
         _listener = null;
@@ -49,6 +52,8 @@ public sealed class BridgeServer(IFramework framework, IClientState clientState,
     }
 
     public void Dispose() => Stop();
+
+    private void CountFrame(IFramework _) => _frame++;
 
     private async Task AcceptLoop(HttpListener listener, CancellationToken ct)
     {
@@ -105,6 +110,7 @@ public sealed class BridgeServer(IFramework framework, IClientState clientState,
         var target = targetManager.GPoseTarget;
         return new
         {
+            frame = _frame,
             camera = GposeCamera.Read(),
             target = target is null ? null : new
             {

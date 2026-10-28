@@ -5,6 +5,7 @@
 - 设备选择：GPU / CPU / 自动（按可用显存）。上游推理代码写死了 CUDA，CPU 模式在推理期间临时重定向
 - 显存优化：身体头/手部头共用一份 MHR；GPU 模式下 MHR 留在 CPU（约省 660MB）
 - 骨干网络精度控制：上游配置默认 bf16（TRAIN.USE_FP16 + FP16_TYPE=bfloat16），可切 fp16 / fp32
+- 快速模式（fast）：移植自 Fast SAM 3D Body 的提速，见 sam3d_fast.py；同时删掉 MHR 的修正形变权重，MHR 只剩约 29MB，直接放显卡
 - 把输出整理成 HumanEstimate
 """
 
@@ -22,6 +23,8 @@ import numpy as np
 
 from ..i18n import tr
 from .base import EstimateResult, HumanEstimate, PoseEstimator
+
+FACES_FILE = "mhr_faces.npy"   # 网格三角形，第一次加载模型时存到权重的 assets 目录
 
 Precision = Literal["auto", "bf16", "fp16", "fp32"]
 Device = Literal["auto", "cuda", "cpu"]
@@ -113,12 +116,15 @@ def _cpu_mhr(scripted):
 class Sam3dBodyEstimator(PoseEstimator):
     """device：auto 时按 nvidia-smi 的可用显存决定（低于 min_free_vram_mb 用 CPU），每次加载时重新判断；
     precision：auto 时 GPU 用 bf16（上游默认）、CPU 用 fp32（多数 CPU 没有 bf16 硬件，反而更慢）；
-    mhr_on_cpu：GPU 模式下把 MHR 留在 CPU。"""
+    mhr_on_cpu：GPU 模式下把 MHR 留在 CPU（快速模式下 MHR 只有约 29MB，忽略此项、放显卡）；
+    fast：快速模式（sam3d_fast），加载时决定，改了要重新加载；
+    backbone_scale：骨干输入缩放（低配模式 0.75），见 sam3d_fast._scaled_backbone。"""
 
     name = "sam3d_body"
 
     def __init__(self, repo_dir: Path, checkpoint_dir: Path, device: Device = "auto", precision: Precision = "auto",
-                 share_mhr: bool = True, mhr_on_cpu: bool = True, min_free_vram_mb: int = 3000):
+                 share_mhr: bool = True, mhr_on_cpu: bool = True, min_free_vram_mb: int = 3000, fast: bool = False,
+                 backbone_scale: float = 1.0):
         self.repo_dir = Path(repo_dir)
         self.checkpoint_dir = Path(checkpoint_dir)
         self.device = device
@@ -126,9 +132,12 @@ class Sam3dBodyEstimator(PoseEstimator):
         self.share_mhr = share_mhr
         self.mhr_on_cpu = mhr_on_cpu
         self.min_free_vram_mb = min_free_vram_mb
-        # 加载后实际使用的设备 / 精度，以及选择原因
+        self.fast = fast
+        self.backbone_scale = backbone_scale
+        # 加载后实际使用的设备 / 精度 / 是否快速模式，以及选择原因
         self.active_device: str | None = None
         self.active_precision: str | None = None
+        self.active_fast: bool | None = None
         self.device_reason: tuple = ("",)   # (中文模板, 参数)，返回给界面时按语言翻译（i18n.tr）
         self._estimator = None
 
@@ -182,7 +191,19 @@ class Sam3dBodyEstimator(PoseEstimator):
             model, cfg = self._build(ckpt, mhr, device, precision)
         with _quiet():
             self._estimator = SAM3DBodyEstimator(sam_3d_body_model=model, model_cfg=cfg)
-        self.active_device, self.active_precision = device, precision
+        self.active_device, self.active_precision, self.active_fast = device, precision, self.fast
+        faces = self.checkpoint_dir / "assets" / FACES_FILE
+        if not faces.exists():   # 存一份三角形：模型卸载后（或刚启动、从识别缓存恢复的会话）也能画人物遮罩
+            try:
+                np.save(faces, np.asarray(self._estimator.faces, dtype=np.int32))
+            except OSError:
+                pass
+
+    def faces(self) -> np.ndarray | None:
+        if self._estimator is not None:
+            return np.asarray(self._estimator.faces, dtype=np.int32)
+        path = self.checkpoint_dir / "assets" / FACES_FILE
+        return np.load(path) if path.exists() else None
 
     def _build(self, ckpt: Path, mhr: Path, device: str, precision: str):
         """同上游 build_models.load_sam_3d_body，区别：在 CPU 上组装好（共用 / 外置 MHR、设精度）再整体搬到目标设备，
@@ -217,17 +238,31 @@ class Sam3dBodyEstimator(PoseEstimator):
         if self.share_mhr:
             # 身体头和手部头各自从同一文件加载了一份冻结的 MHR（约 660MB），只用于无状态前向，共用一份即可
             model.head_pose_hand.mhr = model.head_pose.mhr
-        if device == "cuda" and self.mhr_on_cpu:
+        if self.fast:
+            from . import sam3d_fast
+
+            for mhr in {id(m): m for m in (model.head_pose.mhr, model.head_pose_hand.mhr)}.values():
+                sam3d_fast.strip_correctives(mhr)
+        elif device == "cuda" and self.mhr_on_cpu:
             body = _cpu_mhr(model.head_pose.mhr)
             model.head_pose.mhr = body
             model.head_pose_hand.mhr = body if self.share_mhr else _cpu_mhr(model.head_pose_hand.mhr)
-        return model.to(device).eval(), cfg
+        model = model.to(device).eval()
+        if self.fast or self.backbone_scale != 1.0:
+            import dataclasses
+            from . import sam3d_fast
+
+            base = sam3d_fast.FastOptions() if self.fast else sam3d_fast.ORIGINAL
+            sam3d_fast.apply(model, dataclasses.replace(base, backbone_scale=self.backbone_scale))
+        return model, cfg
 
     def unload(self) -> None:
         import gc
 
         self._estimator = None
-        self.active_device = self.active_precision = None
+        self.active_device = self.active_precision = self.active_fast = None
+        from .. import depth
+        depth.unload()   # 深度模型跟着一起释放
         gc.collect()
         if "torch" in sys.modules:
             import torch
@@ -238,12 +273,29 @@ class Sam3dBodyEstimator(PoseEstimator):
     def _device_scope(self):
         return _cpu_redirect() if self.active_device == "cpu" else nullcontext()
 
-    def estimate(self, image_rgb: np.ndarray, bboxes: np.ndarray | None = None) -> EstimateResult:
+    def estimate(self, image_rgb: np.ndarray, bboxes: np.ndarray | None = None,
+                 masks: np.ndarray | None = None, focal: float | None = None) -> EstimateResult:
+        """bboxes：人物框（N×4，原图像素）；None 时整张图当一个人。人多时按 max_people_per_batch 分批，
+        相机内参对所有批次相同（focal 给了就用它，否则按图片尺寸假设），分批不影响各人的相对位置。结果顺序与 bboxes 一致。
+        masks：(N, 高, 宽) 0/1，每个框的人物遮罩（看得见的像素），作为提示叠加到图像特征上。"""
+        from ..config import settings
+
         self.load()
         h, w = image_rgb.shape[:2]
         t0 = time.perf_counter()
+        chunks = [None] if bboxes is None else np.array_split(bboxes.reshape(-1, 4), max(1, -(-len(bboxes) // settings.max_people_per_batch)))
+        outputs = []
+        start = 0
         with _quiet(), self._device_scope():
-            outputs = self._estimator.process_one_image(image_rgb, bboxes=bboxes)
+            for chunk in chunks:
+                n = 1 if chunk is None else len(chunk)
+                part = None if masks is None else masks[start:start + n]
+                cam_int = None
+                if focal is not None:
+                    from ..depth import camera_intrinsics
+                    cam_int = camera_intrinsics(focal, (w, h))
+                outputs += self._estimator.process_one_image(image_rgb, bboxes=chunk, masks=part, cam_int=cam_int)
+                start += n
         elapsed = (time.perf_counter() - t0) * 1000
         return self._make_result(outputs, w, h, elapsed)
 

@@ -40,7 +40,12 @@ Posegraph plugin (in game, ImGui)  ── HTTP (127.0.0.1) ──►  Posegraph 
 - **Plausibility hints** with one-click fixes, based on ranges sampled from in-game animations.
 - **Hand contact compensation**: hands touching the head / chest / hips stay in contact even when your race's
   proportions differ from the person in the photo; elbows stay pure hinges.
-- **Camera matching**: reproduces the photo's camera angle, distance and field of view in GPose.
+- **Camera matching**: reproduces the photo's camera angle, distance and field of view in GPose; depth (MoGe-2) helps estimate the focal length and the floor.
+- **Facial expressions (beta)**: the photo's expression becomes the game's face bones, at the photo's actual amount and within the game's limits;
+  eyelids, brows, mouth, jaw and gaze can be tuned separately, and face capture also corrects the head direction.
+- **Keep Brio edits in the library**: bones you change in Brio after applying become this image's correction in one click.
+- **Lighting**: 11 one-click lighting setups that follow the face and camera, with a separate 3D view for adjusting each light.
+- **Framing and screenshots**: framing guide, guides, equivalent full-frame focal length, photo overlay, one-click screenshots of the game's own render.
 - **Export** Brio `.pose` files.
 - **Low-VRAM friendly**: Auto / GPU / CPU modes, the model is unloaded right after each recognition by default,
   and CPU mode uses no VRAM at all.
@@ -84,10 +89,14 @@ and add `Posegraph.dll` under *Dev Plugin Locations*.
 - **Plugin**: updates automatically through the plugin repository.
 - **Backend (package users)**: after the plugin updates, *Settings* shows "Backend …, plugin …". When the backend is older,
   click the download button next to it. The plugin downloads the matching source from this repository's tag
-  (`archive/refs/tags/vX.Y.Z.zip`, under 1 MB) and replaces only `backend\src`; Python, dependencies and the model stay.
+  (`archive/refs/tags/vX.Y.Z.zip`) and replaces `backend\src`. Python packages and models that new features need are
+  **components** (listed in `backend/src/posegraph/components.json`, files in the
+  [backend-components-1](https://github.com/extrant/Posegraph/releases/tag/backend-components-1) release): missing ones are
+  downloaded, checked against SHA-256 and unpacked into the package, so older packages get face capture (about 64 MB) and
+  depth (about 400 MB) with one click instead of a new full download.
   The previous version is kept as `backend\src.bak` and restored automatically if the new one fails to start.
   If GitHub is unreachable, set a mirror prefix such as `https://gh-proxy.org/`.
-- A full package download is only needed when the dependencies change; the plugin tells you
+- A full package download is only needed when Python / PyTorch itself changes; the plugin tells you
   (the package's `runtime.json` is older than what the new backend requires).
 - Source installs: update with `git pull` / checkout of the same tag.
 
@@ -159,7 +168,8 @@ merged into the second, and the IVCS icon in the status bar turns yellow.
   sink into the belly in high-knee poses.
 - Very strong elbow flexion creases more than in-game animations (~145° vs ~130°).
 - Jumping / airborne images are pulled to the ground unless *Snap to ground* is turned off.
-- Multiple people and video are reserved in the UI but not implemented; the whole image is treated as one person.
+- Several people in one image (merge mode) is still being polished and is off in this version; video is reserved in the UI but not implemented. The whole image is treated as one person.
+- Facial expressions: sticking out the tongue isn't possible; a one-eyed wink and a squinting smile are sometimes confused; faces in illustrations are rarely found.
 - The CPU mode speed depends heavily on the CPU (measured ~10 s per image on a 20-thread laptop CPU).
 
 ## Building from source

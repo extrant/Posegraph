@@ -12,7 +12,8 @@ await BackendNoticesShownOnce();
 await ForegroundNeverParallel();
 await SameContentInParallel();
 await UndecodableImageRetriesAsPng();
-Console.WriteLine("7 recognition service scenarios passed (real service/library/client; loopback HTTP).");
+await PeopleNeedAMultiPersonBackend();
+Console.WriteLine("8 recognition service scenarios passed (real service/library/client; loopback HTTP).");
 
 static void Check(bool value, string message)
 {
@@ -146,6 +147,25 @@ static async Task UndecodableImageRetriesAsPng()
     Console.WriteLine("PASS undecodable images retry once as PNG decoded by Windows, with details logged");
 }
 
+static async Task PeopleNeedAMultiPersonBackend()
+{
+    const string boxes = "10.0,20.0,300.0,400.0;400.0,20.0,700.0,400.0";
+    using (var f = new Fixture(1))
+    {
+        f.Backend.OldBackend = true;   // 旧后端忽略 boxes，整张图当一个人
+        var error = await Record(() => f.Service.OpenPeopleAsync(f.Images(1)[0], boxes));
+        Check(error is InvalidOperationException && error.Message.Contains("后端不支持多人识别"), $"old backend result was accepted: {error}");
+        Check(!Directory.Exists(f.Library.CacheDir) || Directory.GetFiles(f.Library.CacheDir, "*.npz").Length == 0, "a one-person result was cached as a two-person session");
+    }
+    using (var f = new Fixture(1))
+    {
+        var (info, key, sha1) = await f.Service.OpenPeopleAsync(f.Images(1)[0], boxes);
+        Check(info.Humans.Length == 2 && key.StartsWith(sha1 + "-m") && f.Backend.Boxes.Single() == boxes, "boxes were not sent or the people did not come back");
+        Check(File.Exists(Path.Combine(f.Library.CacheDir, key + ".npz")), "the multi-person session was not cached under its own key");
+    }
+    Console.WriteLine("PASS multi-person sessions are checked against the number of boxes");
+}
+
 static async Task<Exception?> Record(Func<Task> action)
 {
     try { await action(); return null; }
@@ -195,6 +215,7 @@ sealed class FakeBackend : IDisposable
     private readonly LoopbackServer _server;
     public readonly ConcurrentQueue<int> Configured = new();
     public readonly ConcurrentQueue<string> Deleted = new();
+    public readonly ConcurrentQueue<string> Boxes = new();
     public int Created, Parallel, Held, Peak, Unloaded;
     private int _active, _ids;
     public bool OldBackend, OnlyPng, Fail500;
@@ -232,7 +253,12 @@ sealed class FakeBackend : IDisposable
                 await Task.Delay(80);
                 Interlocked.Decrement(ref _active);
                 var id = "s" + Interlocked.Increment(ref _ids);
-                return Json(new { sessionId = id, name = "image", imageSize = new[] { 1, 1 }, inferenceMs = 1, device = "cpu", humans = Array.Empty<object>() });
+                // 新后端按人物框返回同样多的人；旧后端（OldBackend）不认识 boxes，整张图当一个人
+                var boxes = System.Web.HttpUtility.ParseQueryString(query)["boxes"];
+                if (boxes is not null) Boxes.Enqueue(boxes);
+                var people = boxes is null || OldBackend ? 1 : boxes.Split(';').Length;
+                var humans = Enumerable.Range(0, people).Select(_ => new { bbox = new[] { 0f, 0f, 1f, 1f } }).ToArray();
+                return Json(new { sessionId = id, name = "image", imageSize = new[] { 1, 1 }, inferenceMs = 1, device = "cpu", humans });
             }
             case ("POST", "/model/unload"):
                 Interlocked.Increment(ref Unloaded);

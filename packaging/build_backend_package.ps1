@@ -20,6 +20,10 @@ param(
     [Parameter(Mandatory)] [string] $Sam3d,
     [Parameter(Mandatory)] [string] $Weights,
     [Parameter(Mandatory)] [string] $Out,
+    # Optional: MediaPipe face_landmarker.task for facial expression capture (the venv needs mediapipe installed with --no-deps)
+    [string] $FaceModel,
+    # Optional: MoGe-2 ViT-B model.pt (depth / camera / floor; the venv needs moge, utils3d_moge, pipeline with --no-deps)
+    [string] $MogeModel,
     # Runtime version of this package (Python + dependencies). Bump it together with "runtime" in
     # backend/src/posegraph/version.json whenever dependencies change; the plugin then asks users for the full package.
     [int] $Runtime = 1,
@@ -56,6 +60,14 @@ Copy-Tree $Sam3d "$pkg\backend\third_party\sam-3d-body" @(".git", "__pycache__",
 
 Write-Host "5/6 weights"
 Copy-Tree $Weights "$pkg\backend\checkpoints\sam-3d-body-vith"
+if ($FaceModel) {
+    New-Item -ItemType Directory -Force "$pkg\backend\checkpoints\face" | Out-Null
+    Copy-Item $FaceModel "$pkg\backend\checkpoints\face\face_landmarker.task"
+}
+if ($MogeModel) {
+    New-Item -ItemType Directory -Force "$pkg\backend\checkpoints\moge" | Out-Null
+    Copy-Item $MogeModel "$pkg\backend\checkpoints\moge\model.pt"
+}
 
 Write-Host "6/6 launcher, readme, licenses"
 New-Item -ItemType Directory -Force "$pkg\LICENSES" | Out-Null
@@ -68,7 +80,6 @@ $required = (Get-Content "$repo\backend\src\posegraph\version.json" -Raw | Conve
 if ($required -gt $Runtime) { throw "backend/src/posegraph/version.json requires runtime $required, package is $Runtime" }
 @{ runtime = $Runtime; python = (& "$Python\python.exe" -c "import platform; print(platform.python_version())"); torch = "$torch" } |
     ConvertTo-Json | Set-Content "$pkg\runtime.json" -Encoding ascii
-untime.json" -Encoding ascii
 if (Test-Path "$repo\LICENSE") { Copy-Item "$repo\LICENSE" "$pkg\LICENSES\Posegraph-LICENSE.txt" }
 Copy-Item "$repo\THIRD_PARTY_NOTICES.md" "$pkg\LICENSES\THIRD_PARTY_NOTICES.md"
 

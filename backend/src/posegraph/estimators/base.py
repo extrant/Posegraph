@@ -41,8 +41,14 @@ class PoseEstimator(ABC):
         """加载模型到显存。"""
 
     @abstractmethod
-    def estimate(self, image_rgb: np.ndarray, bboxes: np.ndarray | None = None) -> EstimateResult:
-        """对一张 RGB 图片做估计。bboxes 为空时按整图处理。"""
+    def estimate(self, image_rgb: np.ndarray, bboxes: np.ndarray | None = None,
+                 masks: np.ndarray | None = None, focal: float | None = None) -> EstimateResult:
+        """对一张 RGB 图片做估计。bboxes 为空时按整图处理；masks：每个框一张原图尺寸的 0/1 遮罩（人物遮罩提示）；
+        focal：像素焦距（深度模型估的），None 时按图片尺寸假设。"""
+
+    def faces(self) -> np.ndarray | None:
+        """网格的三角形（画人物遮罩用）；不知道时为 None。"""
+        return None
 
     def unload(self) -> None:
         """释放显存（游戏同时运行时，空闲可卸载）。"""

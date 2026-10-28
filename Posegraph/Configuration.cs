@@ -40,6 +40,12 @@ public class Configuration : IPluginConfiguration
     /// <summary>GPU 模式下把 MHR 留在 CPU，显存约省 750MB，每张约慢 0.5 秒。</summary>
     public bool MhrOnCpu { get; set; } = true;
 
+    /// <summary>快速识别（移植自 Fast SAM 3D Body）：左右手合成一批、MHR 不算修正形变。</summary>
+    public bool FastRecognition { get; set; } = true;
+
+    /// <summary>识别时用深度模型（MoGe）：镜头焦距、多人按深度修遮罩和远近、找地面扶正。</summary>
+    public bool UseDepth { get; set; } = true;
+
     /// <summary>多图预识别最多同时处理的图片数（1～8），默认串行；从下一批图片生效。</summary>
     public int BatchRecognitionParallelism { get; set; } = 1;
 
@@ -81,6 +87,47 @@ public class Configuration : IPluginConfiguration
     // ---- 拆分模式（角色列表）
     /// <summary>角色列表贴在主窗口右边跟着移动。</summary>
     public bool SplitDock { get; set; } = true;
+
+    /// <summary>角色列表的模式：false 拆分（每个角色一张图），true 合并（一张图里的多个人分给各个角色）。</summary>
+    public bool SplitMerge { get; set; }
+
+    /// <summary>合并模式「全部应用」后按照片复刻各角色的站位（以基准人物的角色为准）。</summary>
+    public bool MergePlacement { get; set; } = true;
+
+    /// <summary>构图框：显示、比例（"photo" 为当前照片，或 "3:2" 等）、竖构图、框外压暗、参考线（0 无 1 三分 2 中心 3 黄金分割）。</summary>
+    public bool FrameShow { get; set; }
+    public string FrameAspect { get; set; } = "photo";
+    public bool FramePortrait { get; set; }
+    public float FrameDim { get; set; } = 0.6f;
+    public int FrameGuides { get; set; } = 1;
+
+    /// <summary>原图参考：叠原图（不透明度，0 为不叠）、画原图骨架。只画在界面层，截图里没有。</summary>
+    public float FramePhotoAlpha { get; set; }
+    public bool FramePhotoSkeleton { get; set; }
+
+    /// <summary>截图文件夹；空为 文档\Posegraph\Screenshots。</summary>
+    public string ScreenshotDir { get; set; } = "";
+
+    /// <summary>灯光：转镜头时灯跟着转（始终从镜头这一侧照亮脸）。</summary>
+    public bool LightFollowCamera { get; set; } = true;
+
+    /// <summary>灯光 3D 视图的显示选项（专业）：聚光锥、柔和边、镜头、轨道、光照预览球；拖灯方式：自由移动、角度吸附。</summary>
+    public bool LightShowCones { get; set; } = true;
+    public bool LightShowSoftEdge { get; set; }
+    public bool LightShowCamera { get; set; } = true;
+    public bool LightShowOrbit { get; set; } = true;
+    public bool LightShowPreview { get; set; } = true;
+    public bool LightFreeMove { get; set; }
+    public bool LightSnap { get; set; }
+
+    /// <summary>自己存的灯光方案（LightRig 的 JSON，灯的位置相对脸和镜头）。</summary>
+    public List<string> LightRigs { get; set; } = [];
+
+    /// <summary>合并模式 3D 页叠加其他人的骨架（洋葱皮），看清相对位置。</summary>
+    public bool ShowOnion { get; set; } = true;
+
+    /// <summary>合并模式找人用的检测模型：auto（先真人，找不到再插画）/ photo / anime。</summary>
+    public string MergeDetector { get; set; } = "auto";
 
     /// <summary>新图默认使用的预设：photo / illustration。</summary>
     public string DefaultPreset { get; set; } = "photo";

@@ -54,6 +54,47 @@ public static unsafe class GposeCamera
         };
     }
 
+    /// <summary>当前 GPose 相机在世界里的位置（灯光按它摆）；不在 GPose 时为 null。</summary>
+    public static Vector3? WorldPosition()
+    {
+        var cam = Active;
+        if (cam == null) return null;
+        var view = cam->Camera.CameraBase.SceneCamera.ViewMatrix;
+        view.M44 = 1;
+        return Matrix4x4.Invert(view, out var world) ? new Vector3(world.M41, world.M42, world.M43) : null;
+    }
+
+    /// <summary>当前的垂直视角（弧度，按投影矩阵）、画面宽高比和 Zoom；不在 GPose 时为 null。</summary>
+    public static (float FovY, float Aspect, float Zoom)? Projection()
+    {
+        var cam = Active;
+        if (cam == null) return null;
+        var render = cam->Camera.CameraBase.SceneCamera.RenderCamera;
+        if (render == null) return null;
+        var p = render->ProjectionMatrix;
+        return (2 * MathF.Atan(1 / p.M22), p.M22 / p.M11, cam->Zoom);
+    }
+
+    /// <summary>GPose 相机在世界里的位置、视线、上方向、垂直视角（弧度）和画面宽高比（灯光 3D 视图画镜头用）。</summary>
+    public static CameraPose? Pose()
+    {
+        var cam = Active;
+        if (cam == null || Projection() is not { } p) return null;
+        var view = cam->Camera.CameraBase.SceneCamera.ViewMatrix;
+        view.M44 = 1;
+        if (!Matrix4x4.Invert(view, out var w)) return null;
+        // 行向量约定：逆矩阵的三行是相机的右、上、后方向
+        return new CameraPose(new Vector3(w.M41, w.M42, w.M43), -Vector3.Normalize(new Vector3(w.M31, w.M32, w.M33)),
+                              Vector3.Normalize(new Vector3(w.M21, w.M22, w.M23)), p.FovY, p.Aspect);
+    }
+
+    /// <summary>改 Zoom（垂直视角 = 常数 + Zoom，游戏下限约 12.6°）。</summary>
+    public static void SetZoom(float zoom)
+    {
+        var cam = Active;
+        if (cam != null) cam->Zoom = zoom;
+    }
+
     public static bool Write(CameraRequest req)
     {
         var cam = Active;
@@ -79,6 +120,8 @@ public static unsafe class GposeCamera
         [m.M41, m.M42, m.M43, m.M44],
     ];
 }
+
+public readonly record struct CameraPose(Vector3 Position, Vector3 Forward, Vector3 Up, float FovY, float Aspect);
 
 public sealed class CameraRequest
 {

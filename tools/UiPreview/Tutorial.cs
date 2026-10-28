@@ -48,8 +48,8 @@ public static class Tutorial
         };
         scenes["tut-3d"] = (app, path) =>
         {
-            App.Set(app.Main, "_yaw", 0.6f);   // 斜侧视角，看得出前后深度
-            App.Set(app.Main, "_pitch", 0.2f);
+            var view = App.Get<Posegraph.UI.Scene3D>(app.Main, "_stickView")!;   // 斜侧视角，看得出前后深度
+            (view.Yaw, view.Pitch) = (-0.6f, 0.2f);
             MainTab(1)(app, path);
         };
         scenes["tut-tuning"] = MainTab(2);

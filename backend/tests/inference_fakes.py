@@ -65,7 +65,9 @@ class FakeEstimator:
             self.loaded = False
             self.active_device = self.active_precision = None
 
-    def estimate(self, marker):
+    def estimate(self, marker, bboxes=None, masks=None, focal=None):
+        self.bboxes = bboxes
+        self.masks = masks
         if hasattr(marker, "shape"):
             marker = int(marker.flat[0])
         with self.lock:
