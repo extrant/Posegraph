@@ -40,13 +40,25 @@ class FloorTests(unittest.TestCase):
         self.assertGreater(float(n @ up), 0.99)
         self.assertAlmostEqual(d, 1.5, delta=0.1)
 
-    def test_without_feet_only_a_gentle_floor_counts(self):
+    def test_without_feet_there_is_no_floor(self):
+        # 半身照、特写：看不见脚时找到的「地面」多半是背景墙、衣服，不用
         photo, is_floor = room(20)
-        n, _ = depth.find_floor(photo, np.zeros((1, *is_floor.shape), bool))
-        self.assertGreater(float(n @ [0.0, -np.cos(np.radians(20)), -np.sin(np.radians(20))]), 0.99)
-        steep, _ = room(65)
-        self.assertIsNone(depth.find_floor(steep, np.zeros((1, *is_floor.shape), bool)))
+        self.assertIsNone(depth.find_floor(photo, np.zeros((1, *is_floor.shape), bool)))
 
+    def test_person_must_stand_on_the_plane(self):
+        photo, is_floor = room(65)
+        ys, xs = np.nonzero(is_floor)
+        feet = [(int(xs[i]), int(ys[i])) for i in np.linspace(0, len(xs) - 1, 4).astype(int)]
+        up = np.array([0.0, -np.cos(np.radians(65)), -np.sin(np.radians(65))])
+        foot = photo.points[feet[0][1], feet[0][0]]
+        standing = foot + up * np.linspace(0, 1.7, 50)[:, None]     # 从脚往上 1.7m
+        flat = foot + np.array([1.0, 0, 0]) * np.linspace(0, 1.7, 50)[:, None] + up * 0.2   # 贴着面、只高出 0.2m（像靠在背景布前）
+        no_people = np.zeros((1, *is_floor.shape), bool)
+        self.assertIsNotNone(depth.find_floor(photo, no_people, feet, [up], [standing]))
+        self.assertIsNone(depth.find_floor(photo, no_people, feet, [up], [flat]))
+        # 按这块面算躯干快躺平了（> 60°）也不算
+        leaning = np.cross(up, [1.0, 0, 0]) * 0.8 + up * 0.2
+        self.assertIsNone(depth.find_floor(photo, no_people, feet, [leaning], [standing]))
 
 if __name__ == "__main__":
     unittest.main()

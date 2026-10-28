@@ -722,6 +722,7 @@ public sealed partial class MainWindow : Window, IDisposable
         if (_params.Upright != d.Upright) n++;
         if (Math.Abs(_params.UprightMaxDeg - d.UprightMaxDeg) > 1e-4f) n++;
         if (_params.Ground != d.Ground) n++;
+        if (_params.FlatFeet != d.FlatFeet) n++;
         if (Math.Abs(_params.HelperStrength - d.HelperStrength) > 1e-4f) n++;
         if (Math.Abs(_params.FaceHead - d.FaceHead) > 1e-4f) n++;
         n += FaceGroups.Count(g => Math.Abs(_params.FaceGain(g.Key) - 1f) > 1e-4f);
@@ -1448,8 +1449,8 @@ public sealed partial class MainWindow : Window, IDisposable
     private string? _faceError;
 
     /// <summary>
-    /// 调整页的「面部表情」：后端用 MediaPipe 找脸得到的表情系数和置信度，置信度过低的不用。
-    /// 还没换算到 FF14 的脸部骨骼（要等表情采样，见 docs/face-sampling.md），先只显示识别结果。
+    /// 调整页的「面部表情」：后端用 MediaPipe 找脸得到的表情系数和置信度（置信度过低的不用），
+    /// 套用到角色时换算成 FF14 的脸部骨骼（后端 face_rig.py）。
     /// </summary>
     private void DrawFaceSection()
     {
@@ -1975,6 +1976,9 @@ public sealed partial class MainWindow : Window, IDisposable
             var ground = _params.Ground;
             Toggle(Loc.T("自动贴地"), ref ground, Loc.T("把最低的关节放到地面（跪坐/躺下不悬空）。跳跃、腾空的图请关闭"));
             _params.Ground = ground;
+            var flat = _params.FlatFeet;
+            Toggle(Loc.T("踩地的脚放平"), ref flat, Loc.T("识别出的脚常常脚尖微翘、只有脚跟着地：踩在地上的脚换成游戏里平放的样子（只转脚，不动腿）。\n踮脚、勾脚这种明显故意的不会动"));
+            _params.FlatFeet = flat;
         }
         if (ImGui.CollapsingHeader(Loc.T("辅助骨")))
         {
@@ -2268,7 +2272,7 @@ public sealed partial class MainWindow : Window, IDisposable
                              _config.FastRecognition ? Loc.T("快速识别开着时 MHR 只有约 29MB，直接放显卡，这一项不起作用")
                                                      : Loc.T("显存约省 750MB，结果一致，每张约慢 0.5 秒"));
         changed |= Check(Loc.T("快速识别"), _config.FastRecognition, v => _config.FastRecognition = v, Loc.T("移植自 Fast SAM 3D Body：左右手合成一批识别，MHR 不算修正形变（只影响网格表面，骨架不变）。\nRTX 4060 笔记本实测：单人每张约 1.3 秒 → 0.6 秒，两人约 1.7 秒 → 0.8 秒；显存多约 0.1GB，内存少约 0.6GB。\n和关掉时的结果差别：关节平均约 3mm、画面上约 3px，肉眼基本看不出。CPU 模式只快约 10%。\n改了要重新加载模型；已识别过的图片读的是缓存"));
-        changed |= Check(Loc.T("深度辅助识别"), _config.UseDepth, v => _config.UseDepth = v, Loc.T("用 MoGe 估照片的深度：镜头焦距更准、多人时按前后关系修正遮罩和远近、看得见地面时按地面扶正（斜拍、俯拍更稳）。\n代价（RTX 4060 笔记本实测）：单人每张多约 0.5 秒，「识别后立即释放」时含重新加载约多 2 秒；多人带遮罩时遮罩改动大还会再识别一遍，最多多约 6 秒；显存峰值多约 1.3GB，内存多约 2GB。\nCPU 模式每张多约 10～20 秒。\n已识别过的图片读的是缓存，改了要点「重新识别」才看得到区别"));
+        changed |= Check(Loc.T("深度辅助识别"), _config.UseDepth, v => _config.UseDepth = v, Loc.T("用 MoGe 估照片的深度：镜头焦距更准、多人时按前后关系修正遮罩和远近、看得见脚和地面时按地面扶正（斜拍、俯拍更稳）。\n代价（RTX 4070 实测）：单人每张多约 0.5 秒（深度模型本身约 0.05 秒，其余是找地面等计算），「识别后立即释放」时含重新加载约多 2 秒；显存峰值多约 0.75GB，内存多约 2GB。\nCPU 模式深度模型每张约 1 秒。\n已识别过的图片读的是缓存，改了要点「重新识别」才看得到区别"));
         changed |= DrawRecognitionConcurrencySettings();
         return changed;
     }

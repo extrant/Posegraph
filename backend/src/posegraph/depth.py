@@ -16,11 +16,16 @@ import numpy as np
 
 from .config import settings
 
-FLOOR_MAX_TILT_DEG = 40.0   # 看不见脚时：地面法线和画面「上」的夹角上限（再斜多半是墙、背景布、沙发靠背）
-FLOOR_MIN_SHARE = 0.03      # 地面至少占这么多像素
-FLOOR_SINK = 0.15           # 有人的看得见部分沉到平面下这么多（米）就不算地面
-FLOOR_REACH = 0.6           # 至少有一个人的看得见部分离平面这么近（米）才算地面（人站在墙前面、离墙远时排除墙）
+FLOOR_MAX_TORSO_DEG = 45.0  # 按这块面当地面时，人的躯干（髋 → 肩）离「上」不能超过这么多度（实测站着 2~4°、深蹲约 20°；
+                            # 误认的面 43~85°）。弯腰、趴下的人会找不到地面：不扶正总比扶错好
+FLOOR_BODY_HEIGHT = 0.8     # 人要「立」在面上：身体最高处离这块面至少这么高（米；深蹲约 0.9m、坐地上也有 0.9m 左右，
+                            # 背景布、墙、飞扑时脚边的树丛只有 0.2~0.7m）
+FLOOR_MIN_SHARE = 0.015     # 地面至少占这么多像素（低分辨率深度图里地面会缩小；有身体高度、躯干检查兜着，可以放宽）
 ON_FLOOR = 0.15             # 每个人身体最低处离地面不到这么多（米）算「在地上」
+# MoGe 的分辨率（ViT 块数，模型默认最高 3600）。2026-10-29 用 30 张单人照对比 3600 / 1500 / 1200：
+# 1200 块时找到的地面和 3600 完全一样，视场角差中位 1.5°、人离镜头的距离差中位 2.7%、关节角度差中位 0.7°；
+# 4070 上 0.10 → 0.04 秒，额外显存约 1030 → 350MB
+NUM_TOKENS = 1200
 MASK_RERUN = 0.05           # 深度修遮罩后，有人的遮罩变了这么多（占他原遮罩的比例）才重跑一遍 SAM
 
 _lock = threading.Lock()
@@ -59,7 +64,7 @@ def estimate(rgb: np.ndarray, device: str) -> PhotoDepth:
         with torch.no_grad():
             # 半精度只在显卡上快；CPU 上开着会慢几十倍
             out = _model.infer(torch.tensor(rgb / 255.0, dtype=torch.float32, device=device).permute(2, 0, 1),
-                               use_fp16=device != "cpu")
+                               num_tokens=NUM_TOKENS, use_fp16=device != "cpu")
         K = out["intrinsics"].float().cpu().numpy()
         depth = out["depth"].float().cpu().numpy()
         valid = out["mask"].cpu().numpy().astype(bool) & np.isfinite(depth)
@@ -154,7 +159,7 @@ def distance_ratios(meshes: list[np.ndarray], masks: np.ndarray, photo: PhotoDep
 
 # ---------------------------------------------------------------- 地面
 
-def _planes(sample: np.ndarray, up: np.ndarray, max_tilt: float, count: int, iters: int, tol: float, rng):
+def _planes(sample: np.ndarray, up: np.ndarray, count: int, iters: int, tol: float, rng):
     """依次找最大的几个平面（每找到一个就把它的点去掉），法线都朝镜头这边的「上」。返回 [(法线, d, 内点数)]。"""
     near = lambda q, n, d: np.abs(q @ n + d) < tol * np.maximum(1, q[:, 2] / 3)
     out, rest = [], sample
@@ -169,8 +174,6 @@ def _planes(sample: np.ndarray, up: np.ndarray, max_tilt: float, count: int, ite
                 continue
             n = n / np.linalg.norm(n)
             n = n if n @ up > 0 else -n
-            if n @ up < np.cos(np.radians(max_tilt)):
-                continue
             k = int(near(rest, n, -n @ a).sum())
             if k > best:
                 best, plane = k, (n, -n @ a)
@@ -188,16 +191,24 @@ def _planes(sample: np.ndarray, up: np.ndarray, max_tilt: float, count: int, ite
 
 
 def find_floor(photo: PhotoDepth, people: np.ndarray, feet: list[tuple[int, int]] | None = None,
-               torsos: list[np.ndarray] | None = None, iters: int = 400, tol: float = 0.03):
+               torsos: list[np.ndarray] | None = None, bodies: list[np.ndarray] | None = None, scale: float = 1.0,
+               iters: int = 400, tol: float = 0.03):
     """
     地面。返回 (法线, d)（相机系、MoGe 尺度，n·p + d = 0，法线朝上）；没有为 None。
-    看得见脚时：在不是人的像素里找最大的几个平面，取脚踩着的那个（脚上的点离它最近、而且不到 15cm）——
+    只在看得见脚时找：在不是人的像素里找最大的几个平面，取脚踩着的那个（脚上的点离它最近、而且不到 15cm）——
     俯拍时地面的法线会朝镜头倒过来很多，墙反而更像「朝上」，只看朝向会把墙当成地面。
-    看不见脚时：退回取最大的、法线离画面「上」不超过 FLOOR_MAX_TILT_DEG 的平面（再要求人没沉下去、离它不远）。
-    feet：脚（踝 / 脚跟 / 脚尖）在深度图上的像素；torsos：每个人躯干（髋 → 肩）的方向（相机系）。
-    脚贴着墙站时墙离脚也不远，再看躯干：按这块面当地面时人的躯干离「上」超过 75° 的不要，免得把墙当地面；剩下的取最大的。
+    再要求人是「立」在这块面上的：按它当地面时躯干离「上」不超过 FLOOR_MAX_TORSO_DEG，身体最高处离它至少
+    FLOOR_BODY_HEIGHT（影棚的背景布弯到地上、人贴墙站时，脚边也有一块离脚很近的面，但人是靠在它前面、不是站在它上面）。
+    看不见脚（半身照、特写）时不找：2026-10-29 用 30 张单人照对比，那时找到的「地面」都是背景墙、衣服、船舷，
+    会把人扳歪 17~68°。
+    feet：脚（踝 / 脚跟 / 脚尖）在深度图上的像素；torsos：每个人躯干（髋 → 肩）的方向（相机系）；
+    bodies：每个人的网格顶点（相机系，和深度图同一尺度），给了才检查身体高度；scale：深度图 → 识别模型的米（depth_scale），
+    身体高度按识别模型的尺度量（人的大小它估得准，深度图的绝对尺度每张图偏差不同）。
     """
     P = photo.points
+    foot = np.array([P[y, x] for x, y in (feet or []) if photo.valid[y, x] and np.isfinite(P[y, x]).all()])
+    if len(foot) < 2:
+        return None
     valid = photo.valid & ~people.any(0) & np.isfinite(P).all(-1)
     pts = P[valid]
     if len(pts) < 500:
@@ -206,22 +217,14 @@ def find_floor(photo: PhotoDepth, people: np.ndarray, feet: list[tuple[int, int]
     sample = pts[rng.choice(len(pts), min(len(pts), 60000), replace=False)]
     up = np.array([0.0, -1.0, 0.0])
     total = P.shape[0] * P.shape[1]
-    foot = np.array([P[y, x] for x, y in (feet or []) if photo.valid[y, x] and np.isfinite(P[y, x]).all()])
-    if len(foot) >= 2:
-        best = None
-        for n, d, k in _planes(sample, up, 89.0, 4, iters, tol, rng):
-            dist = float(np.min(np.abs(foot @ n + d)))   # 离得最近的脚点（通常是脚尖）；踝、脚跟的点常落在裤腿上，离地二三十厘米
-            share = k / len(sample) * len(pts) / total
-            tilt = np.mean([np.degrees(np.arccos(np.clip(t @ n / (np.linalg.norm(t) + 1e-9), -1, 1))) for t in torsos]) if torsos else 0.0
-            # 脚踩得到、人不会头朝下的平面里取最大的（脚边常有小块台阶、地毯边之类的小平面）
-            if share >= FLOOR_MIN_SHARE and dist < 0.15 and tilt < 75 and (best is None or share > best[0]):
-                best = (share, n, d)
-        return None if best is None else (best[1], best[2])
-    planes = _planes(sample, up, FLOOR_MAX_TILT_DEG, 1, iters, tol, rng)
-    if not planes:
-        return None
-    n, d, k = planes[0]
-    lows = [np.percentile(P[m & photo.valid] @ n + d, 2) for m in people if (m & photo.valid).any()]
-    if k / len(sample) * len(pts) / total < FLOOR_MIN_SHARE or (lows and (min(lows) < -FLOOR_SINK or min(lows) > FLOOR_REACH)):
-        return None
-    return n, d
+    best = None
+    for n, d, k in _planes(sample, up, 4, iters, tol, rng):
+        dist = float(np.min(np.abs(foot @ n + d)))   # 离得最近的脚点（通常是脚尖）；踝、脚跟的点常落在裤腿上，离地二三十厘米
+        share = k / len(sample) * len(pts) / total
+        tilt = float(np.mean([np.degrees(np.arccos(np.clip(t @ n / (np.linalg.norm(t) + 1e-9), -1, 1))) for t in torsos])) if torsos else 0.0
+        tall = max(float(np.percentile(b @ n + d, 99)) for b in bodies) * scale if bodies else FLOOR_BODY_HEIGHT   # 多人时有一个人立在上面就行
+        # 脚踩得到、人立得住的平面里取最大的（脚边常有小块台阶、地毯边之类的小平面）
+        if share >= FLOOR_MIN_SHARE and dist < 0.15 and tilt < FLOOR_MAX_TORSO_DEG and tall >= FLOOR_BODY_HEIGHT \
+                and (best is None or share > best[0]):
+            best = (share, n, d)
+    return None if best is None else (best[1], best[2])

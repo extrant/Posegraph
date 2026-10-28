@@ -5,6 +5,32 @@
   },
   "entries": [
     {
+      "version": "0.5.1",
+      "date": "2026-10-29",
+      "title": {
+        "zh": "站姿更稳：找地面不误判、脚掌贴地",
+        "en": "Steadier stances: no false floors, feet flat on the ground"
+      },
+      "items": {
+        "zh": [
+          "找地面更准：只在看得见脚时找地面，并检查人确实站在那个面上。半身照、特写不会再把背景墙、衣服当成地面，人不会被扳歪（之前可能歪 17~68°）；俯拍等真有地面的照片照样扶正",
+          "脚掌贴地：修正了脚的静止姿态对应，站着的人不再脚尖翘起、只有脚后跟着地",
+          "新开关「踩地的脚放平」（调整页 → 站姿，默认开）：踩在地上的脚换成游戏里平放的样子，只转脚、不动腿；踮脚、勾脚这类明显故意的不会动",
+          "深度图更省：分辨率调到 1200 块，结果基本不变（30 张照片对比，地面判断完全一致），显存峰值从约 1.4GB 降到约 0.75GB，CPU 模式从约 3 秒降到约 1 秒",
+          "后端更新照样会检查并补齐面捕、深度图组件；从 0.4.0 及更早版本升级的，在设置页点「更新后端」一次装好",
+          "改了识别相关的设置：已识别过的图片读的是缓存，点工具栏的「重新识别当前图片」按钮才会用上新的找地面和深度图"
+        ],
+        "en": [
+          "Better floor detection: the floor is only searched for when the feet are visible, and the person must actually stand on it. Half-body shots and close-ups no longer mistake a background wall or clothing for the floor and get tilted (previously by 17–68°); photos with a real floor, such as high-angle shots, are still straightened",
+          "Feet flat on the ground: the feet's rest pose is now matched correctly, so standing characters no longer tilt their toes up and touch the ground with the heel only",
+          "New \"Flatten planted feet\" option (Tuning → Stance, on by default): feet standing on the ground are laid flat like in game, turning only the foot and leaving the legs alone; clearly deliberate tiptoe or flexed feet are kept",
+          "Lighter depth: the depth model runs at 1200 tokens with practically the same results (identical floor decisions on 30 test photos); peak VRAM drops from about 1.4 GB to about 0.75 GB, CPU mode from about 3 s to about 1 s",
+          "Backend updates still check for and add the face capture and depth components; updating from 0.4.0 or earlier needs one click on \"Update backend\" in Settings",
+          "Recognized images come from the cache: use the toolbar's \"Recognize the current image again\" button to apply the new floor detection and depth settings"
+        ]
+      }
+    },
+    {
       "version": "0.5.0",
       "date": "2026-10-28",
       "title": {

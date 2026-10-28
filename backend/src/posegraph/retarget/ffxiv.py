@@ -59,7 +59,10 @@ def _side(side: str) -> list[BoneMap]:
         # 腿：j_asi_b 是膝盖处的短骨，跟随大腿；小腿用 j_asi_c
         BoneMap(f"j_asi_a_{s}", f"{s}_upleg", f"j_asi_b_{s}", f"{s}_lowleg", hinge=(f"j_asi_c_{s}", f"{s}_lowleg")),
         BoneMap(f"j_asi_c_{s}", f"{s}_lowleg", f"j_asi_d_{s}", f"{s}_foot"),
-        BoneMap(f"j_asi_d_{s}", f"{s}_transversetarsal", f"j_asi_e_{s}", f"{s}_ball"),
+        # 脚：FFXIV 的 j_asi_d 从踝到前掌，静止时斜 -30°；MHR 对应的是足中 → 前掌，静止时只斜 -21°。
+        # 骨段对齐会让站着的人脚尖都翘起 9°（脚跟陷地、只有脚跟着地，2026-10-29 实测站姿照片前掌 -8°~-23°），
+        # 所以静止时用 FFXIV 的绑定朝向，照片里的脚相对静止转了多少就转多少
+        BoneMap(f"j_asi_d_{s}", f"{s}_transversetarsal", absolute=True),
         BoneMap(f"j_asi_e_{s}", f"{s}_ball"),
         # 拇指：FFXIV 只有两节
         BoneMap(f"j_oya_a_{s}", f"{s}_thumb1", f"j_oya_b_{s}", f"{s}_thumb2"),
@@ -225,6 +228,35 @@ def forward_kinematics(sk: Skeleton, global_rot: list[R | None] | None = None) -
             G[i] = given if given is not None else G[p] * sk.local_r[i]
             P[i] = P[p] + G[p].apply(sk.local_t[i])
     return G, P
+
+
+# 踩地的脚放平：脚（含脚趾）最低处离全身最低处不到这么高（米）才算踩着地；俯仰和平放差超过 FLAT_FOOT_MAX_DEG 的
+# 当作故意的（踮脚、勾脚）不动。只转脚，不动腿（2026-10-29 用户：只把脚恢复成正常的脚，不要为了着地去弯膝）
+FLAT_FOOT_REACH = 0.08
+FLAT_FOOT_MAX_DEG = 25.0
+
+
+def _flatten_planted_feet(sk: "Skeleton", G: list[R], P: np.ndarray, G_new: list) -> list:
+    """识别出的脚常常脚尖微翘、只有脚跟着地。踩在地上的脚换成绑定姿势那样平放（只保留脚尖指向），绕踝转，腿不动。"""
+    G_bind, P_bind = forward_kinematics(sk)
+    body = [i for i, n in enumerate(sk.names) if n.startswith(("j_", "iv_asi_")) and not n.startswith(("j_sk_", "j_kami", "j_f_", "j_ex_"))]
+    lowest = float(P[body, 1].min())
+    pitch = lambda v: np.degrees(np.arctan2(v[1], np.hypot(v[0], v[2])))
+    for s in "lr":
+        if f"j_asi_d_{s}" not in sk.names or f"j_asi_e_{s}" not in sk.names:
+            continue
+        d, e = sk.index(f"j_asi_d_{s}"), sk.index(f"j_asi_e_{s}")
+        foot = _subtree(sk, d)
+        if float(P[foot, 1].min()) - lowest > FLAT_FOOT_REACH:
+            continue
+        cur, bind = P[e] - P[d], P_bind[e] - P_bind[d]
+        if abs(pitch(cur) - pitch(bind)) > FLAT_FOOT_MAX_DEG:
+            continue
+        yaw = np.arctan2(cur[0], cur[2]) - np.arctan2(bind[0], bind[2])
+        delta = R.from_euler("y", yaw) * G_bind[d] * G[d].inv()
+        for j in foot:
+            G_new[j] = delta * (G_new[j] if G_new[j] is not None else G[j])
+    return G_new
 
 
 def _subtree(sk: Skeleton, root: int) -> list[int]:
@@ -522,7 +554,7 @@ def retarget(joint_global_rots: np.ndarray, joint_coords_cam: np.ndarray | None 
              reference: BrioPose | None = None, race: str = "c0101",
              compensate_hands: bool = True, compensate_head: bool = False,
              upright: bool = True, vertices_cam: np.ndarray | None = None,
-             distribute_neck: bool = False, ground: bool = True,
+             distribute_neck: bool = False, ground: bool = True, flat_feet: bool = True,
              photo: tuple[float, np.ndarray, tuple[int, int]] | None = None,
              neck_scale: float = 1.0, amplitude: dict[str, float] | None = None,
              offsets: dict[str, tuple[float, float, float]] | None = None,
@@ -620,6 +652,9 @@ def retarget(joint_global_rots: np.ndarray, joint_coords_cam: np.ndarray | None 
         compensation.update(_compensate_hands(sk, G, P, G_new, mhr_names, mhr_model, hand_strength, hand_near, hand_far,
                                               frames=(posed, mhr_rest_rot, G, G_bind0), extents=extents))
         compensation["contact_scaling"] = "body" if extents else "torso"
+        G, P = forward_kinematics(sk, G_new)
+    if flat_feet:
+        G_new = _flatten_planted_feet(sk, G, P, G_new)
         G, P = forward_kinematics(sk, G_new)
     for i in sorted(sk.index(n) for n, v in (offsets or {}).items() if any(v)):
         rw = R.from_euler("xyz", offsets[sk.names[i]], degrees=True)

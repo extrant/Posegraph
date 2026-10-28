@@ -126,7 +126,7 @@ Tips:
 
 - **Amplitude**: 1 = as in the photo, below 1 calmer, above 1 stronger. Right-click a slider to reset it.
 - **Hand contact compensation**: keeps hands on the head, chest or hips (your race's proportions differ from the person in the photo).
-- **Stance**: gravity correction (straightens the body when the photo's camera is tilted) and snapping to the ground.
+- **Stance**: gravity correction (straightens the body when the photo's camera is tilted), snapping to the ground, and "Flatten planted feet" (feet standing on the ground are laid flat like in game; only the foot turns, the legs stay).
   **Turn off snapping for jumps and mid-air poses.**
 - **Helper bones**: how strongly the skin helpers at elbows, knees, shoulders etc. follow.
 - **Whole-body rotation / offset**: when the whole person leans or needs raising or lowering (someone sitting on a chair), rotate around the hips or move everything; camera matching doesn't undo it.

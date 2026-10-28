@@ -353,7 +353,9 @@ def _estimate_with_depth(rgb: np.ndarray, bboxes: np.ndarray, person_masks: np.n
             if 0 <= x < size[0] and 0 <= y < size[1]:
                 feet.append((int(x), int(y)))
     torsos = [(k[5] + k[6]) / 2 - (k[9] + k[10]) / 2 for k in (np.asarray(h.keypoints_3d)[:, :3] for h in result.humans)]
-    plane = depth.find_floor(photo, work, feet, torsos)
+    # 网格换到深度图的尺度（depth_scale：深度 × scale = SAM 的米），检查人是不是「立」在找到的面上
+    bodies = [(np.asarray(h.extra["vertices"]) + np.asarray(h.cam_t).reshape(1, 3)) / scale for h in result.humans]
+    plane = depth.find_floor(photo, work, feet, torsos, bodies, scale)
     if plane is not None:
         n, d = plane[0], plane[1] * scale
         lows = [float(((np.asarray(h.extra["vertices"]) + np.asarray(h.cam_t).reshape(1, 3)) @ n).min() + d) for h in result.humans]

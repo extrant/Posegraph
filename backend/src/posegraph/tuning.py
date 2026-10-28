@@ -37,6 +37,7 @@ class RetargetParams(BaseModel):
     upright: bool = True
     upright_max_deg: float = UPRIGHT_MAX_DEG
     ground: bool = True
+    flat_feet: bool = True          # 踩地的脚放平（只转脚，不动腿）
     helper_strength: float = 1.0
     root_rotation: list[float] = Field(default_factory=lambda: [0.0, 0.0, 0.0])   # 整体旋转（度，模型系 xyz，绕髋部）
     root_offset: list[float] = Field(default_factory=lambda: [0.0, 0.0, 0.0])     # 整体位移（米，模型系 xyz）
@@ -64,7 +65,7 @@ def run(human: dict, image_size: tuple[int, int], params: RetargetParams,
                     human["rest_joint_rots"], reference=reference, race=race, vertices_cam=human.get("vertices"),
                     rest_vertices=human.get("rest_vertices"),
                     photo=(float(human["focal_length"]), human["cam_t"], image_size),
-                    upright=params.upright, upright_max_deg=params.upright_max_deg, ground=params.ground,
+                    upright=params.upright, upright_max_deg=params.upright_max_deg, ground=params.ground, flat_feet=params.flat_feet,
                     amplitude=amp, offsets={k: tuple(v) for k, v in params.offsets.items()},
                     hand_strength=params.hand_strength, hand_near=params.hand_near, hand_far=params.hand_far,
                     helper_strength=params.helper_strength, reference_lengths=reference_lengths, ivcs=ivcs,

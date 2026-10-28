@@ -14,6 +14,8 @@ public sealed class RetargetParams
     [JsonPropertyName("upright")] public bool Upright { get; set; } = true;
     [JsonPropertyName("upright_max_deg")] public float UprightMaxDeg { get; set; } = 30f;
     [JsonPropertyName("ground")] public bool Ground { get; set; } = true;
+    /// <summary>踩地的脚放平（只转脚，不动腿）：识别出的脚常脚尖微翘、只有脚跟着地。</summary>
+    [JsonPropertyName("flat_feet")] public bool FlatFeet { get; set; } = true;
     [JsonPropertyName("helper_strength")] public float HelperStrength { get; set; } = 1f;
     /// <summary>整体旋转（度，模型系 x 俯仰 / y 水平转 / z 侧倾，绕髋部）。</summary>
     [JsonPropertyName("root_rotation")] public float[] RootRotation { get; set; } = new float[3];
@@ -36,7 +38,7 @@ public sealed class RetargetParams
         Amplitude = new(Amplitude),
         Offsets = Offsets.ToDictionary(kv => kv.Key, kv => (float[])kv.Value.Clone()),
         HandStrength = HandStrength, HandNear = HandNear, HandFar = HandFar,
-        Upright = Upright, UprightMaxDeg = UprightMaxDeg, Ground = Ground, HelperStrength = HelperStrength,
+        Upright = Upright, UprightMaxDeg = UprightMaxDeg, Ground = Ground, FlatFeet = FlatFeet, HelperStrength = HelperStrength,
         RootRotation = (float[])RootRotation.Clone(), RootOffset = (float[])RootOffset.Clone(),
         Face = Face, FaceStrength = FaceStrength, FaceGains = new(FaceGains), FaceHead = FaceHead,
     };

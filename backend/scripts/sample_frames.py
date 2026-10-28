@@ -2,7 +2,7 @@
 
     .venv/Scripts/python scripts/sample_frames.py [--actor N] [--seconds 30] [--hz 10] [--label 名称]
 
-角色需处于播放动画状态（未冻结）。采样期间让角色做抬手、转腕、弯肘等动作（或表情动作，见 docs/face-sampling.md）。
+角色需处于播放动画状态（未冻结）。采样期间让角色做抬手、转腕、弯肘等动作。
 输出 outputs/samples/<时间>[-<label>].jsonl，每行一帧 Brio pose JSON 的 Bones 字段（含 j_f_ 脸部骨骼）；
 同名 .meta.json 记下标签、种族（RaceSexId）、脸型（FaceID）。
 """
