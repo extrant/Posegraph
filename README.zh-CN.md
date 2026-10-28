@@ -85,6 +85,7 @@ Posegraph 不在 Dalamud 官方仓库里，从自定义仓库安装：
   [backend-components-1](https://github.com/extrant/Posegraph/releases/tag/backend-components-1)），缺哪个下载哪个、校验 SHA-256 后解压进一键包。
   老一键包点一次更新就补齐面捕（约 64MB）和深度图（约 400MB），不用重新下载整个一键包。
   旧版保留为 `backend\src.bak`，新版启动失败会自动回滚。连不上 GitHub 时可以填加速前缀，例如 `https://gh-proxy.org/`。
+  插件里下载不了时可以手动下载、解压，见 [手动更新后端](docs/manual-update.zh-CN.md)（组件压缩包也可以朋友之间传，附校验方法）。
 - 只有 Python / PyTorch 本身要换时才需要重新下载完整一键包，插件会提示（一键包的 `runtime.json` 低于新版后端的要求）。
 - 源码安装：用 `git pull` 或切换到同版本标签更新。
 

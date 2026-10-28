@@ -96,6 +96,8 @@ and add `Posegraph.dll` under *Dev Plugin Locations*.
   depth (about 400 MB) with one click instead of a new full download.
   The previous version is kept as `backend\src.bak` and restored automatically if the new one fails to start.
   If GitHub is unreachable, set a mirror prefix such as `https://gh-proxy.org/`.
+  If downloads fail in the plugin, download and unpack the files by hand: see [Updating the backend by hand](docs/manual-update.md)
+  (component archives can be shared between users; checksums included).
 - A full package download is only needed when Python / PyTorch itself changes; the plugin tells you
   (the package's `runtime.json` is older than what the new backend requires).
 - Source installs: update with `git pull` / checkout of the same tag.

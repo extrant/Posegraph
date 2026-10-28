@@ -266,6 +266,7 @@ The crop button in the second toolbar row.
   verifying each download, so you never need the whole package again. The backend is stopped first and restarted afterwards; if the new
   version doesn't start, the old one is restored. If GitHub is unreachable or slow, fill in a download mirror prefix; if a download breaks,
   just click again — finished components aren't downloaded twice.
+- **Downloads fail in the plugin**: download the files from GitHub in a browser or get the archives from a friend and unpack them into the package yourself; see [Updating the backend by hand](../manual-update.md).
 
 ![Changelog](images/en/tut-changelog.png)
 

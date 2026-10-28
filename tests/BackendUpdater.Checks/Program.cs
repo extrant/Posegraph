@@ -125,7 +125,18 @@ var pkg3 = NewPackage();
 error = await updater.UpdateAsync(Path.Combine(pkg3, "backend"), proxy, Stop, v => Task.FromResult(v == ""));
 Check(error is not null && BackendUpdater.Installed(Path.Combine(pkg3, "backend"))?.Version == "0.4.0", "启动失败回滚到旧版");
 
-foreach (var dir in new[] { pkg, pkg2, pkg3 })
+// 5. 手动放进 .download 的组件（朋友传的、浏览器下的）：校验对得上就直接装，不再下载
+var pkg4 = NewPackage();
+var predownloaded = JsonDocument.Parse(manifestJson).RootElement.GetProperty("components").EnumerateArray().ToArray();
+Directory.CreateDirectory(Path.Combine(pkg4, ".download"));
+foreach (var c in predownloaded)
+    File.WriteAllBytes(Path.Combine(pkg4, ".download", c.GetProperty("id").GetString() + ".zip"), files[c.GetProperty("url").GetString()!]);
+var hitsBefore = componentUrls.Sum(u => hits.GetValueOrDefault(u));
+error = await updater.UpdateAsync(Path.Combine(pkg4, "backend"), proxy, Stop, Start);
+Check(error is null && componentUrls.Sum(u => hits.GetValueOrDefault(u)) == hitsBefore, "手动放进 .download 的组件直接安装、不再下载");
+Check(BackendUpdater.MissingComponents(Path.Combine(pkg4, "backend")).Length == 0, "手动放进的组件装好了");
+
+foreach (var dir in new[] { pkg, pkg2, pkg3, pkg4 })
     try { Directory.Delete(Path.GetDirectoryName(dir)!, true); } catch { }
 Console.WriteLine(failures == 0 ? "全部通过" : $"{failures} 项失败");
 return failures == 0 ? 0 : 1;
