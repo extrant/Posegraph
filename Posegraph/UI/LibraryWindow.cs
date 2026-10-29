@@ -590,6 +590,7 @@ public sealed class LibraryWindow : Window, IDisposable
             _ => StatusIcon(path).Icon is not null ? Loc.T("\n已识别（有缓存，打开不用重新识别）") : "",
         };
         if (_library.KnownHash(path) is { } sha && _library.HasCorrection(sha)) text += Loc.T("\n有保存的修正（打开时自动恢复）");
+        if (_library.KnownHash(path) is { } lit && _library.HasLighting(lit)) text += Loc.T("\n有保存的灯光（套姿势时一并恢复）");
         if (_library.KnownHash(path) is { } h && _library.AuxCount(h) is var aux and > 0)
             text += Loc.F("\n挂了 {0} 张辅助视角图（右键「辅助视角」管理）", aux);
         return text + Loc.T("\n双击打开到主窗口，右键更多操作");

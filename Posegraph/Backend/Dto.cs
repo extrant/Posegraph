@@ -99,6 +99,25 @@ public sealed record StickJoint(string Name, float[] Pos, string? Parent);
 public sealed record FaceResult(bool Available, bool Found, float Confidence, bool Used, string Reason,
                                 Dictionary<string, float> Blendshapes, float YawDeg = 0, float PitchDeg = 0);
 
+/// <summary>照片里的一种颜色：Rgb 线性、最大分量 1；Tinted：离色温线远（彩色灯、霓虹、彩色背景），该直接用 Rgb；
+/// Brightness 只有背景色有：背景亮度 / 脸的亮度。</summary>
+public sealed record PhotoColor(float Kelvin, float[]? Rgb, bool Tinted, float Brightness = 0);
+
+/// <summary>
+/// 照片同款灯光（backend lighting.py）：从照片里人物的脸估出的灯。方位、仰角和灯光方案（LightSpec）同一套约定；
+/// Power 以主光为 1；Softness 0～1.5，越大光越柔；色温只分得出冷暖。
+/// </summary>
+public sealed record PhotoLight(float Azimuth, float Elevation, float Power, float Softness, float Kelvin, float[]? Rgb = null, bool Tinted = false)
+{
+    public PhotoColor Color => new(Kelvin, Rgb, Tinted);
+}
+
+/// <summary>Flat：光比接近 1:1（正面闪光、大面积柔光），方向没有意义；Ambient：环境光相对主光的强度；Ratio：左右脸光比；
+/// AmbientColor：环境光的颜色；Background：照片背景的颜色和亮度（人占满画面时为 null）；
+/// Source：face（按脸估的）/ body（没有脸，按身上露出的皮肤估的）/ coarse（皮肤也少，按衣服的明暗强制估的）。</summary>
+public sealed record PhotoLighting(bool Found, string Reason, bool Flat = false, float Ratio = 1, float Ambient = 0, PhotoLight[]? Lights = null,
+                                   PhotoColor? AmbientColor = null, PhotoColor? Background = null, string Source = "face");
+
 public sealed record Stick(StickJoint[] Joints, Segment[] Mhr);
 
 public sealed record PoseWarning(string Bone, string Level, float Value, float Limit, string Message, string? Group, float? Suggest);

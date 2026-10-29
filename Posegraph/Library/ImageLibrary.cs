@@ -45,6 +45,9 @@ public sealed class ImportResult
 }
 
 /// <summary>一张图保存的修正：在 3D 页调好后存进识别缓存，下次打开这张图自动恢复。</summary>
+/// <summary>图库里一张图存的灯光：方案（含逐盏改过的灯）和整体亮度这些微调。灯的位置相对脸和镜头，换站位、换地图都能用。</summary>
+public sealed record SavedLighting(Lighting.LightRig Rig, Lighting.RigTweaks Tweaks, DateTime SavedAt);
+
 public sealed record SavedCorrection(string Preset, Backend.RetargetParams Params, DateTime SavedAt);
 
 /// <summary>
@@ -382,6 +385,53 @@ public sealed class ImageLibrary
         try { File.Delete(FixPath(sha1)); } catch { }
         if (!HasCorrection(sha1)) return;
         lock (_lock) _fixed!.Remove(sha1);
+    }
+
+    // ------------------------------------------------------------------ 每张图保存的灯光
+
+    private string LightPath(string sha1) => System.IO.Path.Combine(CacheDir, sha1 + ".light.json");
+
+    private HashSet<string>? _lit;   // 存了灯光的哈希（同 _fixed）
+
+    public bool HasLighting(string sha1)
+    {
+        lock (_lock)
+        {
+            _lit ??= Directory.Exists(CacheDir)
+                ? Directory.EnumerateFiles(CacheDir, "*.light.json").Select(f => System.IO.Path.GetFileName(f)[..^".light.json".Length])
+                           .ToHashSet(StringComparer.OrdinalIgnoreCase)
+                : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            return _lit.Contains(sha1);
+        }
+    }
+
+    /// <summary>这张图存的灯光；没有返回 null。</summary>
+    public SavedLighting? ReadLighting(string sha1)
+    {
+        if (!HasLighting(sha1)) return null;
+        try
+        {
+            return JsonSerializer.Deserialize<SavedLighting>(File.ReadAllText(LightPath(sha1)), Json);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    public void WriteLighting(string sha1, SavedLighting lighting)
+    {
+        Directory.CreateDirectory(CacheDir);
+        File.WriteAllText(LightPath(sha1), JsonSerializer.Serialize(lighting, Json));
+        if (HasLighting(sha1)) return;
+        lock (_lock) _lit!.Add(sha1);
+    }
+
+    public void DeleteLighting(string sha1)
+    {
+        try { File.Delete(LightPath(sha1)); } catch { }
+        if (!HasLighting(sha1)) return;
+        lock (_lock) _lit!.Remove(sha1);
     }
 
     // ------------------------------------------------------------------ 辅助视角

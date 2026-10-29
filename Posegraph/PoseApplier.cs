@@ -69,6 +69,9 @@ public sealed class PoseApplier(IFramework framework, IClientState clientState, 
     }
 
     /// <summary>冻结动画、等几帧再导入（否则待机动画会让姿势漂移），之后再应用一次。返回错误信息，成功为 null。</summary>
+    /// <summary>姿势成功套到角色上之后（参数是 ApplyAsync 的 actor）。灯光按新姿势重新摆、从图库恢复灯光用。</summary>
+    public event Action<int?>? Applied;
+
     public async Task<string?> ApplyAsync(int? actor, string poseJson)
     {
         var error = await framework.RunOnFrameworkThread(() =>
@@ -87,6 +90,7 @@ public sealed class PoseApplier(IFramework framework, IClientState clientState, 
             var ok = await framework.RunOnFrameworkThread(() => Resolve(actor) is { } a && brio.ApplyPose(a, poseJson));
             if (!ok) return Loc.T("Brio 应用姿势失败");
         }
+        Applied?.Invoke(actor);
         return null;
     }
 }

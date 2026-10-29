@@ -42,20 +42,20 @@ public sealed class LightingScene(LightingService service, Configuration config)
             return;
         }
         // 换了人 / 重新读脸后把视图中心放回脸上
-        if (_lastFace is not { } last || Vector3.Distance(last, subject.Face) > 0.3f)
+        if (_lastFace is not { } last || Vector3.Distance(last, subject.Center) > 0.3f)
         {
-            _lastFace = subject.Face;
+            _lastFace = subject.Center;
             _frameAll = true;
         }
         var camera = service.Camera;
-        var states = LightRigs.Solve(service.Lights, subject, camera, service.Tweaks);
+        var states = LightRigs.Solve(service.Lights, subject, camera, service.Tweaks, service.Time);
         if (_frameAll)
         {
             // 视图中心放在脸上，距离让最远的灯 / 镜头也在画面里
             _frameAll = false;
-            _view.Target = subject.Face;
-            var far = states.Select(s => Vector3.Distance(s.Position, subject.Face)).Append(1f)
-                            .Concat(config.LightShowCamera && service.CameraPose is { } cp ? [Vector3.Distance(cp.Position, subject.Face)] : []).Max();
+            _view.Target = subject.Center;
+            var far = states.Select(s => Vector3.Distance(s.Position, subject.Center)).Append(1f)
+                            .Concat(config.LightShowCamera && service.CameraPose is { } cp ? [Vector3.Distance(cp.Position, subject.Center)] : []).Max();
             _view.Distance = Math.Clamp(far * 1.15f / MathF.Tan(_view.FovY / 2), 1.5f, 40f);
         }
         _view.Begin("##lightScene", size);
@@ -64,6 +64,8 @@ public sealed class LightingScene(LightingService service, Configuration config)
         var feet = service.Body.Count > 0 ? service.Body.Min(b => MathF.Min(b.A.Y, b.B.Y)) : subject.Face.Y - 1.58f * subject.Scale;
         _view.Grid(new Vector3(subject.Face.X, feet, subject.Face.Z), 3f, 0.5f, new Vector4(1, 1, 1, 0.08f));
         DrawSubject(subject);
+        if (subject.DistanceScale > 1)   // 照半身、全身时画出要照的范围
+            _view.Circle(subject.Center, _view.Forward, subject.Reach, Faint with { W = 0.18f }, 1f, 48);
         if (config.LightShowCamera && service.CameraPose is { } pose) DrawCamera(pose, subject);
         if (config.LightShowOrbit && service.SelectedLight is { } sel && sel < states.Count) DrawOrbit(subject, states[sel].Position);
         for (var i = 0; i < states.Count; i++) DrawLight(i, states[i], subject);
@@ -128,7 +130,7 @@ public sealed class LightingScene(LightingService service, Configuration config)
 
     /// <summary>选中灯的对准点（菱形）：灯轴上离灯「灯到脸的距离」那一点。只有聚光 / 面光有。</summary>
     private Vector3? AimPoint(int i, LightState s, Subject subject)
-        => s.Kind == LightKind.Point ? null : s.Position + Vector3.Transform(Vector3.UnitZ, s.Rotation) * Vector3.Distance(s.Position, subject.Face);
+        => s.Kind == LightKind.Point ? null : s.Position + Vector3.Transform(Vector3.UnitZ, s.Rotation) * Vector3.Distance(s.Position, subject.Center);
 
     private int? AimHandleHit(List<LightState> states)
     {
@@ -157,12 +159,12 @@ public sealed class LightingScene(LightingService service, Configuration config)
         else
         {
             // 沿以脸为中心的球面走（距离不变）；视线没碰到球就取视线上离球心最近的点再推到球面
-            var radius = Vector3.Distance(state.Position, subject.Face);
-            var oc = origin - subject.Face;
+            var radius = Vector3.Distance(state.Position, subject.Center);
+            var oc = origin - subject.Center;
             var b = Vector3.Dot(oc, dir);
             var disc = b * b - (oc.LengthSquared() - radius * radius);
             var hit = disc >= 0 ? origin + dir * (-b - MathF.Sqrt(disc)) : origin + dir * -b;
-            target = subject.Face + Vector3.Normalize(hit - subject.Face) * radius;
+            target = subject.Center + Vector3.Normalize(hit - subject.Center) * radius;
         }
         var (az, el, dist) = LightRigs.Place(target, subject, camera, service.Tweaks);
         if (config.LightSnap)
@@ -181,12 +183,12 @@ public sealed class LightingScene(LightingService service, Configuration config)
     private void DragAim(Subject subject, LightState state, Vector2 mouse)
     {
         // 对准点在过脸、垂直于「灯 → 脸」的平面上移动
-        var toFace = subject.Face - state.Position;
+        var toFace = subject.Center - state.Position;
         var n = Vector3.Normalize(toFace);
         var (origin, dir) = _view.Ray(mouse);
         var denom = Vector3.Dot(dir, n);
         if (MathF.Abs(denom) < 1e-4f) return;
-        var hit = origin + dir * (Vector3.Dot(subject.Face - origin, n) / denom);
+        var hit = origin + dir * (Vector3.Dot(subject.Center - origin, n) / denom);
         var (yaw, pitch) = LightRigs.AimOf(toFace, hit - state.Position);
         if (config.LightSnap)
         {
@@ -223,21 +225,21 @@ public sealed class LightingScene(LightingService service, Configuration config)
             _view.Line(corners[k], corners[(k + 1) % 4], CameraColor, 1.5f);
         }
         _view.Line(c + up * h, c + up * h * 1.4f, CameraColor, 2f);   // 小三角：画面上方
-        _view.DashedLine(pose.Position, subject.Face, CameraColor with { W = 0.3f });
+        _view.DashedLine(pose.Position, subject.Center, CameraColor with { W = 0.3f });
         _view.Text(pose.Position, Loc.T("镜头"), CameraColor, new Vector2(6, -16));
     }
 
     /// <summary>选中灯的轨道：以脸为中心、过这盏灯的水平圈和竖直圈（拖灯时灯沿这个球面走）。</summary>
     private void DrawOrbit(Subject subject, Vector3 light)
     {
-        var offset = light - subject.Face;
+        var offset = light - subject.Center;
         var radius = offset.Length();
-        var level = subject.Face with { Y = light.Y };
+        var level = subject.Center with { Y = light.Y };
         var ring = MathF.Sqrt(MathF.Max(radius * radius - offset.Y * offset.Y, 0));
         _view.Circle(level, Vector3.UnitY, ring, Faint, 1f, 64);
         var flat = new Vector3(offset.X, 0, offset.Z);
         if (flat.LengthSquared() > 1e-6f)
-            _view.Circle(subject.Face, Vector3.Normalize(Vector3.Cross(flat, Vector3.UnitY)), radius, Faint with { W = 0.15f }, 1f, 64);
+            _view.Circle(subject.Center, Vector3.Normalize(Vector3.Cross(flat, Vector3.UnitY)), radius, Faint with { W = 0.15f }, 1f, 64);
     }
 
     private void DrawLight(int i, LightState s, Subject subject)
@@ -247,7 +249,7 @@ public sealed class LightingScene(LightingService service, Configuration config)
         var selected = service.SelectedLight == i;
         var color = lit ? DisplayColor(s.Color) : new Vector4(0.45f, 0.45f, 0.45f, 0.6f);
         var forward = Vector3.Transform(Vector3.UnitZ, s.Rotation);
-        var toFace = Vector3.Distance(s.Position, subject.Face);
+        var toFace = Vector3.Distance(s.Position, subject.Center);
         var line = color with { W = selected ? 0.9f : 0.45f };
 
         if (s.Kind != LightKind.Point && config.LightShowCones)
@@ -276,7 +278,7 @@ public sealed class LightingScene(LightingService service, Configuration config)
             }
         }
         else if (s.Kind == LightKind.Point)
-            _view.DashedLine(s.Position, subject.Face, line with { W = line.W * 0.6f }, 1f, 8);
+            _view.DashedLine(s.Position, subject.Center, line with { W = line.W * 0.6f }, 1f, 8);
 
         if (_view.Project(s.Position) is { } p)
         {

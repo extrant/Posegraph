@@ -5,6 +5,36 @@
   },
   "entries": [
     {
+      "version": "0.6.0",
+      "date": "2026-10-29",
+      "title": {
+        "zh": "照片同款灯光：照着照片打光、配色，全身也照得到",
+        "en": "Photo-matched lighting: light and color like the photo, full body included"
+      },
+      "items": {
+        "zh": [
+          "照片同款灯光：灯光窗口最上面的「照片同款」，按主窗口照片里人物脸上的明暗估出主光从哪来、软硬、冷暖和光比，照着摆灯。没有脸（没拍到头、背对、脸太小）时看身上露出的皮肤，皮肤也少时按衣服的明暗强制估（只当个大概）；光比接近 1:1 的照片换成正面柔光",
+          "照片配色：灯的位置不动，只按照片换颜色——主光用照片主光的颜色，补光和背后的灯用照片背景、环境的颜色；照片背景不暗时再加一盏照向身后的背景光。彩色灯、霓虹、彩色背景直接用 RGB，窗口里的色块显示取到的颜色",
+          "打光范围：脸 / 半身 / 全身，默认看游戏镜头拍到多少自动换（拍到脚是全身，拍到腰是半身）。范围大时灯离远一些、光斑放宽，全身照也整个人都照得到",
+          "灯跟着人走：Posegraph 给打光的角色换了姿势、或角色被挪动 / 转身后，灯自动重新摆（「跟随角色」开关，默认开）",
+          "灯光存进图库：「存进这张图」把现在的灯（逐盏改过的、整体微调都算）存进主窗口当前的图，以后给角色套这张图的姿势时一并恢复",
+          "动态灯效：逐盏调整里新增「动态」：闪烁、呼吸、环绕、变色，可调快慢和幅度；「烛光」方案默认火苗轻轻跳动",
+          "3D 布光改成贴在灯光窗口右边的独立窗口：宽度可以拖，点「3D 布光」展开 / 收起，点中任一个窗口两个一起前置；操作提示改到灯光窗口的标题栏；整体微调新增「补光」倍数",
+          "照片估光在后端算：在设置页点「更新后端」就能用（不用下载新组件）。每张照片第一次点约 3～7 秒（CPU），之后读缓存"
+        ],
+        "en": [
+          "Photo-matched lighting: \"Match the photo\" at the top of the lighting window estimates where the key light comes from, how hard it is, how warm or cool, and the light ratio from the shading on the face in the main window's photo, and places the lights to match. Without a usable face (head out of frame, facing away, face too small) it uses the bare skin on the body, and with little bare skin it forces a rough estimate from the shading on the clothes; photos with a light ratio close to 1:1 get a soft front light",
+          "Photo colors: keeps the lights where they are and only recolors them from the photo - the key takes the photo's key light color, fills and lights behind take the photo's background and ambient colors; if the background isn't dark, a background light aimed behind the character is added. Colored lights, neon and colored backdrops are used as RGB, and swatches in the window show the colors picked",
+          "Light area: face / half body / full body, switched automatically by how much the game camera shows (feet visible is full body, waist visible is half body). For larger areas the lights move further away and widen, so full-body shots are lit head to toe",
+          "Lights follow the character: when Posegraph changes the lit character's pose, or the character is moved or turned, the lights are placed again (\"Follow character\", on by default)",
+          "Lighting in the gallery: \"Save to this image\" stores the current lights (per-light changes and overall adjustments included) with the main window's image, and they are restored whenever that image's pose is applied",
+          "Light effects: a new \"Effect\" per light - flicker, pulse, orbit, color cycle - with speed and strength; the \"Candle\" setup flickers gently by default",
+          "3D lighting is now a separate window docked to the right of the lighting window: drag to resize its width, show or hide it with \"3D lighting\", and clicking either window brings both to the front; status messages moved to the lighting window's title bar; a new \"Fill\" multiplier",
+          "Photo lighting is computed by the backend: click \"Update backend\" in Settings to use it (no new components to download). The first click per photo takes about 3-7 s (CPU), later clicks are cached"
+        ]
+      }
+    },
+    {
       "version": "0.5.1",
       "date": "2026-10-29",
       "title": {

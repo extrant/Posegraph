@@ -111,6 +111,18 @@ public class Configuration : IPluginConfiguration
     /// <summary>灯光：转镜头时灯跟着转（始终从镜头这一侧照亮脸）。</summary>
     public bool LightFollowCamera { get; set; } = true;
 
+    /// <summary>灯光：Posegraph 给打光的角色换了姿势、或角色被挪动 / 转身后，自动重新读脸再摆。</summary>
+    public bool LightFollowSubject { get; set; } = true;
+
+    /// <summary>灯光的打光范围：auto（看游戏镜头拍到多少）/ face / half / full。</summary>
+    public string LightFraming { get; set; } = "auto";
+
+    /// <summary>灯光：3D 布光窗口（贴在灯光窗口右边）展开着。</summary>
+    public bool LightSceneOpen { get; set; } = true;
+
+    /// <summary>灯光：给角色套主窗口的图时，这张图在图库里存过灯光就一并恢复。</summary>
+    public bool LightRestoreFromLibrary { get; set; } = true;
+
     /// <summary>灯光 3D 视图的显示选项（专业）：聚光锥、柔和边、镜头、轨道、光照预览球；拖灯方式：自由移动、角度吸附。</summary>
     public bool LightShowCones { get; set; } = true;
     public bool LightShowSoftEdge { get; set; }

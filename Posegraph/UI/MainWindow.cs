@@ -87,6 +87,16 @@ public sealed partial class MainWindow : Window, IDisposable
     /// <summary>当前选中的角色（null 为 GPose 目标），灯光窗口照它打光。</summary>
     public int? SelectedActor => _actor;
 
+    /// <summary>主窗口当前的图在图库里的内容哈希（存灯光、修正用）；没打开图为 null。</summary>
+    public string? CurrentImageSha1 => _imageSha1;
+
+    /// <summary>主窗口里有识别好的照片（灯光窗口的「照片同款」要用）。</summary>
+    public bool HasPhoto => _session is not null && BackendOnline;
+
+    /// <summary>当前照片里选中那个人的照片同款灯光；没有照片时为 null。</summary>
+    public async Task<PhotoLighting?> PhotoLightingAsync()
+        => _session is { } s ? await _client.LightingAsync(s.SessionId, _person) : null;
+
     /// <summary>主窗口关闭时（关闭按钮、指令、退出 GPose 自动关闭）调用：图库、角色列表跟着关（由 Plugin 接上）。</summary>
     public Action? Closed { get; set; }
 

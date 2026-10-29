@@ -682,6 +682,70 @@ def session_face(sid: str, person: int = 0) -> dict:
     return {"available": True, **out}
 
 
+def _background(s: Session, size) -> np.ndarray:
+    """照片里不是人的像素（size = 宽、高）：有网格三角形时按所有人的网格投影再外扩一圈，否则按人物框。"""
+    import cv2
+
+    w, h = size
+    faces = _estimator.faces()
+    if faces is not None:
+        labels = masks.render_labels(s.humans, s.image_size, faces)
+        person = cv2.resize((labels > 0).astype(np.uint8), (w, h), interpolation=cv2.INTER_NEAREST)
+        grow = max(3, round(max(w, h) * 0.015))
+        person = cv2.dilate(person, np.ones((2 * grow + 1, 2 * grow + 1), np.uint8))
+    else:
+        person = np.zeros((h, w), np.uint8)
+        k = w / float(s.image_size[0])
+        for hu in s.humans:
+            x1, y1, x2, y2 = (int(round(float(v) * k)) for v in hu["bbox"][:4])
+            person[max(0, y1):y2, max(0, x1):x2] = 1
+    return person == 0
+
+
+@app.get("/sessions/{sid}/lighting")
+def session_lighting(sid: str, person: int = 0) -> dict:
+    """照片同款灯光（见 lighting.py）：从第 person 个人的脸估主光的方位、仰角、软硬、冷暖和光比，插件据此生成灯光方案；
+    脸用不了（背对、没拍到头、脸太小）时改用身体上露出的皮肤。在会话的预览图上估（图库恢复的会话也能用）；结果记在会话里。"""
+    from PIL import Image
+
+    from . import lighting
+
+    s = _session(sid)
+    human = _human(s, person, use_aux=False)
+    if s.lighting is not None and person in s.lighting:
+        out = s.lighting[person]
+        return {**out, "reason": _tr_reason(out["reason"])} if out["reason"] else out
+    rgb = np.asarray(Image.open(io.BytesIO(s.preview_png)).convert("RGB"))
+    floor = human.get("floor")
+    up = np.asarray(floor[:3], dtype=float) if floor is not None and len(floor) >= 3 else None
+    focal = float(np.ravel(human["focal_length"])[0])
+    scale = rgb.shape[1] / float(s.image_size[0])
+    background = _background(s, rgb.shape[1::-1])
+    result = _face_result(s, person)
+    out = {"found": False, "reason": "面捕组件没装（mediapipe 或 face_landmarker 模型）"}
+    if result is not None and result.found and result.landmarks:
+        # 面捕的脸朝向是 OpenGL 约定（y 上、z 朝镜头外），换到相机系（y 下、z 朝前）
+        forward = np.asarray(result.rotation, dtype=float)[:, 2] * [1, -1, -1] if result.rotation else None
+        out = lighting.estimate(rgb, result.landmarks, focal, scale, up, forward, background)
+    elif result is not None:
+        out = {"found": False, "reason": result.reason or "没找到脸（插画、遮挡或背对）"}
+    faces = _estimator.faces()
+    if not out["found"] and faces is not None:   # 脸用不了：改看身体（露出的皮肤，不够时按衣服的受光强制估）
+        cam_t = np.asarray(human["cam_t"], dtype=float).reshape(1, 3)
+        body = lighting.estimate_body(rgb, np.asarray(human["vertices"], dtype=float) + cam_t, faces, focal, scale,
+                                      human["keypoints_2d"], np.asarray(human["joint_coords"], dtype=float) + cam_t, up, background)
+        out = body if body["found"] else {"found": False, "reason": f"{out['reason']}；{body['reason']}"}
+    if s.lighting is None:
+        s.lighting = {}
+    s.lighting[person] = out   # 记中文原文，每次返回时按当次的界面语言翻译
+    return {**out, "reason": _tr_reason(out["reason"])} if out["reason"] else out
+
+
+def _tr_reason(reason: str) -> str:
+    """估不出光的原因（可能是「脸的原因；身体的原因」两句拼起来的）按界面语言翻译。"""
+    return tr("；").join(tr(part) for part in reason.split("；"))
+
+
 class BrioEditsRequest(RetargetRequest):
     edited: str                     # 用户在 Brio 里改过之后读回的姿势（Brio pose JSON）
 

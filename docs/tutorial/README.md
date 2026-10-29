@@ -237,15 +237,28 @@ main bones automatically, so edits to helper bones alone can't be kept either.
 ## 14. Lighting
 
 The light bulb button in the second toolbar row. Click a setup to light the current character (loop, Rembrandt, butterfly, split,
-backlight and more, 11 in total). Lights are placed relative to the face and the camera; with "Follow camera" on they turn with the camera.
+backlight and more, 11 in total). Lights are placed relative to the character and the camera. With "Follow camera" on they turn with the camera;
+with "Follow character" on they are placed again when Posegraph changes the character's pose or the character is moved or turned.
 
 ![Lighting](images/en/tut-lighting.png)
 
-- The three sliders at the top adjust overall brightness, warmth and light distance.
-- **3D lighting**: a separate 3D view showing every light, the character and the camera. Drag a light to move it, drag its rings to rotate it;
-  switch between camera view, front, side and top. The ball at the top right previews the lighting ratio.
-- The buttons below select a light; "Adjust each light" lets you solo or mute a light and change its color, intensity and angle.
-- Lights are removed automatically when you leave GPose.
+- **Match the photo**: estimates where the key light comes from, how hard it is, how warm or cool, and the light ratio from the shading on the
+  face in the main window's photo, and places the lights to match. Without a face it uses the bare skin on the body, and with little bare skin it
+  forces a rough estimate from the shading on the clothes. The first click per photo takes a few seconds.
+- **Photo colors**: keeps the lights where they are and only recolors them from the photo; if the photo's background isn't dark, a background
+  light aimed behind the character is added. The swatches below show the colors picked from the photo.
+- **Light area**: face / half body / full body. "Auto" (the default) follows how much the game camera shows - feet visible is full body,
+  waist visible is half body, otherwise the face. For larger areas the lights move further away and widen so the whole character is lit.
+- The sliders adjust overall brightness, warmth, light distance and fill (lower fill gives a higher light ratio; turn it down when the scene
+  itself is already bright).
+- **Save to this image**: stores the current lights with the main window's image; they are restored whenever that image's pose is applied
+  ("Restore with pose").
+- **3D lighting**: a separate window docked to the right of the lighting window; show or hide it with "3D lighting" and drag to resize its width.
+  It shows every light, the character and the camera: drag a light to move it, drag the diamond to turn the light head; switch between camera view,
+  front, side and top. The ball at the top right previews the lighting ratio.
+- The buttons below the 3D view select a light; "Adjust each light" lets you solo or mute a light, change its color, intensity and angle,
+  and add an effect (flicker, pulse, orbit, color cycle).
+- Status messages appear in the lighting window's title bar. Lights are removed automatically when you leave GPose.
 
 ## 15. Framing and screenshots
 

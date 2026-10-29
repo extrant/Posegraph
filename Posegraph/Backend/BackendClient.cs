@@ -82,6 +82,13 @@ public sealed partial class BackendClient(Func<int> port) : IDisposable
         return (await ReadAsync<FaceResult>(resp))!;
     }
 
+    /// <summary>会话里第 person 个人的照片同款灯光（第一次问约几秒，之后读缓存）。</summary>
+    public async Task<PhotoLighting> LightingAsync(string sid, int person)
+    {
+        using var resp = await _http.GetAsync(Url($"/sessions/{sid}/lighting?person={person}"));
+        return (await ReadAsync<PhotoLighting>(resp))!;
+    }
+
     public async Task<MaskData> MasksAsync(string sid, bool render = true)
     {
         using var resp = await _http.GetAsync(Url($"/sessions/{sid}/masks{(render ? "" : "?render=false")}"));

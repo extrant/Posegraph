@@ -1,34 +1,54 @@
+using System.Diagnostics;
 using System.Numerics;
 using System.Text.Json;
+using Dalamud.Interface.Utility;
 using Dalamud.Plugin.Services;
+using Posegraph.Library;
 
 namespace Posegraph.Lighting;
 
 /// <summary>
 /// 一键布光：选一套方案，按当前角色的脸和 GPose 相机算出每盏灯摆哪，生成游戏灯。
-/// 「跟随镜头」开着时相机动了灯跟着转（人物的脸位置在套用时读一次，角色动了再点一次「重新摆」）。
+/// 「跟随镜头」开着时相机动了灯跟着转；「跟随角色」开着时 Posegraph 给这个角色换了姿势、或角色被挪动 / 转身后自动重新读脸再摆。
+/// 打光范围（脸 / 半身 / 全身）默认看游戏镜头拍到多少自动换，灯围着那一块的中心摆。有动态灯效的灯每帧更新。主窗口的图在图库里存过灯光时，给角色套这张图的姿势时一并恢复。
 /// 退出 GPose、插件卸载时清掉所有灯。
 /// </summary>
-public sealed class LightingService : IDisposable
+public sealed partial class LightingService : IDisposable
 {
+    private const int MovePollTicks = 30;          // 每隔这么多帧看一次角色挪没挪
+    private const float MoveThreshold = 0.01f;     // 挪了 1 厘米以上
+    private const float TurnThresholdDeg = 1f;     // 或转了 1° 以上就重新摆
+    private const int FramingPollTicks = 15;       // 自动打光范围：每隔这么多帧看一次镜头拍到哪
+    private const float ScreenMargin = 0.03f;      // 离画面边缘这么近（画面的比例）以内不算拍到
+
     private readonly IFramework _framework;
     private readonly IClientState _clientState;
     private readonly PoseApplier _applier;
     private readonly Configuration _config;
     private readonly GameLights _lights = new();
     private readonly List<(nint Handle, LightKind Kind)> _spawned = [];
+    private readonly IGameGui _gameGui;
+    private readonly Stopwatch _clock = Stopwatch.StartNew();   // 动态灯效的时间
     private Subject? _subject;
     private List<(Vector3 A, Vector3 B)> _body = [];
     private Vector3? _lastCamera;
     private int _tick;
+    private int? _actor;                 // 打光的角色（同主窗口的选法，null 为 GPose 目标）
+    private int? _actorIndex;            // 读脸时角色的对象序号：盯它挪没挪
+    private Vector3 _modelPosition;
+    private Quaternion _modelRotation;
+    private bool _following;             // 正在因为角色动了重新摆
+    private string? _lastImage;          // 上次套姿势时主窗口的图（换了图才从图库恢复灯光）
 
-    public LightingService(IFramework framework, IClientState clientState, PoseApplier applier, Configuration config)
+    public LightingService(IFramework framework, IClientState clientState, PoseApplier applier, Configuration config, IGameGui gameGui)
     {
         _framework = framework;
         _clientState = clientState;
         _applier = applier;
         _config = config;
+        _gameGui = gameGui;
         _framework.Update += OnUpdate;
+        _applier.Applied += OnPoseApplied;
     }
 
     /// <summary>当前套用的方案（灯可在界面里逐盏改，改的是这份拷贝）；null 为没有灯。</summary>
@@ -50,8 +70,11 @@ public sealed class LightingService : IDisposable
 
     public HashSet<int> Muted { get; } = [];
 
-    /// <summary>读到的脸（3D 视图的中心、拖灯反算用）。</summary>
-    public Subject? Subject => _subject;
+    /// <summary>读到的人，已按打光范围定好灯的中心（3D 视图、拖灯反算用）。</summary>
+    public Subject? Subject => _subject is { } s ? LightRigs.Framed(s, Framing) : null;
+
+    /// <summary>现在的打光范围：设置里选了就是它，「自动」时看游戏镜头拍到多少。</summary>
+    public LightFraming Framing { get; private set; }
 
     /// <summary>读脸时顺带记下的身体骨架（世界坐标线段），3D 视图里画人。</summary>
     public IReadOnlyList<(Vector3 A, Vector3 B)> Body => _body;
@@ -61,6 +84,15 @@ public sealed class LightingService : IDisposable
 
     /// <summary>灯摆的时候用的镜头位置：跟随镜头时是当前镜头，否则是套用 / 重新摆时的镜头。</summary>
     public Vector3? Camera => _config.LightFollowCamera ? CameraPose?.Position ?? _lastCamera : _lastCamera;
+
+    /// <summary>动态灯效的时间（秒）。</summary>
+    public float Time => (float)_clock.Elapsed.TotalSeconds;
+
+    /// <summary>主窗口当前的图（图库哈希）和它存的灯光；没有为 null。由 Plugin 接上。</summary>
+    public Func<(string Image, SavedLighting? Saved)?>? CurrentImage { get; set; }
+
+    /// <summary>自动做的事（跟随角色、从图库恢复）的结果，给灯光窗口的标题栏显示。</summary>
+    public event Action<string, bool>? Notice;
 
     /// <summary>这盏灯现在是否发光（独显 / 关掉之后）。</summary>
     public bool IsLit(int i) => Solo is { } s ? s == i : !Muted.Contains(i);
@@ -80,6 +112,8 @@ public sealed class LightingService : IDisposable
         var subject = await ReadSubjectAsync(actor);
         if (subject is null) return Error = Loc.T("读不到角色的脸（不在 GPose、没选角色或 Brio 不可用）");
         _subject = subject;
+        _actor = actor;
+        Framing = await _framework.RunOnFrameworkThread(() => ResolveFraming(subject.Value));
         if (Active?.Id != rig.Id || Lights.Count != rig.Lights.Length)
         {
             SelectedLight = Solo = null;
@@ -97,6 +131,17 @@ public sealed class LightingService : IDisposable
 
     /// <summary>界面改了某盏灯或全局微调：按已读到的脸重摆（不重新读角色）。</summary>
     public void Refresh() => _framework.RunOnFrameworkThread(Rebuild);
+
+    /// <summary>照片配色：按照片给现在的灯换颜色（见 LightRigs.WithPhotoColors）。返回换了颜色的盏数和加上的盏数。</summary>
+    public (int Changed, int Added) ApplyPhotoColors(Backend.PhotoLighting photo)
+    {
+        var before = Lights;
+        Lights = LightRigs.WithPhotoColors(before, photo);
+        var changed = before.Where((l, i) => !LightRigs.SameColor(l, Lights[i])).Count();
+        if (Lights.Count != before.Count) Solo = null;
+        Refresh();
+        return (changed, Lights.Count - before.Count);
+    }
 
     public void Clear() => _framework.RunOnFrameworkThread(() =>
     {
@@ -118,12 +163,48 @@ public sealed class LightingService : IDisposable
     public void DeleteCustom(LightRig rig)
         => _config.LightRigs.RemoveAll(json => json.Contains($"\"{rig.Id}\"", StringComparison.Ordinal));
 
+    /// <summary>现在的灯（含逐盏改过的、整体亮度这些微调），存进图库用。没有灯时为 null。</summary>
+    public SavedLighting? Snapshot()
+        => Active is { } rig ? new SavedLighting(rig with { Lights = [.. Lights] }, Tweaks, DateTime.Now) : null;
+
+    /// <summary>设置改了打光范围：马上按新的范围重摆。</summary>
+    public void RefreshFraming() => _framework.RunOnFrameworkThread(() =>
+    {
+        if (_subject is { } s) Framing = ResolveFraming(s);
+        Rebuild();
+    });
+
+    /// <summary>
+    /// 打光范围：设置里选了就用选的；「自动」时看脚、腰有没有在游戏画面里——脚拍到了是全身，腰拍到了是半身，否则照脸。
+    /// 必须在主线程调用。
+    /// </summary>
+    private LightFraming ResolveFraming(Subject s)
+    {
+        switch (_config.LightFraming)
+        {
+            case "face": return LightFraming.Face;
+            case "half": return LightFraming.Half;
+            case "full": return LightFraming.Full;
+        }
+        if (s.Feet is { } feet && OnScreen(feet)) return LightFraming.Full;
+        if (s.Pelvis is { } pelvis && OnScreen(pelvis)) return LightFraming.Half;
+        return LightFraming.Face;
+    }
+
+    private bool OnScreen(Vector3 world)
+    {
+        if (!_gameGui.WorldToScreen(world, out var screen)) return false;
+        var vp = ImGuiHelpers.MainViewport;
+        var uv = (screen - vp.Pos) / vp.Size;
+        return uv.X > ScreenMargin && uv.X < 1 - ScreenMargin && uv.Y > ScreenMargin && uv.Y < 1 - ScreenMargin;
+    }
+
     private void Rebuild()
     {
-        if (_subject is not { } subject || !_clientState.IsGPosing) return;
+        if (Subject is not { } subject || !_clientState.IsGPosing) return;
         var camera = GposeCamera.WorldPosition();
         _lastCamera = camera;
-        var states = LightRigs.Solve(Lights, subject, camera, Tweaks);
+        var states = LightRigs.Solve(Lights, subject, camera, Tweaks, Time);
         for (var i = 0; i < states.Count; i++)
             if (!IsLit(i)) states[i] = states[i] with { Color = Vector3.Zero };
         // 种类或数量变了就重建，否则原地改（避免闪）
@@ -160,9 +241,80 @@ public sealed class LightingService : IDisposable
             Muted.Clear();
             return;
         }
-        if (!_config.LightFollowCamera || ++_tick % 6 != 0) return;
+        _tick++;
+        if (_config.LightFollowSubject && _tick % MovePollTicks == 0 && !_following && _actorIndex is { } index)
+            _ = CheckMovedAsync(index);
+        if (_config.LightFraming == "auto" && _tick % FramingPollTicks == 0 && _subject is { } raw)
+        {
+            var framing = ResolveFraming(raw);
+            if (framing != Framing)
+            {
+                Framing = framing;
+                Rebuild();
+            }
+        }
+        if (Lights.Any(l => l.Effect != LightEffect.None))
+        {
+            Rebuild();
+            return;
+        }
+        if (!_config.LightFollowCamera || _tick % 6 != 0) return;
         if (GposeCamera.WorldPosition() is { } cam && (_lastCamera is not { } last || Vector3.Distance(cam, last) > 0.02f))
             Rebuild();
+    }
+
+    /// <summary>
+    /// Posegraph 给某个角色套了姿势：主窗口的图换过且图库里存了灯光 → 恢复那套灯；否则打着光的正是这个角色 → 按新姿势重新摆。
+    /// </summary>
+    private void OnPoseApplied(int? actor) => _ = Task.Run(async () =>
+    {
+        try
+        {
+            if (!_clientState.IsGPosing) return;
+            var current = CurrentImage?.Invoke();
+            var newImage = current is { } c && c.Image != _lastImage;
+            if (current is { } cur) _lastImage = cur.Image;
+            if (newImage && _config.LightRestoreFromLibrary && current?.Saved is { } saved)
+            {
+                Tweaks = saved.Tweaks;
+                var error = await ApplyAsync(saved.Rig, actor);
+                Notice?.Invoke(error ?? Loc.F("已按图库里这张图存的灯光打光（{0}）", Loc.T(saved.Rig.Name)), error is null);
+                return;
+            }
+            if (Active is null || !_config.LightFollowSubject || !await SameActorAsync(actor)) return;
+            await FollowAsync();
+        }
+        catch (Exception ex)
+        {
+            Notice?.Invoke(ex.Message, false);
+        }
+    });
+
+    private async Task<bool> SameActorAsync(int? actor)
+        => actor == _actor || (await _applier.IdentifyAsync(actor))?.Index is { } a && a == _actorIndex;
+
+    private async Task FollowAsync()
+    {
+        if (_following) return;
+        _following = true;
+        try
+        {
+            var error = await ReplaceAsync(_actor);
+            if (error is not null) Notice?.Invoke(error, false);
+        }
+        finally { _following = false; }
+    }
+
+    /// <summary>角色被挪动或转身（Brio 移动、换站位）：位置或朝向变了就重新读脸再摆。</summary>
+    private async Task CheckMovedAsync(int index)
+    {
+        var model = await _applier.GetTransformAsync(index);
+        if (model is null || _following) return;
+        var position = new Vector3(model.Position[0], model.Position[1], model.Position[2]);
+        var rotation = new Quaternion(model.Rotation[0], model.Rotation[1], model.Rotation[2], model.Rotation[3]);
+        var turned = 2 * MathF.Acos(Math.Clamp(MathF.Abs(Quaternion.Dot(rotation, _modelRotation)), 0f, 1f)) * 180f / MathF.PI;
+        if (Vector3.Distance(position, _modelPosition) < MoveThreshold && turned < TurnThresholdDeg) return;
+        await FollowAsync();
     }
 
     /// <summary>
@@ -192,6 +344,9 @@ public sealed class LightingService : IDisposable
         var rotation = new Quaternion(model.Rotation[0], model.Rotation[1], model.Rotation[2], model.Rotation[3]);
         var scale = new Vector3(model.Scale[0], model.Scale[1], model.Scale[2]);
         Vector3 World(Vector3 p) => position + Vector3.Transform(p * scale, rotation);
+        _actorIndex = id.Index;
+        _modelPosition = position;
+        _modelRotation = rotation;
 
         var hasEyes = bones.TryGetValue("j_f_eye_l", out var eyeL) & bones.TryGetValue("j_f_eye_r", out var eyeR);
         var faceModel = hasEyes ? (eyeL + eyeR) / 2 : head + Vector3.Normalize(head - neck) * 0.08f;
@@ -208,8 +363,16 @@ public sealed class LightingService : IDisposable
         var eyeHeight = faceModel.Y * scale.Y;
         _body = [.. BodyBones.Where(b => bones.ContainsKey(b.Child) && bones.ContainsKey(b.Parent))
                              .Select(b => (World(bones[b.Parent]), World(bones[b.Child])))];
-        return new Subject(face, forward, up, Math.Clamp(eyeHeight / 1.58f, 0.4f, 1.5f));
+        // 脚：脚踝、脚尖里最低的那个（站着、坐着、躺着都是离地最近的一点）
+        var feet = FeetBones.Where(bones.ContainsKey).Select(b => World(bones[b])).OrderBy(p => p.Y).Cast<Vector3?>().FirstOrDefault();
+        return new Subject(face, forward, up, Math.Clamp(eyeHeight / 1.58f, 0.4f, 1.5f))
+        {
+            Pelvis = bones.TryGetValue("j_kosi", out var pelvis) ? World(pelvis) : null,
+            Feet = feet,
+        };
     }
+
+    private static readonly string[] FeetBones = ["j_asi_d_l", "j_asi_d_r", "j_asi_e_l", "j_asi_e_r"];
 
     /// <summary>3D 视图里画的身体骨架（子 → 父）。</summary>
     private static readonly (string Child, string Parent)[] BodyBones =
@@ -232,6 +395,7 @@ public sealed class LightingService : IDisposable
     public void Dispose()
     {
         _framework.Update -= OnUpdate;
+        _applier.Applied -= OnPoseApplied;
         // 卸载插件可能不在主线程：同步回主线程清灯
         _framework.RunOnFrameworkThread(() =>
         {

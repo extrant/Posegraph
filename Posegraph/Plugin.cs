@@ -50,6 +50,7 @@ public sealed class Plugin : IDalamudPlugin
         ITextureProvider textures,
         ITextureReadbackProvider readback,
         IDragDropManager dragDrop,
+        IGameGui gameGui,
         IDataManager data,
         IPluginLog log)
     {
@@ -86,9 +87,14 @@ public sealed class Plugin : IDalamudPlugin
         _windows.AddWindow(_update);
         _main.ShowChangelog = () => _update.IsOpen = true;
         _main.ToggleLibrary = _library.Toggle;
-        _lighting = new Lighting.LightingService(framework, clientState, applier, _config);
-        _lightingWindow = new LightingWindow(_lighting, _config, pi, () => _main.SelectedActor, () => clientState.IsGPosing);
+        _lighting = new Lighting.LightingService(framework, clientState, applier, _config, gameGui);
+        _lighting.CurrentImage = () => _main.CurrentImageSha1 is { } sha ? (sha, _main.Library.ReadLighting(sha)) : null;
+        _lightingWindow = new LightingWindow(_lighting, _config, pi, () => _main.SelectedActor, () => clientState.IsGPosing,
+                                             () => _main.HasPhoto, _main.PhotoLightingAsync, () => _main.CurrentImageSha1, _main.Library);
         _windows.AddWindow(_lightingWindow);
+        var lightingScene = new LightingSceneWindow(_lighting, _config, pi, _lightingWindow);
+        _windows.AddWindow(lightingScene);
+        _lightingWindow.SceneWindow = lightingScene;
         _main.ToggleLighting = _lightingWindow.Toggle;
         _composition = new CompositionWindow(_config, pi, framework, clientState, textures, readback, () => _main.PhotoSize,
                                              () => _main.PhotoTexture, () => _main.PhotoSkeleton);
