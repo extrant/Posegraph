@@ -97,19 +97,30 @@ def _angles(matrix: np.ndarray) -> tuple[float, float]:
     return float(yaw), float(pitch)
 
 
-def score(nose_offset: float, side: float, face_width: float, yaw_deg: float) -> tuple[float, str]:
-    """三项打分相乘；返回置信度和最拉低分数的原因（满分时为空）。"""
+def score(nose_offset: float, side: float, face_width: float, yaw_deg: float,
+          sizes: tuple[float, float] = (MIN_SIZE_PX, FULL_SIZE_PX)) -> tuple[float, str]:
+    """三项打分相乘；返回置信度和最拉低分数的原因（满分时为空）。sizes：脸宽零分、满分的像素。"""
     parts = {
         "找到的脸不是这个人的（可能是旁边的人）": float(np.clip(1 - (nose_offset / side - 0.15) / 0.2, 0, 1)),
-        "脸太小": float(np.clip((face_width - MIN_SIZE_PX) / (FULL_SIZE_PX - MIN_SIZE_PX), 0, 1)),
+        "脸太小": float(np.clip((face_width - sizes[0]) / (sizes[1] - sizes[0]), 0, 1)),
         "侧脸太多": float(np.clip((MAX_YAW_DEG - abs(yaw_deg)) / (MAX_YAW_DEG - FULL_YAW_DEG), 0, 1)),
     }
     worst = min(parts, key=parts.get)
     return float(np.prod(list(parts.values()))), worst if parts[worst] < 1 else ""
 
 
-def analyze(preview_rgb: np.ndarray, keypoints_2d: np.ndarray, image_size) -> FaceResult:
-    """在预览图（session.preview_png）里找这个人的脸。keypoints_2d 是 SAM 的关键点（原图像素）。"""
+VIDEO_SIZES = (14.0, 40.0)   # 视频的脸宽打分：远景里的脸常只有三四十像素，照样能找到；表情强度另按脸宽打折（small_face_factor）
+
+
+def small_face_factor(face_width: float) -> float:
+    """小脸的表情打折：脸宽 72 像素以上不打折，越小越淡（最低 0.3）。小脸的关键点和表情系数偏差大（眼睛常被认成半闭）。"""
+    return float(np.clip((face_width - VIDEO_SIZES[0]) / (FULL_SIZE_PX - VIDEO_SIZES[0]), 0.3, 1.0))
+
+
+def analyze(preview_rgb: np.ndarray, keypoints_2d: np.ndarray, image_size,
+            sizes: tuple[float, float] = (MIN_SIZE_PX, FULL_SIZE_PX)) -> FaceResult:
+    """在预览图（session.preview_png）里找这个人的脸。keypoints_2d 是 SAM 的关键点（原图像素）。
+    sizes：脸宽的零分、满分像素（视频用 VIDEO_SIZES，收小脸）。"""
     h, w = preview_rgb.shape[:2]
     scale = w / float(image_size[0])
     box = head_box(keypoints_2d, scale, (w, h))
@@ -146,7 +157,7 @@ def analyze(preview_rgb: np.ndarray, keypoints_2d: np.ndarray, image_size) -> Fa
             # 摆正重试时找到的姿态 = 绕相机 z 转了 angle × 真实姿态（实测），转回去
             c, s_ = np.cos(np.radians(-angle)), np.sin(np.radians(-angle))
             rotation = (np.array([[c, -s_, 0], [s_, c, 0], [0, 0, 1]]) @ m).round(5).tolist()
-        conf, reason = score(float(np.linalg.norm(faces[i][NOSE_TIP, :2] - nose)), x2 - x1, float(np.ptp(faces[i][:, 0])), yaw)
+        conf, reason = score(float(np.linalg.norm(faces[i][NOSE_TIP, :2] - nose)), x2 - x1, float(np.ptp(faces[i][:, 0])), yaw, sizes)
         if best is None or conf > best.confidence:
             best = FaceResult(True, conf, conf >= MIN_CONFIDENCE, "" if conf >= MIN_CONFIDENCE else (reason or "置信度太低"),
                               shapes[i], yaw, pitch, box, faces[i].round(2).tolist(), rotation)

@@ -23,6 +23,8 @@ public sealed class BridgeServer(IFramework framework, IClientState clientState,
 
     private HttpListener? _listener;
     private CancellationTokenSource? _cts;
+    private VideoSpike? _spike;
+    private VideoSpike Spike => _spike ??= new VideoSpike(framework, clientState, targetManager, brio);
     private long _frame;   // 游戏帧号：后端连读相机时据此判断两次读数是不是同一帧（帧率低时按时间间隔判断会误判「已停稳」）
 
     public bool IsRunning => _listener?.IsListening == true;
@@ -92,6 +94,24 @@ public sealed class BridgeServer(IFramework framework, IClientState clientState,
                 case ("POST", "/camera"):
                     await HandleWriteCamera(ctx);
                     break;
+                case ("POST", "/spike/record"):
+                    await WriteJson(ctx, 200, VideoSpike.Record is { } record ? await record(await ReadBody(ctx)) : new { error = "no hook" });
+                    break;
+                case ("POST", "/spike/poses"):
+                    await WriteJson(ctx, 200, await Spike.PosesAsync(await ReadBody(ctx)));
+                    break;
+                case ("POST", "/spike/camera"):
+                    await WriteJson(ctx, 200, await Spike.CameraAsync(await ReadBody(ctx)));
+                    break;
+                case ("POST", "/spike/place"):
+                    await WriteJson(ctx, 200, await Spike.PlaceTestAsync(await ReadBody(ctx)));
+                    break;
+                case ("POST", "/spike/dump"):
+                    await WriteJson(ctx, 200, await Spike.DumpAsync(await ReadBody(ctx)));
+                    break;
+                case ("POST", "/spike/brio"):
+                    await WriteJson(ctx, 200, await Spike.BrioTimelineAsync(await ReadBody(ctx)));
+                    break;
                 default:
                     await WriteJson(ctx, 404, new { error = "not found" });
                     break;
@@ -102,6 +122,13 @@ public sealed class BridgeServer(IFramework framework, IClientState clientState,
             log.Error(ex, Loc.T("Posegraph 处理请求失败"));
             await WriteJson(ctx, 500, new { error = ex.Message });
         }
+    }
+
+    private static async Task<JsonElement> ReadBody(HttpListenerContext ctx)
+    {
+        using var reader = new StreamReader(ctx.Request.InputStream, Encoding.UTF8);
+        var text = await reader.ReadToEndAsync();
+        return JsonDocument.Parse(text.Length == 0 ? "{}" : text).RootElement.Clone();
     }
 
     private object ReadCamera()

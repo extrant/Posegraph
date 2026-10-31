@@ -14,6 +14,11 @@
   POST /sessions/{id}/retarget         按参数重定向（只算重定向，几十毫秒），返回 Brio 姿势、叠加层、火柴人、合理性提示
   POST /sessions/{id}/camera           按照片镜头设置 GPose 相机（经 Posegraph HTTP 闭环求解）
   POST /sessions/{id}/views            挂上辅助视角（别的会话里识别好的同一姿势），重定向默认用融合结果（multiview.py）
+  POST /videos?name=xx                 请求体为视频文件，返回时长、帧率、尺寸；后台粗查切镜（GET /videos/{id} 里的 cuts）
+  GET  /videos/{id}/frame?t=秒         预览帧（JPEG，长边不超过 max_side）
+  POST /videos/{id}/detect?t=秒        找出那一帧里的人
+  POST /videos/{id}/jobs               逐帧识别任务（后台）：起止、帧率、选人那一帧、每个人的框 / 种族 / 游戏姿势
+  GET  /jobs/{id} | POST /jobs/{id}/cancel | GET /jobs/{id}/result   进度、取消、片段结果（见 video.py）
   GET  /presets                        参数预设
   GET  /races                          支持的种族骨架（retarget/races.py）
   POST /shutdown                       退出服务
@@ -27,6 +32,7 @@ import io
 import threading
 import time
 import uuid
+from pathlib import Path
 
 import numpy as np
 from fastapi import FastAPI, HTTPException, Request
@@ -944,6 +950,512 @@ def session_camera(sid: str, req: CameraRequest) -> dict:
             "forwardErrorDeg": round(result["forward_error_deg"], 2),
             "fovDeg": round(result["fov_deg"], 1), "targetFovDeg": round(result["target_fov_deg"], 1),
             "framingErrorPct": round(framing * 100, 1), "log": log}
+
+
+# ---------------------------------------------------------------- 视频（video.py）
+
+VIDEO_DIR = SERVICE_ROOT / "outputs" / "videos"
+MAX_VIDEOS = 4
+_videos: dict[str, dict] = {}     # id → {"info": VideoInfo, "name", "cuts": None | [秒]}
+_jobs: dict[str, "video.Job"] = {}
+_jobs_lock = threading.Lock()
+
+
+def _video(vid: str) -> dict:
+    v = _videos.get(vid)
+    if v is None:
+        raise HTTPException(404, tr("视频不存在（后端重启过？请重新载入）"))
+    return v
+
+
+def _forget_video(vid: str) -> None:
+    v = _videos.pop(vid, None)
+    if v is not None:
+        v["stop"].set()
+        try:
+            v["info"].path.unlink(missing_ok=True)
+        except OSError:
+            pass
+
+
+_renders: dict[str, object] = {}   # 录制中：id → video.FrameWriter
+_renders_lock = threading.Lock()
+RENDER_IDLE_SECONDS = 300
+
+
+class RenderRequest(BaseModel):
+    path: str            # 输出的 mp4 完整路径（插件定，一般在 文档\Posegraph\Videos）
+    width: int
+    height: int
+    fps: float = 30
+    music: str | None = None   # 配音乐：原视频（或音频）文件的完整路径；没有音轨时找同名的音频文件
+    music_start: float = 0.0   # 从原视频的第几秒起（片段的起点）
+
+
+@app.post("/renders")
+def render_start(req: RenderRequest) -> dict:
+    """开始把逐帧画面编码成 mp4：之后 POST /renders/{id}/frames 一帧一帧送，最后 /finish。"""
+    from . import video
+
+    if req.width < 16 or req.height < 16 or not 1 <= req.fps <= 120:
+        raise HTTPException(400, tr("录制参数不对"))
+    path = Path(req.path)
+    if path.suffix.lower() != ".mp4" or not path.is_absolute():
+        raise HTTPException(400, tr("录制参数不对"))
+    try:
+        writer = video.FrameWriter(path, req.width, req.height, req.fps)
+    except (ValueError, OSError) as ex:
+        raise HTTPException(500, tr("没有可用的视频编码器：{error}", error=str(ex)))
+    music, music_note = None, ""
+    if req.music:
+        from . import audio
+
+        if not audio.available():
+            music_note = tr("没装音频组件（PyAV），录出来是无声视频")
+        elif (source := audio.find_source(Path(req.music))) is None:
+            music_note = tr("没找到音乐：{name} 里没有声音，同一文件夹里也没有同名的音频文件", name=Path(req.music).name)
+        else:
+            music = source
+            writer.music = (source, max(0.0, req.music_start))
+    rid = uuid.uuid4().hex[:12]
+    with _renders_lock:
+        # 5 分钟没送帧的（游戏中途崩了、插件重载）当作放弃：关掉、删掉没录完的文件
+        for old in [k for k, w in _renders.items() if time.monotonic() - w.touched > RENDER_IDLE_SECONDS]:
+            _renders.pop(old).discard()
+        _renders[rid] = writer
+    return {"renderId": rid, "width": writer.size[0], "height": writer.size[1], "codec": writer.codec,
+            "music": music.name if music is not None else None, "warning": music_note}
+
+
+def _render(rid: str):
+    with _renders_lock:
+        writer = _renders.get(rid)
+    if writer is None:
+        raise HTTPException(404, tr("录制不存在或已结束"))
+    return writer
+
+
+@app.post("/renders/{rid}/frames")
+async def render_frame(rid: str, request: Request, width: int, height: int, order: str = "bgra") -> dict:
+    """一帧原始像素（请求体，每像素 4 字节）。"""
+    writer = _render(rid)
+    data = await request.body()
+    try:
+        await run_in_threadpool(writer.write, data, width, height, "rgba" if order == "rgba" else "bgra")
+    except ValueError as ex:
+        raise HTTPException(400, str(ex))
+    return {"frames": writer.frames}
+
+
+@app.post("/renders/{rid}/finish")
+def render_finish(rid: str) -> dict:
+    """写完：配上音乐（开始录制时给了的话），搬到最终路径。"""
+    writer = _render(rid)
+    with _renders_lock:
+        _renders.pop(rid, None)
+    writer.close()
+    warning = tr("配音乐失败，保留了无声视频：{error}", error=writer.music_error) if writer.music_error else ""
+    return {"path": str(writer.path), "frames": writer.frames, "codec": writer.codec,
+            "musicSeconds": round(writer.music_seconds, 2), "warning": warning}
+
+
+@app.delete("/renders/{rid}")
+def render_cancel(rid: str) -> dict:
+    """取消录制：关掉并删掉没录完的文件。"""
+    with _renders_lock:
+        writer = _renders.pop(rid, None)
+    if writer is not None:
+        writer.discard()
+    return {"ok": True}
+
+
+class AudioRequest(BaseModel):
+    path: str            # 原视频或音频文件的完整路径（没有音轨时找同名的音频文件）
+    start: float = 0.0   # 从第几秒起（原视频时间）
+    end: float = 0.0     # 到第几秒
+    speed: float = 1.0
+    volume: float = 1.0
+
+
+@app.post("/audio/wav")
+def audio_wav(req: AudioRequest) -> Response:
+    """播放片段时放的音乐：原视频 start~end 秒按速度、音量切成 WAV（插件按片段时间同步放；第一次要解码整首，之后有缓存）。"""
+    from . import audio
+
+    if not audio.available():
+        raise HTTPException(503, tr("没装音频组件（PyAV），放不了音乐"))
+    source = audio.find_source(Path(req.path))
+    if source is None:
+        raise HTTPException(404, tr("没找到音乐：{name} 里没有声音，同一文件夹里也没有同名的音频文件", name=Path(req.path).name))
+    if not 0.1 <= req.speed <= 4 or req.end < req.start:
+        raise HTTPException(400, tr("录制参数不对"))
+    data = audio.wav(source, req.start, req.end, req.speed, req.volume)
+    return Response(data, media_type="audio/wav", headers={"X-Music-Source": source.name.encode("utf-8").hex()})
+
+
+@app.post("/videos")
+async def video_upload(request: Request, name: str = "video") -> dict:
+    """视频先写到 outputs/videos，只留最近 MAX_VIDEOS 个；切镜在后台查（几秒到几十秒）。"""
+    from . import video
+
+    VIDEO_DIR.mkdir(parents=True, exist_ok=True)
+    vid = uuid.uuid4().hex[:12]
+    path = VIDEO_DIR / f"{vid}{Path(name).suffix or '.mp4'}"
+    size = 0
+    with open(path, "wb") as f:
+        async for chunk in request.stream():
+            f.write(chunk)
+            size += len(chunk)
+    if size == 0:
+        path.unlink(missing_ok=True)
+        raise HTTPException(400, tr("请求体为空"))
+    try:
+        info = await run_in_threadpool(video.open_video, path)
+    except ValueError:
+        path.unlink(missing_ok=True)
+        raise HTTPException(400, tr("无法读取视频（格式不支持或文件损坏）"))
+    while len(_videos) >= MAX_VIDEOS:
+        _forget_video(next(iter(_videos)))
+    entry = {"info": info, "name": name, "cuts": None, "stop": threading.Event()}
+    _videos[vid] = entry
+
+    def find_cuts():
+        try:
+            entry["cuts"] = video.detect_cuts(info, entry["stop"].is_set)
+        except Exception:
+            entry["cuts"] = []
+    threading.Thread(target=find_cuts, daemon=True).start()
+    return {"videoId": vid, "name": name, **info.describe()}
+
+
+@app.get("/videos/{vid}")
+def video_get(vid: str) -> dict:
+    v = _video(vid)
+    return {"videoId": vid, "name": v["name"], **v["info"].describe(), "cuts": v["cuts"]}
+
+
+@app.delete("/videos/{vid}")
+def video_delete(vid: str) -> dict:
+    _forget_video(vid)
+    return {"ok": True}
+
+
+@app.get("/videos/{vid}/frame")
+def video_frame(vid: str, t: float = 0, max_side: int = 960) -> Response:
+    import cv2
+
+    from . import video
+
+    try:
+        rgb = video.read_frame(_video(vid)["info"], t)
+    except ValueError:
+        raise HTTPException(400, tr("读不到这一帧"))
+    h, w = rgb.shape[:2]
+    scale = min(1.0, max_side / max(w, h))
+    if scale < 1:
+        rgb = cv2.resize(rgb, (round(w * scale), round(h * scale)), interpolation=cv2.INTER_AREA)
+    ok, jpg = cv2.imencode(".jpg", cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR), [cv2.IMWRITE_JPEG_QUALITY, 88])
+    return Response(jpg.tobytes(), media_type="image/jpeg")
+
+
+@app.post("/videos/{vid}/detect")
+async def video_detect(vid: str, t: float = 0, kind: str = "auto") -> dict:
+    """那一帧里的人（框是原视频像素）。"""
+    from . import video
+
+    if kind not in detect.KINDS:
+        raise HTTPException(400, tr("kind 只能是 auto / photo / anime"))
+    info = _video(vid)["info"]
+    try:
+        rgb = await run_in_threadpool(video.read_frame, info, t)
+        found = await run_in_threadpool(detect.detect, rgb, kind)
+    except ValueError:
+        raise HTTPException(400, tr("读不到这一帧"))
+    except FileNotFoundError as ex:
+        raise HTTPException(503, str(ex))
+    return {"imageSize": [info.width, info.height], **found}
+
+
+class VideoPerson(BaseModel):
+    box: list[float]                # 选人那一帧里的框（原视频像素 x1,y1,x2,y2）
+    race: str | None = None
+    reference: str | None = None    # 游戏角色当前姿势（Brio pose JSON），骨长 / 缩放按它
+    trust_reference: bool = False
+    params: tuning.RetargetParams = tuning.RetargetParams()
+
+
+class VideoJobRequest(BaseModel):
+    start: float = 0
+    end: float | None = None        # 缺省到视频结尾
+    fps: float = 10
+    seed_time: float | None = None  # 选人的那一帧（秒），缺省为 start
+    smooth: float = 0.5             # 0 不平滑 ~ 1 很平滑
+    detector: str = "auto"
+    people: list[VideoPerson]
+
+
+def _video_estimate(rgb: np.ndarray, boxes: np.ndarray):
+    """视频逐帧识别：和照片识别共用模型和锁（中间插进来的照片识别排队），不走深度、不走共享模型。"""
+    global _last_used
+    with _model_lifecycle.inference(), _model_lock:
+        _parallel.close_if_idle()
+        _load_model()
+        try:
+            return _estimator.estimate(rgb, boxes)
+        finally:
+            _last_used = time.monotonic()
+
+
+def _video_upright(human: dict, image_size) -> list[float] | None:
+    from .retarget.ffxiv import _feet_in_frame, _upright_rotation
+
+    names = load_mhr_rest()[0]
+    flip = np.array([1.0, -1.0, -1.0])
+    if not _feet_in_frame(names, human["joint_coords"], float(human["focal_length"]), human["cam_t"], image_size):
+        return None
+    rot = _upright_rotation(names, human["joint_coords"] * flip, human["vertices"] * flip)
+    return None if rot is None else rot.as_quat().tolist()
+
+
+def _video_depth(rgb: np.ndarray):
+    """视频镜头解算用的深度（MoGe）：设置里关了深度或没装时 None（只解镜头转动）。"""
+    import dataclasses
+
+    import cv2
+
+    if not _use_depth or not depth.available():
+        return None
+    H, W = rgb.shape[:2]
+    sc = min(1.0, 640 / max(W, H))
+    small = cv2.resize(rgb, (max(1, round(W * sc)), max(1, round(H * sc))), interpolation=cv2.INTER_AREA) if sc < 1 else rgb
+    photo = depth.estimate(small, _estimator.active_device or "cpu")
+    return dataclasses.replace(photo, focal=photo.focal / sc)   # 焦距换回原图像素；深度图按自己的尺寸取
+
+
+def _video_geometry(human: dict, rt):
+    from . import motion
+
+    return motion.geometry(human, rt, load_mhr_rest()[0])
+
+
+def _video_camera(human: dict, rt) -> dict:
+    """主角的镜头，算在角色模型系里（模型变换取单位：插件播放时再乘角色的世界变换）。"""
+    from .camera import photo_camera_in_world
+
+    target = photo_camera_in_world(human, rt, np.zeros(3), np.array([0.0, 0.0, 0.0, 1.0]), np.ones(3), load_mhr_rest()[0])
+    return {"position": np.asarray(target.position).tolist(), "forward": np.asarray(target.forward).tolist(),
+            "up": np.asarray(target.up).tolist(), "fovY": float(target.fov_y_deg)}
+
+
+VIDEO_FACE_STRENGTH = 0.7   # 视频表情在用户强度上再打的折扣：逐帧识别有抖动，宁可淡一点（同照片表情一样夹在游戏实测范围里）
+
+
+def _video_face(people: list, warnings: list[str], analyze_frames: bool = True):
+    """视频表情（video.FaceHooks）；没人开表情、面捕没装或缺游戏表情数据时 None（缺的写进 warnings）。
+    analyze_frames=False：重算片段时只用存下来的面捕结果，不需要面捕组件。"""
+    from . import face, face_rig, video
+
+    wanted = [i for i, p in enumerate(people) if p.params is not None and p.params.face]
+    if not wanted:
+        return None
+    if analyze_frames and not face.available():
+        warnings.append(tr("面捕组件没装（mediapipe 或 face_landmarker 模型）"))
+        return None
+    skeletons = {i: face_rig.match(people[i].race, people[i].reference) for i in wanted}
+    if not any(skeletons.values()):
+        warnings.append(tr("还没有游戏表情数据：在游戏里输入 /posegraph facedump 导出一次"))
+        return None
+
+    def analyze(rgb, human, image_size):
+        result = face.analyze(rgb, human["keypoints_2d"], image_size, face.VIDEO_SIZES)
+        if not result.used or not result.landmarks:
+            return None
+        return video.FaceObs(np.asarray(result.landmarks, dtype=np.float32),
+                             np.asarray(result.rotation, dtype=np.float32) if result.rotation else None, dict(result.blendshapes))
+
+    def solve(person, obs):
+        sk = skeletons.get(person)
+        if sk is None:
+            return None
+        params = people[person].params
+        m = face_rig.measure(obs.landmarks, obs.rotation)
+        width = float(np.ptp(np.asarray(obs.landmarks)[:, 0]))
+        strength = params.face_strength * VIDEO_FACE_STRENGTH * face.small_face_factor(width)
+        return face_rig.solve(sk, m, strength, obs.blendshapes, params.face_gains)
+
+    def attach(person, t, q, s, head):
+        return face_rig.to_model(skeletons[person], t, q, s, head)
+
+    return video.FaceHooks(analyze, solve, attach)
+
+
+@app.post("/videos/{vid}/jobs")
+def video_job(vid: str, req: VideoJobRequest) -> dict:
+    import contextvars
+
+    from . import video
+
+    entry = _video(vid)
+    info = entry["info"]
+    if not req.people:
+        raise HTTPException(400, tr("至少选一个人"))
+    if req.detector not in detect.KINDS:
+        raise HTTPException(400, tr("kind 只能是 auto / photo / anime"))
+    end = info.duration if req.end is None else min(req.end, info.duration)
+    start = max(0.0, req.start)
+    fps = float(np.clip(req.fps, 1, 60))
+    if end - start < 1 / fps:
+        raise HTTPException(400, tr("截取的时间段太短"))
+    if (end - start) * fps > 3000:
+        raise HTTPException(400, tr("帧数太多（{count} 帧）：缩短时间段或降低帧率", count=round((end - start) * fps)))
+    people, warnings = [], []
+    for p in req.people:
+        if len(p.box) != 4:
+            raise HTTPException(400, tr("人物框格式不对，应为 x1,y1,x2,y2;…"))
+        people.append(_video_person(p, p.box, warnings))
+    face_hooks = _video_face(people, warnings)
+    spec = video.JobSpec(start, end, fps, start if req.seed_time is None else req.seed_time, people, req.smooth, req.detector)
+    job = video.new_job(vid, spec)
+    with _jobs_lock:
+        for old in [j for j in _jobs.values() if j.state in ("done", "error", "cancelled")][:-4]:
+            _jobs.pop(old.id, None)
+        _jobs[job.id] = job
+
+    def detect_people(rgb):
+        return [d["bbox"] for d in detect.detect(rgb, req.detector)["people"]]
+
+    def work():
+        try:
+            video.run_job(job, info, _video_estimate, detect_people, _video_retarget, _video_camera, _video_upright, face_hooks,
+                          _video_depth, _video_geometry)
+            if job.result is not None:
+                _clip_warnings(job.result, face_hooks, warnings)
+            job.state = "done"
+        except video.Cancelled:
+            job.state = "cancelled"
+        except Exception as ex:
+            job.state, job.error = "error", f"{type(ex).__name__}: {ex}"
+        finally:
+            job.finished = time.monotonic()
+            with _model_lock:
+                if _release_after == 0 and not _held:
+                    _estimator.unload()
+
+    ctx = contextvars.copy_context()   # 带上这个请求的界面语言
+    threading.Thread(target=lambda: ctx.run(work), daemon=True).start()
+    return job.describe()
+
+
+def _video_person(p, box: list[float], warnings: list[str]):
+    """请求里的一个人 → video.PersonSpec：种族、骨长（按游戏姿势）、IVCS，提示追加到 warnings。"""
+    from . import video
+
+    ref = BrioPose.loads(p.reference) if p.reference else None
+    race = _resolve_race(p.race, ref)
+    use_lengths, _ = _reference_lengths(ref, race, p.trust_reference)
+    ivcs = _ivcs(ref, race)
+    warnings += race["warnings"]
+    return video.PersonSpec(box, race["code"], ref, use_lengths, ivcs is not False, p.params)
+
+
+def _video_retarget(human, image_size, person, upright):
+    return tuning.run(human, image_size, person.params, person.reference, person.race,
+                      reference_lengths=person.reference_lengths, ivcs=person.ivcs, upright_override=upright)
+
+
+def _clip_warnings(result: dict, face_hooks, warnings: list[str]) -> None:
+    if face_hooks is not None and any(p.get("face", {}).get("enabled") and not p["face"]["frames"] for p in result["people"]):
+        warnings.append(tr("视频里没找到能用的脸（太小、侧脸或被挡住），表情没套"))
+    result["warnings"] = list(dict.fromkeys(warnings))
+
+
+def _job(jid: str):
+    job = _jobs.get(jid)
+    if job is None:
+        raise HTTPException(404, tr("任务不存在（后端重启过？）"))
+    return job
+
+
+@app.get("/jobs/{jid}")
+def job_get(jid: str) -> dict:
+    return _job(jid).describe()
+
+
+@app.post("/jobs/{jid}/cancel")
+def job_cancel(jid: str) -> dict:
+    job = _job(jid)
+    job.cancel.set()
+    return job.describe()
+
+
+@app.get("/jobs/{jid}/result")
+def job_result(jid: str) -> dict:
+    job = _job(jid)
+    if job.state != "done" or job.result is None:
+        raise HTTPException(409, tr("任务还没完成"))
+    return job.result
+
+
+@app.get("/jobs/{jid}/raw")
+def job_raw(jid: str) -> Response:
+    """识别的原始结果（npz，和种族无关）：插件存在片段旁边，换种族 / 调表情权重时传回来重算（POST /raws）。"""
+    from . import video
+
+    job = _job(jid)
+    if job.state != "done" or job.raw is None:
+        raise HTTPException(409, tr("任务还没完成"))
+    return Response(video.raw_to_bytes(job.raw), media_type="application/octet-stream")
+
+
+_raws: dict[str, object] = {}   # 上传的原始结果：id → video.Raw（只留最近几份）
+MAX_RAWS = 4
+
+
+@app.post("/raws")
+async def raw_upload(request: Request) -> dict:
+    from . import video
+
+    data = await request.body()
+    try:
+        raw = await run_in_threadpool(video.raw_from_bytes, data)
+    except Exception:
+        raise HTTPException(400, tr("识别原始数据读不了（文件损坏或版本不对）"))
+    while len(_raws) >= MAX_RAWS:
+        _raws.pop(next(iter(_raws)))
+    rid = uuid.uuid4().hex[:12]
+    _raws[rid] = raw
+    return {"rawId": rid, "frames": len(raw.times), "people": len(raw.humans),
+            "faces": [sum(f is not None for f in faces) for faces in raw.faces]}
+
+
+class ClipPerson(BaseModel):
+    race: str | None = None
+    reference: str | None = None    # 游戏角色当前姿势（Brio pose JSON），骨长 / 缩放按它
+    trust_reference: bool = False
+    params: tuning.RetargetParams = tuning.RetargetParams()
+
+
+class ClipRequest(BaseModel):
+    people: list[ClipPerson]
+    smooth: float = 0.5
+
+
+@app.post("/raws/{rid}/clip")
+def raw_clip(rid: str, req: ClipRequest) -> dict:
+    """按新的种族 / 骨长 / 表情权重重算片段（重定向、镜头、表情，不重新识别；一百帧几秒）。格式同 /jobs/{id}/result。"""
+    from . import video
+
+    raw = _raws.get(rid)
+    if raw is None:
+        raise HTTPException(404, tr("识别原始数据不在了（后端重启过？），请重新上传"))
+    if len(req.people) != len(raw.humans):
+        raise HTTPException(400, tr("人数和识别时不一样"))
+    warnings: list[str] = []
+    people = [_video_person(p, [], warnings) for p in req.people]
+    face_hooks = _video_face(people, warnings, analyze_frames=False)
+    result = video.build_clip(raw, people, req.smooth, _video_retarget, _video_camera, face_hooks, geometry_of=_video_geometry)
+    _clip_warnings(result, face_hooks, warnings)
+    return result
 
 
 @app.get("/races")

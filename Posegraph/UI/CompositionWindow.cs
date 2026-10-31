@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface;
@@ -9,6 +10,7 @@ using Dalamud.Interface.Utility.Raii;
 using Dalamud.Interface.Windowing;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
+using FFXIVClientStructs.FFXIV.Client.UI;
 using Posegraph.Backend;
 
 namespace Posegraph.UI;
@@ -16,6 +18,7 @@ namespace Posegraph.UI;
 /// <summary>
 /// 构图与截图：在游戏画面上画出构图框（照片比例或常用比例，横竖可切），框外压暗，可叠参考线；
 /// 显示 / 设置相当于全画幅相机的等效焦距；一键截图只截游戏渲染的画面（不含插件界面），按构图框裁好存成 PNG。
+/// 开了「ReShade 兼容」时改为藏起游戏界面和插件窗口，拷屏幕上的最终画面（见 ScreenCapture），截完恢复。
 /// 构图框和复刻镜头的约定一致：比游戏画面窄的照片上下对齐，更宽的左右对齐（见后端 camera.game_fov_y）。
 /// </summary>
 public sealed class CompositionWindow : Window
@@ -39,6 +42,7 @@ public sealed class CompositionWindow : Window
     private readonly IClientState _clientState;
     private readonly ITextureProvider _textures;
     private readonly ITextureReadbackProvider _readback;
+    private readonly IGameGui _gameGui;
     private readonly Func<int[]?> _photoSize;
     private readonly Func<IDalamudTextureWrap?> _photoTexture;
     private readonly Func<Segment[]?> _photoSkeleton;
@@ -48,7 +52,7 @@ public sealed class CompositionWindow : Window
     private float? _fovOffset;   // 拖焦距滑条期间固定「垂直视角 - Zoom」，避免投影矩阵晚一帧更新造成来回跳
 
     public CompositionWindow(Configuration config, IDalamudPluginInterface pi, IFramework framework, IClientState clientState,
-                             ITextureProvider textures, ITextureReadbackProvider readback, Func<int[]?> photoSize,
+                             ITextureProvider textures, ITextureReadbackProvider readback, IGameGui gameGui, Func<int[]?> photoSize,
                              Func<IDalamudTextureWrap?> photoTexture, Func<Segment[]?> photoSkeleton)
         : base(Loc.T("Posegraph 构图与截图") + "###PosegraphComposition")
     {
@@ -58,6 +62,7 @@ public sealed class CompositionWindow : Window
         _clientState = clientState;
         _textures = textures;
         _readback = readback;
+        _gameGui = gameGui;
         _photoSize = photoSize;
         _photoTexture = photoTexture;
         _photoSkeleton = photoSkeleton;
@@ -69,6 +74,9 @@ public sealed class CompositionWindow : Window
     /// <summary>默认截图文件夹：文档\Posegraph\Screenshots（和图库 文档\Posegraph\Images 放在一起）。</summary>
     public static string DefaultShotDir
         => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Posegraph", "Screenshots");
+
+    /// <summary>ReShade 兼容截图期间为 true：插件的窗口和构图框都不画（拷的是屏幕上的最终画面）。</summary>
+    public bool HideUi { get; private set; }
 
     private string ShotDir => string.IsNullOrWhiteSpace(_config.ScreenshotDir) ? DefaultShotDir : _config.ScreenshotDir;
 
@@ -143,7 +151,7 @@ public sealed class CompositionWindow : Window
         DrawFocal();
         ImGui.Separator();
         DrawShot();
-        if (_status.Length > 0) ImGui.TextColored(_statusColor, _status);
+        if (_status.Length > 0) UiText.Fit(_status, _statusColor, 400 * ImGuiHelpers.GlobalScale);   // 长的截成省略号，悬停看全文，别把窗口撑宽
         if (changed) _pi.SavePluginConfig(_config);
     }
 
@@ -213,7 +221,17 @@ public sealed class CompositionWindow : Window
         using (ImRaii.Disabled(_shooting || !_clientState.IsGPosing))
             if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Camera, Loc.T("截图")))
                 Shoot();
-        Tip(Loc.T("只截游戏渲染的画面（不含插件和 Dalamud 的窗口），PNG 无损；显示构图框时按框裁切。\n游戏自己的界面要先隐藏（GPose 里的隐藏界面）"));
+        Tip(_config.ShotReShade
+            ? Loc.T("拷屏幕上游戏窗口的最终画面（带 ReShade 等后期），PNG 无损；显示构图框时按框裁切。\n截的时候游戏界面和 Posegraph 的窗口会自动藏一下，截完恢复；别的插件窗口要自己关")
+            : Loc.T("只截游戏渲染的画面（不含插件和 Dalamud 的窗口），PNG 无损；显示构图框时按框裁切。\n游戏自己的界面要先隐藏（GPose 里的隐藏界面）"));
+        ImGui.SameLine();
+        var reshade = _config.ShotReShade;
+        if (ImGui.Checkbox(Loc.T("ReShade 兼容"), ref reshade))
+        {
+            _config.ShotReShade = reshade;
+            _pi.SavePluginConfig(_config);
+        }
+        Tip(Loc.T("ReShade 的效果是最后才叠到画面上的，普通截图截不到。勾上后截图时自动藏起游戏界面和插件窗口，直接拷屏幕上的最终画面，截完恢复。\n要用窗口或无边框窗口模式（全屏独占读不到），游戏窗口别被挡住"));
         ImGui.SameLine();
         if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.FolderOpen, Loc.T("打开文件夹")))
         {
@@ -232,6 +250,11 @@ public sealed class CompositionWindow : Window
     /// <summary>截游戏画面（ImGui 绘制之前的那一帧），按构图框裁切后存 PNG。必须在绘制线程调用（读 ImGui 视口）。</summary>
     public void Shoot()
     {
+        if (_config.ShotReShade)
+        {
+            ShootScreen();
+            return;
+        }
         var vp = ImGui.GetMainViewport();
         var args = new ImGuiViewportTextureArgs { ViewportId = vp.ID, TakeBeforeImGuiRender = true, KeepTransparency = false };
         if (_config.FrameShow)
@@ -263,6 +286,75 @@ public sealed class CompositionWindow : Window
         });
     }
 
+    /// <summary>截图前临时隐藏游戏界面（和 GPose 里的「隐藏界面」一样），等两帧让它消失；本来就藏着时不动，返回 false。</summary>
+    private async Task<bool> HideGameUiAsync()
+    {
+        if (_gameGui.GameUiHidden) return false;
+        await _framework.RunOnFrameworkThread(() => SetGameUiVisible(false));
+        await _framework.DelayTicks(2);
+        return true;
+    }
+
+    private Task ShowGameUiAsync() => _framework.RunOnFrameworkThread(() => SetGameUiVisible(true));
+
+    internal static unsafe void SetGameUiVisible(bool visible)
+    {
+        var ui = UIModule.Instance();
+        if (ui is not null) ui->GetRaptureAtkModule()->SetUiVisibility(visible);
+    }
+
+    /// <summary>
+    /// ReShade 兼容截图：藏起游戏界面和插件窗口，等这一帧显示到屏幕上，拷屏幕上的游戏窗口，马上恢复；再按构图框裁切存 PNG。
+    /// 必须在绘制线程调用。
+    /// </summary>
+    private void ShootScreen()
+    {
+        var vp = ImGui.GetMainViewport();
+        TextureModificationArgs? crop = null;
+        if (_config.FrameShow)
+        {
+            var frame = FrameRect(vp.Size);
+            crop = new TextureModificationArgs { Uv0 = frame.Min / vp.Size, Uv1 = (frame.Min + frame.Size) / vp.Size };
+        }
+        var path = Path.Combine(ShotDir, $"Posegraph_{DateTime.Now:yyyyMMdd_HHmmss_fff}.png");
+        var window = Process.GetCurrentProcess().MainWindowHandle;
+        _shooting = true;
+        HideUi = true;
+        SetStatus(Loc.T("截图中…"), Yellow);
+        Task.Run(async () =>
+        {
+            var hidGameUi = false;
+            try
+            {
+                hidGameUi = await HideGameUiAsync();
+                await _framework.DelayTicks(5);   // 藏了界面的画面要经过 ReShade 和系统合成才到屏幕上
+                var shot = ScreenCapture.Capture(window);
+                HideUi = false;
+                if (hidGameUi) await ShowGameUiAsync();
+                hidGameUi = false;
+                Directory.CreateDirectory(ShotDir);
+                using var image = await _textures.CreateFromRawAsync(RawImageSpecification.Bgra32(shot.Width, shot.Height), shot.Pixels, "Posegraph screen shot");
+                using var cropped = crop is { } args ? await _textures.CreateFromExistingTextureAsync(image, args, true, "Posegraph screen crop") : null;
+                var output = cropped ?? image;
+                var encoder = _readback.GetSupportedImageEncoderInfos()
+                    .FirstOrDefault(c => c.MimeTypes.Contains("image/png", StringComparer.OrdinalIgnoreCase))
+                    ?? throw new InvalidOperationException(Loc.T("未找到 PNG 图像编码器"));
+                await _readback.SaveToFileAsync(output, encoder.ContainerGuid, path, null, true);
+                SetStatus(Loc.F("已保存 {0}（{1}×{2}）", Path.GetFileName(path), output.Width, output.Height), Green);
+            }
+            catch (Exception ex)
+            {
+                SetStatus(Loc.F("截图失败：{0}", ex.Message), Yellow);
+            }
+            finally
+            {
+                HideUi = false;
+                if (hidGameUi) await ShowGameUiAsync();
+                _shooting = false;
+            }
+        });
+    }
+
     /// <summary>构图框的宽高比（宽 / 高）；"照片" 但主窗口没有照片时按 3:2。</summary>
     public float Aspect()
     {
@@ -276,16 +368,19 @@ public sealed class CompositionWindow : Window
     /// <summary>构图框在游戏画面里的位置（相对视口左上角）：放得下的最大尺寸、居中。</summary>
     private (Vector2 Min, Vector2 Size) FrameRect(Vector2 viewport) => FitRect(viewport, Aspect());
 
-    private static (Vector2 Min, Vector2 Size) FitRect(Vector2 viewport, float aspect)
+    internal static (Vector2 Min, Vector2 Size) FitRect(Vector2 viewport, float aspect)
     {
         var size = aspect < viewport.X / viewport.Y ? new Vector2(viewport.Y * aspect, viewport.Y) : new Vector2(viewport.X, viewport.X / aspect);
         return ((viewport - size) / 2, size);
     }
 
+    /// <summary>别处要求暂时不画构图框（视频的 ReShade 兼容录制期间）。</summary>
+    public Func<bool> Suppressed { get; set; } = () => false;
+
     /// <summary>每帧画构图框（背景层，在所有窗口下面、游戏画面上面；截图时不会被截进去）。</summary>
     public void DrawOverlay()
     {
-        if (!_clientState.IsGPosing) return;
+        if (!_clientState.IsGPosing || HideUi || Suppressed()) return;
         DrawPhotoOverlay();
         if (!_config.FrameShow) return;
         var vp = ImGui.GetMainViewport();

@@ -108,6 +108,28 @@ public class Configuration : IPluginConfiguration
     /// <summary>截图文件夹；空为 文档\Posegraph\Screenshots。</summary>
     public string ScreenshotDir { get; set; } = "";
 
+    /// <summary>ReShade 兼容截图：自动藏起游戏界面和插件窗口，拷屏幕上的最终画面（带 ReShade 等后期），截完恢复。</summary>
+    public bool ShotReShade { get; set; }
+
+    /// <summary>视频：上次打开视频的文件夹、识别帧率、平滑程度。</summary>
+    public string LastVideoDir { get; set; } = "";
+    public int VideoFps { get; set; } = 10;
+    public float VideoSmooth { get; set; } = 0.5f;
+    public bool VideoFace { get; set; } = true;
+    public float VideoFaceStrength { get; set; } = 1f;                       // 视频表情强度（后端再打七折）
+    public Dictionary<string, float> VideoFaceGains { get; set; } = new();   // 分项权重：eyes / brows / mouth / jaw / gaze
+    public int VideoRecordFps { get; set; } = 30;   // 录成视频的帧率，0 = 跟片段一样
+
+    /// <summary>视频播放：循环、控制镜头、走动模式（固定机位，角色在场景里走；关掉是跟拍）。</summary>
+    public bool VideoLoop { get; set; } = true;
+    public bool VideoDriveCamera { get; set; } = true;
+    public bool VideoWalk { get; set; }
+    public int VideoWalkCamera { get; set; }          // 走动模式的机位：WalkCamera（原运镜 / 固定机位 / 平滑跟拍 / 定点摇镜）
+    public int VideoHiddenCamera { get; set; } = 1;   // 原运镜拍不到人时：HiddenCamera（照原视频 / 平滑跟拍 / 定点摇镜）
+    public bool VideoMusic { get; set; } = true;      // 录成视频时配上原视频的音乐
+    public bool VideoPlayMusic { get; set; } = true;  // 播放片段时同步放原视频的音乐
+    public float VideoMusicVolume { get; set; } = 0.8f;
+
     /// <summary>灯光：转镜头时灯跟着转（始终从镜头这一侧照亮脸）。</summary>
     public bool LightFollowCamera { get; set; } = true;
 

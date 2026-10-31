@@ -9,7 +9,8 @@ namespace Posegraph.Lighting;
 
 /// <summary>
 /// 一键布光：选一套方案，按当前角色的脸和 GPose 相机算出每盏灯摆哪，生成游戏灯。
-/// 「跟随镜头」开着时相机动了灯跟着转；「跟随角色」开着时 Posegraph 给这个角色换了姿势、或角色被挪动 / 转身后自动重新读脸再摆。
+/// 「跟随镜头」开着时相机动了灯跟着转；「跟随角色」开着时 Posegraph 给这个角色换了姿势、或角色被挪动 / 转身后自动重新读脸再摆：
+/// 主光那一侧沿用手动套用时定的（脸转过正面也不左右翻），人的位置、朝向在 FollowSeconds 内平滑过渡过去（视频播放时不跳）。
 /// 打光范围（脸 / 半身 / 全身）默认看游戏镜头拍到多少自动换，灯围着那一块的中心摆。有动态灯效的灯每帧更新。主窗口的图在图库里存过灯光时，给角色套这张图的姿势时一并恢复。
 /// 退出 GPose、插件卸载时清掉所有灯。
 /// </summary>
@@ -20,6 +21,7 @@ public sealed partial class LightingService : IDisposable
     private const float TurnThresholdDeg = 1f;     // 或转了 1° 以上就重新摆
     private const int FramingPollTicks = 15;       // 自动打光范围：每隔这么多帧看一次镜头拍到哪
     private const float ScreenMargin = 0.03f;      // 离画面边缘这么近（画面的比例）以内不算拍到
+    private const float FollowSeconds = 0.4f;      // 跟随角色时灯平滑过渡的时间常数
 
     private readonly IFramework _framework;
     private readonly IClientState _clientState;
@@ -30,6 +32,8 @@ public sealed partial class LightingService : IDisposable
     private readonly IGameGui _gameGui;
     private readonly Stopwatch _clock = Stopwatch.StartNew();   // 动态灯效的时间
     private Subject? _subject;
+    private Subject? _target;            // 跟随角色读到的新位置：_subject 每帧往它靠
+    private float? _side;                // 主光那一侧：手动套用时定，跟随时沿用
     private List<(Vector3 A, Vector3 B)> _body = [];
     private Vector3? _lastCamera;
     private int _tick;
@@ -106,14 +110,25 @@ public sealed partial class LightingService : IDisposable
         catch (JsonException) { return null; }
     }).OfType<LightRig>();
 
-    /// <summary>读角色的脸，套用方案。actor 同主窗口（null 为 GPose 目标）。返回失败原因，成功为 null。</summary>
-    public async Task<string?> ApplyAsync(LightRig rig, int? actor)
+    /// <summary>读角色的脸，套用方案。actor 同主窗口（null 为 GPose 目标）。返回失败原因，成功为 null。
+    /// follow：跟随角色的自动重摆——主光那一侧沿用之前的，人的位置平滑过渡过去。</summary>
+    public async Task<string?> ApplyAsync(LightRig rig, int? actor, bool follow = false)
     {
-        var subject = await ReadSubjectAsync(actor);
-        if (subject is null) return Error = Loc.T("读不到角色的脸（不在 GPose、没选角色或 Brio 不可用）");
+        var read = await ReadSubjectAsync(actor);
+        if (read is not { } subject) return Error = Loc.T("读不到角色的脸（不在 GPose、没选角色或 Brio 不可用）");
+        if (!follow || _side is null)
+            _side = await _framework.RunOnFrameworkThread(() => LightRigs.SideOf(subject, GposeCamera.WorldPosition()));
+        subject = subject with { Side = _side };
+        if (follow && _subject is not null && Active?.Id == rig.Id && Lights.Count == rig.Lights.Length)
+        {
+            _target = subject;   // 平滑过渡：OnUpdate 每帧靠过去
+            _actor = actor;
+            return Error = null;
+        }
         _subject = subject;
+        _target = null;
         _actor = actor;
-        Framing = await _framework.RunOnFrameworkThread(() => ResolveFraming(subject.Value));
+        Framing = await _framework.RunOnFrameworkThread(() => ResolveFraming(subject));
         if (Active?.Id != rig.Id || Lights.Count != rig.Lights.Length)
         {
             SelectedLight = Solo = null;
@@ -126,8 +141,8 @@ public sealed partial class LightingService : IDisposable
     }
 
     /// <summary>角色动过后重新读脸，再摆一次。</summary>
-    public async Task<string?> ReplaceAsync(int? actor)
-        => Active is { } rig ? await ApplyAsync(rig with { Lights = [.. Lights] }, actor) : null;
+    public async Task<string?> ReplaceAsync(int? actor, bool follow = false)
+        => Active is { } rig ? await ApplyAsync(rig with { Lights = [.. Lights] }, actor, follow) : null;
 
     /// <summary>界面改了某盏灯或全局微调：按已读到的脸重摆（不重新读角色）。</summary>
     public void Refresh() => _framework.RunOnFrameworkThread(Rebuild);
@@ -244,6 +259,16 @@ public sealed partial class LightingService : IDisposable
         _tick++;
         if (_config.LightFollowSubject && _tick % MovePollTicks == 0 && !_following && _actorIndex is { } index)
             _ = CheckMovedAsync(index);
+        if (_target is { } target && _subject is { } current)
+        {
+            var k = 1f - MathF.Exp(-(float)framework.UpdateDelta.TotalSeconds / FollowSeconds);
+            var next = current.Toward(target, k);
+            var done = Vector3.Distance(next.Face, target.Face) < 0.002f && Vector3.Dot(next.Forward, target.Forward) > 0.9999f;
+            _subject = done ? target : next;
+            if (done) _target = null;
+            Rebuild();
+            return;
+        }
         if (_config.LightFraming == "auto" && _tick % FramingPollTicks == 0 && _subject is { } raw)
         {
             var framing = ResolveFraming(raw);
@@ -299,7 +324,7 @@ public sealed partial class LightingService : IDisposable
         _following = true;
         try
         {
-            var error = await ReplaceAsync(_actor);
+            var error = await ReplaceAsync(_actor, follow: true);
             if (error is not null) Notice?.Invoke(error, false);
         }
         finally { _following = false; }

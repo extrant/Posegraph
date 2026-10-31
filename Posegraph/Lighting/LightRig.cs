@@ -34,11 +34,25 @@ public sealed record LightRig(string Id, string Name, string Description, LightS
 /// 被照的人：脸的位置（世界）、脸朝向、头顶方向，以及体型比例（人族中原 = 1）。Pelvis / Feet：腰和脚（世界），算打光范围用。
 /// Center / Reach / DistanceScale：打光范围（见 LightFraming、LightRigs.Framed）——灯围着 Center 摆、对准 Center，
 /// 距离再乘 DistanceScale，聚光的光斑至少罩住半径 Reach（米）；默认就是脸。
+/// Side：主光放画面哪一侧（1 右、-1 左）；null 时按脸转过去的方向定（跟随角色自动重摆时锁住，免得脸一转过正面灯就左右翻）。
 /// </summary>
 public readonly record struct Subject(Vector3 Face, Vector3 Forward, Vector3 Up, float Scale)
 {
     public Vector3? Pelvis { get; init; }
     public Vector3? Feet { get; init; }
+    public float? Side { get; init; }
+
+    /// <summary>往 target 靠近 k（0~1）：位置线性、方向归一化插值（跟随角色时平滑过渡用）。</summary>
+    public Subject Toward(Subject target, float k)
+    {
+        static Vector3 Dir(Vector3 a, Vector3 b, float k) => Vector3.Normalize(Vector3.Lerp(a, b, k) + new Vector3(0, 1e-6f, 0));
+        static Vector3? Opt(Vector3? a, Vector3? b, float k) => a is { } x && b is { } y ? Vector3.Lerp(x, y, k) : b;
+        return new Subject(Vector3.Lerp(Face, target.Face, k), Dir(Forward, target.Forward, k), Dir(Up, target.Up, k),
+                           Scale + (target.Scale - Scale) * k)
+        {
+            Pelvis = Opt(Pelvis, target.Pelvis, k), Feet = Opt(Feet, target.Feet, k), Side = target.Side ?? Side,
+        };
+    }
     public Vector3 Center { get; init; } = Face;
     public float Reach { get; init; } = FaceReach * Scale;
     public float DistanceScale { get; init; } = 1f;
@@ -256,6 +270,9 @@ public static class LightRigs
         _ => s with { Center = s.Face, Reach = Subject.FaceReach * s.Scale, DistanceScale = 1f },
     };
 
+    /// <summary>主光在哪一侧（1 右、-1 左），见 Frame。</summary>
+    public static float SideOf(Subject subject, Vector3? camera) => Frame(subject with { Side = null }, camera).Side;
+
     /// <summary>按人物和镜头位置算出每盏灯的世界状态。camera 为 null 时把脸朝向当成镜头方向。</summary>
     public static List<LightState> Solve(IEnumerable<LightSpec> lights, Subject subject, Vector3? camera, RigTweaks tweaks, float time = 0)
     {
@@ -346,8 +363,8 @@ public static class LightRigs
     {
         var toCamera = Flat(camera is { } c ? c - subject.Center : subject.Forward, subject.Forward);
         var camRight = Vector3.Normalize(Vector3.Cross(Vector3.UnitY, toCamera));
-        // 窄光：主光放在脸转过去的那一侧；脸几乎正对镜头时默认画面右侧
-        var side = Vector3.Dot(Flat(subject.Forward, toCamera), camRight) < -0.05f ? -1f : 1f;
+        // 窄光：主光放在脸转过去的那一侧；脸几乎正对镜头时默认画面右侧（Side 锁住时照它）
+        var side = subject.Side ?? (Vector3.Dot(Flat(subject.Forward, toCamera), camRight) < -0.05f ? -1f : 1f);
         return (toCamera, camRight, side);
     }
 

@@ -13,6 +13,7 @@ dependencies = [
     "scipy>=1.13",
     "httpx>=0.27",
     "pillow>=10",
+    "av>=13,<14",   # 录制配音乐（audio.py）；没装时录无声视频
 ]
 
 [project.optional-dependencies]

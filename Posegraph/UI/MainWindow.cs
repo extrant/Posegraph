@@ -41,7 +41,7 @@ public sealed partial class MainWindow : Window, IDisposable
         ("wrist", "手腕", "手腕弯曲扭转"),
     ];
 
-    private static readonly (string Key, string Label, string Tip)[] FaceGroups =
+    internal static readonly (string Key, string Label, string Tip)[] FaceGroups =
     [
         ("eyes", "眼睑", "闭眼、睁大、眯眼"),
         ("brows", "眉毛", "眉头、眉梢的高低和皱眉"),
@@ -75,6 +75,12 @@ public sealed partial class MainWindow : Window, IDisposable
 
     /// <summary>打开 / 关闭构图与截图窗口（由 Plugin 接上）。</summary>
     public Action? ToggleComposition { get; set; }
+
+    /// <summary>打开 / 关闭视频窗口（由 Plugin 接上）。</summary>
+    public Action? ToggleVideo { get; set; }
+
+    /// <summary>识别后端客户端（视频窗口用）。</summary>
+    public BackendClient Client => _client;
 
     /// <summary>当前照片的尺寸（宽、高），构图框按它的比例；没有照片时为 null。</summary>
     public int[]? PhotoSize => _session?.ImageSize;
@@ -926,8 +932,8 @@ public sealed partial class MainWindow : Window, IDisposable
         _ = Run(async () =>
         {
             var preview = await TextureImages.ThumbnailPngAsync(_textures, _readback, await File.ReadAllBytesAsync(image), 256);
-            var path = BrioPoseLibrary.Save(r.Pose, Path.GetFileNameWithoutExtension(image), Library.Meta(image)?.Tags ?? [],
-                                            preview, Path.GetFileName(image));
+            var path = BrioPoseLibrary.Save(r.Pose, Races.Suffixed(Path.GetFileNameWithoutExtension(image), r.Race?.Code ?? _raceOverride ?? _detectedRace),
+                                            Library.Meta(image)?.Tags ?? [], preview, Path.GetFileName(image));
             SetStatus(Loc.F("已存到 Brio 姿势库：{0}", Path.GetFileName(path)), Green);
         });
     }
@@ -945,8 +951,8 @@ public sealed partial class MainWindow : Window, IDisposable
             var p = Library.ReadCorrection(sha1)?.Params.Clone() ?? LoadParams(_preset);
             var r = await _client.RetargetAsync(info.SessionId, 0, p, null, _raceOverride ?? _detectedRace);
             var preview = await TextureImages.ThumbnailPngAsync(_textures, _readback, await File.ReadAllBytesAsync(image), 256);
-            return BrioPoseLibrary.Save(r.Pose, Path.GetFileNameWithoutExtension(image), Library.Meta(image)?.Tags ?? [],
-                                        preview, Path.GetFileName(image));
+            return BrioPoseLibrary.Save(r.Pose, Races.Suffixed(Path.GetFileNameWithoutExtension(image), r.Race?.Code ?? _raceOverride ?? _detectedRace),
+                                        Library.Meta(image)?.Tags ?? [], preview, Path.GetFileName(image));
         }
         finally
         {
@@ -962,6 +968,25 @@ public sealed partial class MainWindow : Window, IDisposable
 
     /// <summary>必须在主线程（绘制时）调用。</summary>
     public PoseApplier.ActorIdentity? Identify(int index) => _applier.Identify(index);
+
+    /// <summary>
+    /// 视频用：角色的骨架编号（用户改过种族就用改的）和体型签名（骨架 + 外貌数据，Glamourer 换种族 / 体型时会变）。
+    /// 模型还没加载好（换种族重建中）或找不到角色时为 null。
+    /// </summary>
+    public async Task<(string? Race, string Body)?> ActorBodyAsync(int actor)
+    {
+        if (await _applier.IdentifyAsync(actor) is not { ModelReady: true } id) return null;
+        var race = (id.Key == _actorKey ? _raceOverride : _actorStates.GetValueOrDefault(id.Key)?.RaceOverride) ?? id.Race;
+        return (race, $"{race}|{id.Signature[Math.Min(id.Signature.Length, id.Key.Length + 1)..]}");
+    }
+
+    /// <summary>视频识别用：角色现在的游戏姿势（骨长 / 缩放按它）和骨架编号（用户改过种族就用改的）。</summary>
+    public async Task<(string? Reference, string? Race)> ActorContextAsync(int actor)
+    {
+        if (await _applier.IdentifyAsync(actor) is not { } id) return (null, null);
+        var race = (id.Key == _actorKey ? _raceOverride : _actorStates.GetValueOrDefault(id.Key)?.RaceOverride) ?? id.Race;
+        return (await _applier.GetPoseAsync(actor), race);
+    }
 
     /// <summary>在主窗口里编辑某个角色的图：切到这个角色并打开图片（3D / 调整页的修正照常保存到这张图）。</summary>
     public void Edit(int actor, string image)
@@ -1161,7 +1186,8 @@ public sealed partial class MainWindow : Window, IDisposable
         if (IconButton("##composition", FontAwesomeIcon.CropAlt, Loc.T("构图与截图：构图框、等效焦距、一键截图"), ToggleComposition is not null))
             ToggleComposition!();
         ImGui.SameLine();
-        IconButton("##video", FontAwesomeIcon.Film, Loc.T("视频逐帧（预留）"), false);
+        if (IconButton("##video", FontAwesomeIcon.Film, Loc.T("视频：逐帧识别视频里的动作和镜头，在游戏里播放"), ToggleVideo is not null))
+            ToggleVideo!();
         if (_recognizing || _rtBusy)
         {
             ImGui.SameLine();

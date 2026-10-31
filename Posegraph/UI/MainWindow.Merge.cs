@@ -153,7 +153,7 @@ public sealed partial class MainWindow
                     return;
                 }
             }
-            if (!SplitWindow.MergeAvailable || !DetectorsReady) return;
+            if (!DetectorsReady) return;
             var r = await _client.DetectAsync(await File.ReadAllBytesAsync(path), _config.MergeDetector);
             if (r.People.Length < 2 || path != _imagePath) return;
             ShowPeopleList?.Invoke();

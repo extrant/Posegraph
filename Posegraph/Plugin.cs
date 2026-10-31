@@ -35,6 +35,7 @@ public sealed class Plugin : IDalamudPlugin
     private readonly Lighting.LightingService _lighting;
     private readonly LightingWindow _lightingWindow;
     private readonly CompositionWindow _composition;
+    private readonly VideoWindow _video;
     private bool _openedByGpose;
     private bool _shotRequested;
     private readonly IDataManager _data;
@@ -96,10 +97,16 @@ public sealed class Plugin : IDalamudPlugin
         _windows.AddWindow(lightingScene);
         _lightingWindow.SceneWindow = lightingScene;
         _main.ToggleLighting = _lightingWindow.Toggle;
-        _composition = new CompositionWindow(_config, pi, framework, clientState, textures, readback, () => _main.PhotoSize,
+        _composition = new CompositionWindow(_config, pi, framework, clientState, textures, readback, gameGui, () => _main.PhotoSize,
                                              () => _main.PhotoTexture, () => _main.PhotoSkeleton);
         _windows.AddWindow(_composition);
         _main.ToggleComposition = _composition.Toggle;
+        _video = new VideoWindow(_config, pi, framework, textures, readback, gameGui, _main, brio, applier);
+        _composition.Suppressed = () => _video.HideUi;
+        VideoSpike.Record = body => _video.SpikeRecordAsync(framework, body.GetProperty("clip").GetString()!, body.GetProperty("actor").GetInt32(),
+                                                            body.GetProperty("fps").GetDouble(), body.GetProperty("reshade").GetBoolean());
+        _windows.AddWindow(_video);
+        _main.ToggleVideo = _video.Toggle;
         _main.DumpFaceData = DumpFaceAnimations;
         _main.LibraryDragged = () => _library.DraggedImages;
         _main.Closed = () => _library.IsOpen = _split.IsOpen = _masks.IsOpen = _lightingWindow.IsOpen = _composition.IsOpen = false;
@@ -121,8 +128,7 @@ public sealed class Plugin : IDalamudPlugin
         pi.UiBuilder.Draw += DrawDragSource;
         pi.UiBuilder.Draw += _composition.DrawOverlay;
         pi.UiBuilder.Draw += DrawPendingShot;
-        pi.UiBuilder.Draw += _windows.Draw;
-        pi.UiBuilder.Draw += _auxMenu.DrawDialogs;
+        pi.UiBuilder.Draw += DrawWindows;
         pi.UiBuilder.OpenMainUi += ToggleManually;
         pi.UiBuilder.OpenConfigUi += _main.OpenSettings;
 
@@ -228,6 +234,14 @@ public sealed class Plugin : IDalamudPlugin
         });
     }
 
+    /// <summary>画所有窗口；ReShade 兼容截图期间不画（拷的是屏幕上的最终画面）。</summary>
+    private void DrawWindows()
+    {
+        if (_composition.HideUi || _video.HideUi) return;
+        _windows.Draw();
+        _auxMenu.DrawDialogs();
+    }
+
     private void DrawPendingShot()
     {
         if (!_shotRequested) return;
@@ -260,8 +274,7 @@ public sealed class Plugin : IDalamudPlugin
         _framework.Update -= OnFrameworkUpdate;
         _lighting.Dispose();
         _commands.RemoveHandler(Command);
-        _pi.UiBuilder.Draw -= _windows.Draw;
-        _pi.UiBuilder.Draw -= _auxMenu.DrawDialogs;
+        _pi.UiBuilder.Draw -= DrawWindows;
         _pi.UiBuilder.Draw -= DrawDragSource;
         _pi.UiBuilder.Draw -= _composition.DrawOverlay;
         _pi.UiBuilder.Draw -= DrawPendingShot;
@@ -269,6 +282,7 @@ public sealed class Plugin : IDalamudPlugin
         _pi.UiBuilder.OpenConfigUi -= _main.OpenSettings;
         _windows.RemoveAllWindows();
         _library.Dispose();
+        _video.Dispose();
         _split.Dispose();
         _masks.Dispose();
         _update.Dispose();

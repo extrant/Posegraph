@@ -38,6 +38,9 @@ public static class Races
 
     public static string Label(string? code) => Find(code) is { } r ? Loc.T(r.Name) : code ?? Loc.T("未知");
 
+    /// <summary>名字后面加种族性别（姿势预设、片段命名用：骨骼是按这个种族算的）；不知道种族时原样返回。</summary>
+    public static string Suffixed(string name, string? code) => code is null ? name : $"{name} {Label(code)}";
+
     /// <summary>角色当前实际加载的骨架编号（人形绘制对象的 RaceSexId，如 101 → c0101）；能反映换种族 MOD。读不到为 null。必须在主线程调用。</summary>
     public static unsafe string? FromModel(IGameObject? obj)
     {

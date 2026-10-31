@@ -23,9 +23,29 @@ def tr(text: str, **kwargs) -> str:
 
 
 EN = {
+    # 视频（video.py）
+    "视频不存在（后端重启过？请重新载入）": "Video not found (did the backend restart? Load it again)",
+    "无法读取视频（格式不支持或文件损坏）": "Cannot read the video (unsupported format or corrupted file)",
+    "读不到这一帧": "Cannot read this frame",
+    "至少选一个人": "Select at least one person",
+    "截取的时间段太短": "The selected range is too short",
+    "帧数太多（{count} 帧）：缩短时间段或降低帧率": "Too many frames ({count}): shorten the range or lower the frame rate",
+    "任务不存在（后端重启过？）": "Job not found (did the backend restart?)",
+    "任务还没完成": "The job has not finished yet",
     # 面捕（face.py）
     "面捕组件没装（mediapipe 或 face_landmarker 模型）": "Face capture is not installed (mediapipe or the face_landmarker model)",
     "还没有游戏表情数据：在游戏里输入 /posegraph facedump 导出一次": "No game expression data yet: type /posegraph facedump in game once to export it",
+    "视频里没找到能用的脸（太小、侧脸或被挡住），表情没套": "No usable face found in the video (too small, turned away or covered); no expression applied",
+    "录制参数不对": "Invalid recording parameters",
+    "识别原始数据读不了（文件损坏或版本不对）": "Cannot read the recognition data (damaged file or wrong version)",
+    "识别原始数据不在了（后端重启过？），请重新上传": "The recognition data is gone (backend restarted?); upload it again",
+    "人数和识别时不一样": "The number of people differs from the recognition",
+    "没装音频组件（PyAV），录出来是无声视频": "The audio component (PyAV) is not installed; the video will be silent",
+    "没找到音乐：{name} 里没有声音，同一文件夹里也没有同名的音频文件": "No music found: {name} has no audio and there is no audio file with the same name next to it",
+    "配音乐失败，保留了无声视频：{error}": "Adding music failed; kept the silent video: {error}",
+    "没装音频组件（PyAV），放不了音乐": "The audio component (PyAV) is not installed; music cannot be played",
+    "没有可用的视频编码器：{error}": "No video encoder available: {error}",
+    "录制不存在或已结束": "The recording does not exist or has already finished",
     "姿势里没有头部骨骼": "The pose has no head bone",
     "左眼闭": "Left eye closed", "右眼闭": "Right eye closed", "左眼睁大": "Left eye wide", "右眼睁大": "Right eye wide",
     "左眼眯": "Left eye squint", "右眼眯": "Right eye squint", "左眉头高(cm)": "Left inner brow up (cm)", "右眉头高(cm)": "Right inner brow up (cm)",

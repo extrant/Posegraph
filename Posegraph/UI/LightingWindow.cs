@@ -134,7 +134,7 @@ public sealed class LightingWindow : Window
                 Run(() => _service.ReplaceAsync(_actor()), Loc.T("已按角色现在的位置重新摆"));
             if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
                 ImGui.SetTooltip(Loc.T("角色挪动、换了姿势后点这里：重新读脸的位置和朝向"));
-            ImGui.SameLine();
+            UiText.SameLineIfFits(UiText.IconButtonWidth(Loc.T("关掉所有灯")));
             if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Trash, Loc.T("关掉所有灯")))
             {
                 _service.Clear();
@@ -143,14 +143,14 @@ public sealed class LightingWindow : Window
         }
         if (SceneWindow is { } scene)
         {
-            ImGui.SameLine();
+            UiText.SameLineIfFits(UiText.IconButtonWidth(Loc.T("3D 布光")));
             using (ImRaii.PushColor(ImGuiCol.Button, PosegraphTheme.Accent with { W = 0.55f }, scene.IsOpen))
                 if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Cube, Loc.T("3D 布光")))
                     scene.IsOpen = !scene.IsOpen;
             if (ImGui.IsItemHovered())
                 ImGui.SetTooltip(Loc.T("展开 / 收起 3D 布光窗口：贴在这个窗口右边，宽度可以拖"));
         }
-        ImGui.SameLine();
+        UiText.SameLineIfFits(UiText.CheckboxWidth(Loc.T("跟随镜头")));
         var follow = _config.LightFollowCamera;
         if (ImGui.Checkbox(Loc.T("跟随镜头"), ref follow))
         {
@@ -159,9 +159,9 @@ public sealed class LightingWindow : Window
         }
         if (ImGui.IsItemHovered())
             ImGui.SetTooltip(Loc.T("转镜头时灯跟着转，始终从镜头这一侧照亮脸"));
-        ImGui.SameLine();
+        UiText.SameLineIfFits(110 * ImGuiHelpers.GlobalScale + ImGui.GetStyle().ItemInnerSpacing.X + ImGui.CalcTextSize(Loc.T("打光范围")).X);
         DrawFraming();
-        ImGui.SameLine();
+        UiText.SameLineIfFits(UiText.CheckboxWidth(Loc.T("跟随角色")));
         if (Check(Loc.T("跟随角色"), _config.LightFollowSubject, v => _config.LightFollowSubject = v,
                   Loc.T("Posegraph 给这个角色换了姿势、或角色被挪动 / 转身后，自动重新读脸再摆（在 Brio 里手动掰骨骼不算，掰完点「重新摆」）")))
             _pi.SavePluginConfig(_config);

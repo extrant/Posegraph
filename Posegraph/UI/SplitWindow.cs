@@ -106,11 +106,8 @@ public sealed class SplitWindow : Window, IDisposable
             if (_main.Identify(index) is { } id) _keys[index] = id.Key;
     }
 
-    /// <summary>合并模式（一张图多人）还在打磨，这一版先关掉：界面上置灰、不能切过去，存着的设置也当拆分模式。</summary>
-    public const bool MergeAvailable = false;
-
-    /// <summary>当前是不是合并模式（关掉时一律是拆分）。</summary>
-    public bool MergeMode => MergeAvailable && _config.SplitMerge;
+    /// <summary>当前是不是合并模式（一张图多人）。</summary>
+    public bool MergeMode => _config.SplitMerge;
 
     public override void Draw()
     {
@@ -134,10 +131,8 @@ public sealed class SplitWindow : Window, IDisposable
         if (ImGui.RadioButton(Loc.T("拆分"), !merge)) SetMode(false);
         if (ImGui.IsItemHovered()) ImGui.SetTooltip(Loc.T("每个角色一张图"));
         ImGui.SameLine();
-        using (ImRaii.Disabled(!MergeAvailable))
-            if (ImGui.RadioButton(Loc.T("合并"), merge)) SetMode(true);
-        if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
-            ImGui.SetTooltip(MergeAvailable ? Loc.T("一张图里的多个人分给各个角色") : Loc.T("一张图里的多个人分给各个角色（还在打磨，下个版本开放）"));
+        if (ImGui.RadioButton(Loc.T("合并"), merge)) SetMode(true);
+        if (ImGui.IsItemHovered()) ImGui.SetTooltip(Loc.T("一张图里的多个人分给各个角色"));
         ImGui.SameLine();
         ImGuiComponents.HelpMarker(merge
             ? Loc.T("主窗口当前那张图里有多个人时用：\n1. 「找人」自动框出图里的人（主窗口图像页上可以拖边角调整、空白处拖出新框、右键删除）\n2. 勾选要识别的人，点「识别」\n3. 给每个人选一个角色，点「全部应用」\n要细调某个人：点「编辑」，主窗口切到这个人（各人的调整值分开保存）。\n角色只在这次 GPose 里有效。")
@@ -164,7 +159,6 @@ public sealed class SplitWindow : Window, IDisposable
     /// <summary>主窗口找到 2 个以上的人时：打开并切到合并页。</summary>
     public void ShowMerge()
     {
-        if (!MergeAvailable) return;
         if (!_config.SplitMerge) SetMode(true);
         IsOpen = true;
     }
