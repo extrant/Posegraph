@@ -35,6 +35,19 @@
       "url": "https://github.com/extrant/Posegraph/releases/download/backend-components-2/posegraph-audio-2.zip",
       "size": 73754999,
       "sha256": "91e63c7c0d97fca103b499437d57cc93246828cc5305732a6356e3a6f3fee378"
+    },
+    {
+      "id": "detect",
+      "name": "人物检测（视频找人、跟踪）",
+      "nameEn": "Person detection (finding and tracking people in videos)",
+      "check": [
+        "python/Lib/site-packages/onnxruntime/__init__.py",
+        "backend/checkpoints/detectors/yolo11m.onnx",
+        "backend/checkpoints/detectors/anime_person_v1.3_s.onnx"
+      ],
+      "url": "https://github.com/extrant/Posegraph/releases/download/backend-components-2/posegraph-detect-2.zip",
+      "size": 165503929,
+      "sha256": "c562b7de20be434f71ca44a1b603c350d3a972e74ac2258b4401e5d5405f2f25"
     }
   ]
 }

@@ -5,6 +5,22 @@
   },
   "entries": [
     {
+      "version": "0.7.1",
+      "date": "2026-11-01",
+      "title": {
+        "zh": "补上视频找人要的人物检测组件",
+        "en": "Adds the person detection component that finding people in videos needs"
+      },
+      "items": {
+        "zh": [
+          "修复：老一键包没有人物检测组件（onnxruntime 和检测模型），视频里「找人」和逐帧跟踪用不了。在设置页点「更新后端」会自动补上（约 158MB）"
+        ],
+        "en": [
+          "Fix: older one-click packages lack the person detection component (onnxruntime and the detection models), so \"Find people\" and frame-by-frame tracking in videos didn't work. Click \"Update backend\" in Settings to add it (about 158 MB)"
+        ]
+      }
+    },
+    {
       "version": "0.7.0",
       "date": "2026-11-01",
       "title": {

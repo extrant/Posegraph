@@ -43,7 +43,15 @@ COMPONENTS = [
         "paths": [f"{SITE}/av", f"{SITE}/av.libs", f"{SITE}/av-13.1.0.dist-info"],
         "check": [f"{SITE}/av/__init__.py"],
     },
-    # 找人（合并模式）暂不发：合并模式这一版关着，YOLO11 权重是 AGPL-3.0，发之前要先定授权怎么处理
+    {
+        # 0.7.1 视频「找人」和逐帧跟踪（detect.py）。YOLO11m 权重是 AGPL-3.0（2026-11-01 用户决定照发，THIRD_PARTY_NOTICES 注明），
+        # 插画检测模型 MIT。flatbuffers 面捕组件里也有，这里再带一份：没装面捕的一键包也能用
+        "id": "detect", "name": "人物检测（视频找人、跟踪）", "nameEn": "Person detection (finding and tracking people in videos)",
+        "paths": [f"{SITE}/onnxruntime", f"{SITE}/onnxruntime-1.31.1.dist-info", f"{SITE}/flatbuffers",
+                  f"{SITE}/flatbuffers-25.12.19.dist-info", "backend/checkpoints/detectors"],
+        "check": [f"{SITE}/onnxruntime/__init__.py", "backend/checkpoints/detectors/yolo11m.onnx",
+                  "backend/checkpoints/detectors/anime_person_v1.3_s.onnx"],
+    },
 ]
 
 # already compressed: storing is as small and much faster
