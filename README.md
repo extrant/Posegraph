@@ -55,7 +55,7 @@ Posegraph plugin (in game, ImGui)  ── HTTP (127.0.0.1) ──►  Posegraph 
 
 - FINAL FANTASY XIV with Dalamud (API 15) and **Brio** installed and enabled
 - Windows 10/11 64-bit
-- For GPU inference: an NVIDIA GPU with about **3 GB free VRAM** (about 2 GB used while recognizing).
+- For GPU inference: an NVIDIA GPU (CUDA is bundled in the backend package) or a ROCm-capable AMD GPU (via source setup below), with about **3 GB free VRAM** (about 2 GB used while recognizing).
   Without it, Posegraph runs on the CPU: about 10–20 s per image and about 4 GB RAM.
 - About 7 GB of disk space for the backend package
 
@@ -189,7 +189,7 @@ The project uses `Dalamud.NET.SDK` 15 and `Brio.API`. For XIVLauncherCN the Dala
 
 ```powershell
 cd backend
-powershell -ExecutionPolicy Bypass -File scripts\setup_sam3d.ps1     # venv, CUDA PyTorch, upstream source, weights (SHA256-checked)
+powershell -ExecutionPolicy Bypass -File scripts\setup_sam3d.ps1     # venv, CUDA/ROCm PyTorch, upstream source, weights (SHA256-checked)
 .venv\Scripts\python -m posegraph.app                               # http://127.0.0.1:42430
 ```
 

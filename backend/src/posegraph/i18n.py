@@ -100,6 +100,10 @@ EN = {
     # 设备
     "手动指定": "set manually",
     "未检测到 NVIDIA 显卡": "no NVIDIA GPU detected",
+    "未检测到 AMD 显卡": "no AMD GPU detected",
+    "未检测到可用独立显卡": "no discrete GPU detected",
+    "PyTorch 未包含 GPU 支持": "PyTorch built without GPU support",
+    "当前 PyTorch 环境不支持此显卡": "GPU not supported by this PyTorch build",
     "可用显存 {free} MB，低于 {need} MB": "{free} MB VRAM free, below {need} MB",
     "可用显存 {free} MB": "{free} MB VRAM free",
     # 错误

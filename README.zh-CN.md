@@ -50,7 +50,7 @@ Posegraph 插件（游戏内 ImGui）  ── HTTP（127.0.0.1）──►  Pose
 
 - 装好 Dalamud（API 15）并启用 **Brio** 的 FF14
 - Windows 10/11 64 位
-- 用显卡识别：NVIDIA 显卡，可用显存约 **3GB**（识别时约占 2GB）。没有的话用 CPU：每张约 10~20 秒，内存约 4GB。
+- 用显卡识别：NVIDIA 显卡（一键包内置 CUDA），或支持 ROCm 的 AMD 显卡（需按下方「后端（开发安装）」配置 ROCm 环境），可用显存约 **3GB**（识别时约占 2GB）。没有的话用 CPU：每张约 10~20 秒，内存约 4GB。
 - 后端一键包约 7GB 磁盘空间
 
 ## 安装
@@ -164,7 +164,7 @@ dotnet build -c Release      # 产物：Posegraph\bin\Release\Posegraph\latest.z
 
 ```powershell
 cd backend
-powershell -ExecutionPolicy Bypass -File scripts\setup_sam3d.ps1     # 虚拟环境、CUDA 版 PyTorch、上游源码、权重（SHA256 校验）
+powershell -ExecutionPolicy Bypass -File scripts\setup_sam3d.ps1     # 虚拟环境、CUDA/ROCm 版 PyTorch、上游源码、权重（SHA256 校验）
 .venv\Scripts\python -m posegraph.app                               # http://127.0.0.1:42430
 ```
 

@@ -114,8 +114,8 @@ def _cpu_mhr(scripted):
 
 
 class Sam3dBodyEstimator(PoseEstimator):
-    """device：auto 时按 nvidia-smi 的可用显存决定（低于 min_free_vram_mb 用 CPU），每次加载时重新判断；
-    precision：auto 时 GPU 用 bf16（上游默认）、CPU 用 fp32（多数 CPU 没有 bf16 硬件，反而更慢）；
+    """device：auto 时按可用显存决定（低于 min_free_vram_mb 用 CPU），每次加载时重新判断；
+    precision：auto 时 GPU 用 bf16（上游默认；不支持硬件 bf16 的 ROCm 卡用 fp16）、CPU 用 fp32；
     mhr_on_cpu：GPU 模式下把 MHR 留在 CPU（快速模式下 MHR 只有约 29MB，忽略此项、放显卡）；
     fast：快速模式（sam3d_fast），加载时决定，改了要重新加载；
     backbone_scale：骨干输入缩放（低配模式 0.75），见 sam3d_fast._scaled_backbone。"""
@@ -149,14 +149,31 @@ class Sam3dBodyEstimator(PoseEstimator):
         if self.device != "auto":
             self.device_reason = ("手动指定",)
             return self.device
-        from ..gpu import query_gpu
+        import torch
+        from ..gpu import query_gpu_vendor
 
-        gpu = query_gpu(max_age=0)
+        has_hip = bool(getattr(torch.version, "hip", None))
+        has_cuda = bool(getattr(torch.version, "cuda", None))
+        if not has_cuda and not has_hip:
+            self.device_reason = ("PyTorch 未包含 GPU 支持",)
+            return "cpu"
+
+        gpu, vendor = query_gpu_vendor(max_age=0)
         if gpu is None:
+            self.device_reason = ("未检测到可用独立显卡",)
+            return "cpu"
+        # 在调用 torch.cuda.is_available() 前先核对构建后端与显卡厂商，不匹配时不建上下文
+        if has_hip and vendor != "amd":
+            self.device_reason = ("未检测到 AMD 显卡",)
+            return "cpu"
+        if has_cuda and not has_hip and vendor != "nvidia":
             self.device_reason = ("未检测到 NVIDIA 显卡",)
             return "cpu"
         if gpu["freeMB"] < self.min_free_vram_mb:
             self.device_reason = ("可用显存 {free} MB，低于 {need} MB", {"free": gpu["freeMB"], "need": self.min_free_vram_mb})
+            return "cpu"
+        if not torch.cuda.is_available():
+            self.device_reason = ("当前 PyTorch 环境不支持此显卡",)
             return "cpu"
         self.device_reason = ("可用显存 {free} MB", {"free": gpu["freeMB"]})
         return "cuda"
@@ -181,7 +198,18 @@ class Sam3dBodyEstimator(PoseEstimator):
             from sam_3d_body import SAM3DBodyEstimator
 
         device = self._pick_device()
-        precision = self.precision if self.precision != "auto" else ("bf16" if device == "cuda" else "fp32")
+        if device == "cuda" and sys.platform == "win32" and getattr(torch.version, "hip", None) and hasattr(torch, "backends"):
+            # Windows ROCm MIOpen 的文件锁（ufdb.txt.lock.fslock）在部分环境或非 ASCII 用户目录下会报错并导致退出卡死；
+            # 模型仅含少量 patchify 卷积，关闭 MIOpen 后直接走 ATen 原生 im2col + hipBLASLt
+            torch.backends.cudnn.enabled = False
+        if self.precision != "auto":
+            precision = self.precision
+        elif device != "cuda":
+            precision = "fp32"
+        elif getattr(torch.version, "hip", None) and not torch.cuda.is_bf16_supported():
+            precision = "fp16"   # RDNA 2 等无硬件 bf16 的 ROCm 显卡改用 fp16
+        else:
+            precision = "bf16"
         try:
             model, cfg = self._build(ckpt, mhr, device, precision)
         except torch.OutOfMemoryError:
