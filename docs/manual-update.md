@@ -25,10 +25,11 @@ All you do is **unpack a few archives into the package folder**; there's no need
 |---|---|---|---|
 | `posegraph-face-1.zip` | about 64 MB | Face capture (expressions, head follows face) | [GitHub](https://github.com/extrant/Posegraph/releases/download/backend-components-1/posegraph-face-1.zip) |
 | `posegraph-depth-1.zip` | about 400 MB | Depth (camera focal length, floor) | [GitHub](https://github.com/extrant/Posegraph/releases/download/backend-components-1/posegraph-depth-1.zip) |
-| `Posegraph-0.5.0.zip` | about 5 MB | Backend code | [GitHub](https://github.com/extrant/Posegraph/archive/refs/tags/v0.5.0.zip) |
+| `posegraph-audio-2.zip` | about 70 MB | Audio (music for video playback and recording, 0.7.0 and later) | [GitHub](https://github.com/extrant/Posegraph/releases/download/backend-components-2/posegraph-audio-2.zip) |
+| `Posegraph-0.7.0.zip` | about 5 MB | Backend code | [GitHub](https://github.com/extrant/Posegraph/archive/refs/tags/v0.7.0.zip) |
 
-- Both components are on the [backend-components-1](https://github.com/extrant/Posegraph/releases/tag/backend-components-1) page;
-  the backend code is **Source code (zip)** at the bottom of the [v0.5.0](https://github.com/extrant/Posegraph/releases/tag/v0.5.0) page.
+- Face capture and depth are on the [backend-components-1](https://github.com/extrant/Posegraph/releases/tag/backend-components-1) page, audio on the [backend-components-2](https://github.com/extrant/Posegraph/releases/tag/backend-components-2) page;
+  the backend code is **Source code (zip)** at the bottom of the [v0.7.0](https://github.com/extrant/Posegraph/releases/tag/v0.7.0) page.
 - If GitHub won't open, put a download prefix in front of the link, e.g.
   `https://gh-proxy.org/https://github.com/extrant/Posegraph/releases/download/backend-components-1/posegraph-face-1.zip`.
 - Components are installed once: later versions don't need them again unless they change.
@@ -37,7 +38,7 @@ All you do is **unpack a few archives into the package folder**; there's no need
 
 ## 2. Unpack the components
 
-Both components work the same way; `posegraph-face-1.zip` is the example. The archive contains a `python` and a
+Every component works the same way; `posegraph-face-1.zip` is the example (the audio component only has `python`). The archive contains a `python` and a
 `backend` folder, which have to **merge with the folders of the same name in the package**.
 
 **With Windows' built-in extractor (right-click → Extract All):**
@@ -64,17 +65,17 @@ If you ended up with something like `D:\Posegraph-Backend\posegraph-face-1\pytho
 
 ## 3. Replace the backend code
 
-1. Unpack `Posegraph-0.5.0.zip` anywhere (the desktop is fine).
+1. Unpack `Posegraph-0.7.0.zip` anywhere (the desktop is fine).
 2. In the package's `backend` folder, **rename** the existing `src` folder to `src.old` (a backup; delete it once the new version works).
-3. **Copy** the `src` folder from the unpacked `Posegraph-0.5.0\backend` into the package's `backend` folder.
+3. **Copy** the `src` folder from the unpacked `Posegraph-0.7.0\backend` into the package's `backend` folder.
 
-Afterwards `D:\Posegraph-Backend\backend\src\posegraph\version.json` says `"version": "0.5.0"`.
+Afterwards `D:\Posegraph-Backend\backend\src\posegraph\version.json` says `"version": "0.7.0"`.
 
 ## 4. Check
 
 Back in game, on the plugin's **Settings** tab:
 
-- "Backend 0.5.0, plugin v0.5.0" and **Up to date** means everything is in place.
+- "Backend 0.7.0, plugin v0.7.0" and **Up to date** means everything is in place.
 - "Missing components: …" means that component isn't unpacked correctly; check the files from step 2.
 - Still offering an update means `src` wasn't replaced correctly; check the version in `version.json`.
 
@@ -101,8 +102,9 @@ its SHA-256 before unpacking:
 |---|---|
 | `posegraph-face-1.zip` | `ac62fb58b2a7600f73c48f08811e6bd15a47f1104fb8dd1f00b9f6fd24604721` |
 | `posegraph-depth-1.zip` | `23e387d0008c7065fd5573d7b7fec8b28ca7997a899fff4efb4e1eabd80b03bf` |
+| `posegraph-audio-2.zip` | `91e63c7c0d97fca103b499437d57cc93246828cc5305732a6356e3a6f3fee378` |
 
-If it doesn't match, don't use it; download it again. The backend code `Posegraph-0.5.0.zip` is repackaged by GitHub on
+If it doesn't match, don't use it; download it again. The backend code `Posegraph-0.7.0.zip` is repackaged by GitHub on
 each download and has no fixed checksum, so it's best to get it from GitHub yourself.
 
 A shortcut: put the verified component archives in a `.download` folder inside the package folder (create it if needed),

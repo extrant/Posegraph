@@ -40,7 +40,7 @@ from fastapi.responses import Response
 from starlette.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
 
-from . import depth, detect, masks, session_archive, tuning
+from . import depth, detect, hands, masks, session_archive, tuning
 from .config import SERVICE_ROOT, settings
 from .estimators import create_estimator
 from . import RUNTIME_REQUIRED, __version__
@@ -304,6 +304,7 @@ async def create_session(request: Request, name: str = "image", hold: bool = Fal
                        "bbox": h.bbox, "image_size": np.array(result.image_size),
                        "vertices": h.extra["vertices"], "rest_vertices": h.extra["rest_vertices"],
                        **({"floor": h.extra["floor"]} if "floor" in h.extra else {})})
+    humans = await run_in_threadpool(_refine_hands, rgb, humans)
     session = await run_in_threadpool(_add_session, name, result.image_size, _preview_png(rgb), humans, result.timings_ms["inference"])
 
     if settings.save_sessions:   # 存一份 npz，命令行脚本（push_pose / preview_overlay / Blender 对比）可直接复用
@@ -1217,19 +1218,25 @@ def _video_upright(human: dict, image_size) -> list[float] | None:
     return None if rot is None else rot.as_quat().tolist()
 
 
-def _video_depth(rgb: np.ndarray):
-    """视频镜头解算用的深度（MoGe）：设置里关了深度或没装时 None（只解镜头转动）。"""
-    import dataclasses
+def _video_hands(rgb: np.ndarray, human: dict) -> dict:
+    """手指精修的逐帧检测；出错当这一帧没认出（不影响整段识别）。"""
+    try:
+        return hands.detect(rgb, human)
+    except Exception:
+        return {}
 
-    import cv2
 
-    if not _use_depth or not depth.available():
-        return None
-    H, W = rgb.shape[:2]
-    sc = min(1.0, 640 / max(W, H))
-    small = cv2.resize(rgb, (max(1, round(W * sc)), max(1, round(H * sc))), interpolation=cv2.INTER_AREA) if sc < 1 else rgb
-    photo = depth.estimate(small, _estimator.active_device or "cpu")
-    return dataclasses.replace(photo, focal=photo.focal / sc)   # 焦距换回原图像素；深度图按自己的尺寸取
+def _refine_hands(rgb: np.ndarray, humans: list[dict]) -> list[dict]:
+    """照片：认得出的手按 MediaPipe 重算手指（hands.py）；没装模型、关了或出错时原样返回。"""
+    if not settings.hand_refine or not hands.available():
+        return humans
+    out = []
+    for h in humans:
+        try:
+            out.append(hands.refine(rgb, h)[0])
+        except Exception:
+            out.append(h)
+    return out
 
 
 def _video_geometry(human: dict, rt):
@@ -1327,7 +1334,7 @@ def video_job(vid: str, req: VideoJobRequest) -> dict:
     def work():
         try:
             video.run_job(job, info, _video_estimate, detect_people, _video_retarget, _video_camera, _video_upright, face_hooks,
-                          _video_depth, _video_geometry)
+                          _video_geometry, _video_hands if settings.hand_refine and hands.available() else None)
             if job.result is not None:
                 _clip_warnings(job.result, face_hooks, warnings)
             job.state = "done"
@@ -1358,9 +1365,9 @@ def _video_person(p, box: list[float], warnings: list[str]):
     return video.PersonSpec(box, race["code"], ref, use_lengths, ivcs is not False, p.params)
 
 
-def _video_retarget(human, image_size, person, upright):
+def _video_retarget(human, image_size, person, upright, edits=None):
     return tuning.run(human, image_size, person.params, person.reference, person.race,
-                      reference_lengths=person.reference_lengths, ivcs=person.ivcs, upright_override=upright)
+                      reference_lengths=person.reference_lengths, ivcs=person.ivcs, upright_override=upright, edits=edits)
 
 
 def _clip_warnings(result: dict, face_hooks, warnings: list[str]) -> None:
@@ -1433,11 +1440,28 @@ class ClipPerson(BaseModel):
     reference: str | None = None    # 游戏角色当前姿势（Brio pose JSON），骨长 / 缩放按它
     trust_reference: bool = False
     params: tuning.RetargetParams = tuning.RetargetParams()
+    edits: list[dict] = []          # 时间轴修正的关键帧（edits.Key.to_json 的格式）
 
 
 class ClipRequest(BaseModel):
     people: list[ClipPerson]
     smooth: float = 0.5
+    frames: list[int] | None = None  # [a, b]：只重算这几帧的骨骼（改了时间轴修正后），见 video.build_clip 的 frame_range
+
+
+def _clip_people(raw, req: ClipRequest, warnings: list[str]) -> list:
+    """请求里的人 → video.PersonSpec（带时间轴修正）；人数不对、修正格式不对时 400。"""
+    from . import edits
+
+    if len(req.people) != len(raw.humans):
+        raise HTTPException(400, tr("人数和识别时不一样"))
+    people = [_video_person(p, [], warnings) for p in req.people]
+    for spec, p in zip(people, req.people):
+        try:
+            spec.edits = [edits.Key.from_json(k) for k in p.edits]
+        except (KeyError, TypeError, ValueError) as ex:
+            raise HTTPException(400, tr("时间轴修正的格式不对：{error}", error=ex))
+    return people
 
 
 @app.post("/raws/{rid}/clip")
@@ -1445,17 +1469,94 @@ def raw_clip(rid: str, req: ClipRequest) -> dict:
     """按新的种族 / 骨长 / 表情权重重算片段（重定向、镜头、表情，不重新识别；一百帧几秒）。格式同 /jobs/{id}/result。"""
     from . import video
 
+    raw = _raw(rid)
+    warnings: list[str] = []
+    people = _clip_people(raw, req, warnings)
+    face_hooks = _video_face(people, warnings, analyze_frames=False)
+    frames = None
+    if req.frames is not None:
+        if len(req.frames) != 2 or req.frames[0] > req.frames[1]:
+            raise HTTPException(400, tr("frames 应为 [起始帧, 结束帧]"))
+        frames = (int(req.frames[0]), int(req.frames[1]))
+    result = video.build_clip(raw, people, req.smooth, _video_retarget, _video_camera, face_hooks, geometry_of=_video_geometry,
+                              frame_range=frames)
+    if frames is None:
+        _clip_warnings(result, face_hooks, warnings)
+    return result
+
+
+def _raw(rid: str):
     raw = _raws.get(rid)
     if raw is None:
         raise HTTPException(404, tr("识别原始数据不在了（后端重启过？），请重新上传"))
-    if len(req.people) != len(raw.humans):
-        raise HTTPException(400, tr("人数和识别时不一样"))
-    warnings: list[str] = []
-    people = [_video_person(p, [], warnings) for p in req.people]
-    face_hooks = _video_face(people, warnings, analyze_frames=False)
-    result = video.build_clip(raw, people, req.smooth, _video_retarget, _video_camera, face_hooks, geometry_of=_video_geometry)
-    _clip_warnings(result, face_hooks, warnings)
-    return result
+    return raw
+
+
+class EditFrameRequest(ClipRequest):
+    person: int = 0
+    frame: int = 0
+    pose: str | None = None    # capture：Brio 读回的姿势（用户改过）
+    shown: str | None = None   # capture：播放器在这一帧写给角色的姿势
+    group: str | None = None   # pose：复制哪组骨骼（edits.GROUPS），缺省全身
+
+
+def _edit_frame(raw, req: EditFrameRequest, with_edits: bool):
+    """某人某帧的重定向结果（with_edits：带上时间轴修正），以及骨架的骨骼名 / 父骨骼、能修正的骨骼。"""
+    from scipy.spatial.transform import Rotation as R
+
+    from . import edits
+    from .retarget.ffxiv import helper_rules, helper_scale_rules, load_ffxiv_skeleton
+
+    people = _clip_people(raw, req, [])
+    if not 0 <= req.person < len(people) or not 0 <= req.frame < len(raw.times):
+        raise HTTPException(400, tr("人或帧超出范围"))
+    human = raw.human(req.person, req.frame)
+    if human is None:
+        raise HTTPException(409, tr("这一帧没识别到这个人"))
+    spec = people[req.person]
+    upright = R.from_quat(raw.upright[req.frame])
+    frame_edits = edits.at(spec.edits, req.frame / raw.fps) if with_edits and spec.edits else None
+    rt = _video_retarget(human, raw.image_size, spec, upright, frame_edits)
+    sk = load_ffxiv_skeleton(spec.race)
+    driven = {r.helper for r in helper_rules(spec.race)} | {r.helper for r in helper_scale_rules(spec.race)}
+    allowed = {n for n in rt.bones if not n.startswith("j_f_") and n not in driven}
+    return rt, sk.names, [int(p) for p in sk.parents], allowed
+
+
+def _pose_rotations(text: str) -> dict[str, np.ndarray]:
+    try:
+        pose = BrioPose.loads(text)
+    except Exception:
+        raise HTTPException(400, tr("姿势 JSON 解析失败"))
+    return {n: t.rotation for n in pose.bone_names if (t := pose.get(n)) is not None}
+
+
+@app.post("/raws/{rid}/edits/capture")
+def raw_edit_capture(rid: str, req: EditFrameRequest) -> dict:
+    """时间轴修正：用户暂停在第 frame 帧、在 Brio 里改了骨骼 → 这一帧的关键帧（delta，相对不含修正的原动作）。
+    返回 {bones：骨骼名 → 四元数, changed：改了哪些骨骼}；没改时 bones 为空。"""
+    from . import edits
+
+    if not req.pose or not req.shown:
+        raise HTTPException(400, tr("要给 Brio 读回的姿势和播放器写的姿势"))
+    raw = _raw(rid)
+    rt, names, parents, allowed = _edit_frame(raw, req, with_edits=False)
+    bones = edits.capture(names, parents, allowed, rt.all_rotations, _pose_rotations(req.shown), _pose_rotations(req.pose))
+    return {"bones": {k: np.round(v, 7).tolist() for k, v in bones.items()}, "changed": sorted(bones)}
+
+
+@app.post("/raws/{rid}/edits/pose")
+def raw_edit_pose(rid: str, req: EditFrameRequest) -> dict:
+    """复制骨骼姿势：第 frame 帧（带上已有的修正）这组骨骼相对父骨骼的朝向，粘贴成 pose 关键帧用。"""
+    from . import edits
+
+    group = edits.GROUPS.get(req.group or "body")
+    if group is None:
+        raise HTTPException(400, tr("没有这个骨骼组：{group}", group=req.group))
+    raw = _raw(rid)
+    rt, names, parents, allowed = _edit_frame(raw, req, with_edits=True)
+    bones = edits.locals_of(names, parents, rt.all_rotations, sorted(n for n in allowed if group(n)))
+    return {"bones": {k: np.round(v, 7).tolist() for k, v in bones.items()}}
 
 
 @app.get("/races")

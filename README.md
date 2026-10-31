@@ -46,6 +46,7 @@ Posegraph plugin (in game, ImGui)  ── HTTP (127.0.0.1) ──►  Posegraph 
 - **Keep Brio edits in the library**: bones you change in Brio after applying become this image's correction in one click.
 - **Lighting**: 11 one-click lighting setups plus "Match the photo" (estimates the key light and colors from the photo), placed around the character and camera with full-body coverage, saved with gallery images, and a separate 3D window for adjusting each light and adding effects.
 - **Framing and screenshots**: framing guide, guides, equivalent full-frame focal length, photo overlay, one-click screenshots of the game's own render.
+- **Video motion (beta)**: recognizes the motion, expressions and camera movement of a video frame by frame and plays it in GPose (camera-following or walking through the scene, several camera styles); several people at once; timeline corrections (keep bones changed in Brio as keyframes, copy and paste them to other frames); music in sync and recording to video.
 - **Export** Brio `.pose` files.
 - **Low-VRAM friendly**: Auto / GPU / CPU modes, the model is unloaded right after each recognition by default,
   and CPU mode uses no VRAM at all.
@@ -170,7 +171,8 @@ merged into the second, and the IVCS icon in the status bar turns yellow.
   sink into the belly in high-knee poses.
 - Very strong elbow flexion creases more than in-game animations (~145° vs ~130°).
 - Jumping / airborne images are pulled to the ground unless *Snap to ground* is turned off.
-- Several people in one image (merge mode) is still being polished and is off in this version; video is reserved in the UI but not implemented. The whole image is treated as one person.
+- Several people in one image (merge mode) is still being polished and is off in this version; the whole image is treated as one person (videos can have several people).
+- Video: fingers come straight from the recognition model and are often wrong for small or blurry hands - fix them with timeline corrections; for videos with cuts, select one continuous shot; motion and expressions get worse when the person is small in the frame.
 - Facial expressions: sticking out the tongue isn't possible; a one-eyed wink and a squinting smile are sometimes confused; faces in illustrations are rarely found.
 - The CPU mode speed depends heavily on the CPU (measured ~10 s per image on a 20-thread laptop CPU).
 

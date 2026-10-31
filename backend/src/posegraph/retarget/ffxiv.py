@@ -562,7 +562,7 @@ def retarget(joint_global_rots: np.ndarray, joint_coords_cam: np.ndarray | None 
              upright_max_deg: float = UPRIGHT_MAX_DEG, helper_strength: float = 1.0,
              rest_vertices: np.ndarray | None = None, reference_lengths: bool = True,
              ivcs: bool = True, upright_override: R | None = None, root_rotation: tuple[float, float, float] = (0.0, 0.0, 0.0),
-             root_offset: tuple[float, float, float] = (0.0, 0.0, 0.0)) -> RetargetResult:
+             root_offset: tuple[float, float, float] = (0.0, 0.0, 0.0), edits: dict | None = None) -> RetargetResult:
     """joint_global_rots: (127,3,3) SAM 3D Body 输出 pred_global_rots；
     joint_coords_cam: (127,3) pred_joint_coords（相机系，仅用于自检）；
     rest_coords / rest_rots: 该人物体型下的零姿态（缺省用平均体型 mhr_rest.json，骨段方向会有几度系统误差）；
@@ -582,6 +582,7 @@ def retarget(joint_global_rots: np.ndarray, joint_coords_cam: np.ndarray | None 
     neck_scale: 颈部幅度，按比例缩放颈 j_kubi、头 j_kao 相对上一级的转动（方向不变）。
     插画的头颈比例经过夸张，识别模型容易把头颈角度估大，可调到 0.5 左右；
     amplitude: 骨骼名 → 幅度（同 neck_scale 的做法，可用于任意骨骼，>1 放大）；与 neck_scale 同时给出时以它为准；
+    edits: 视频时间轴修正（edits.at 的结果：骨骼名 → edits.BoneEdit），相对父骨骼，在手动偏移之后、辅助骨之前施加；
     offsets: 骨骼名 → 手动偏移（度，绕模型系 x/y/z 轴，按 x→y→z 顺序），整棵子树一起转，在末端补偿之后、辅助骨之前施加；
     hand_strength / hand_near / hand_far: 手部末端补偿的强度与生效距离；upright_max_deg: 重力校正角上限；
     helper_strength: 辅助骨联动强度（1 为游戏采样拟合值）；
@@ -663,6 +664,11 @@ def retarget(joint_global_rots: np.ndarray, joint_coords_cam: np.ndarray | None 
         for j in _subtree(sk, i):
             if G_new[j] is not None:
                 G_new[j] = rw * G_new[j]
+        G, P = forward_kinematics(sk, G_new)
+    if edits:
+        from ..edits import apply as apply_edits
+
+        apply_edits(sk.parents, {n: i for i, n in enumerate(sk.names)}, G, G_new, edits, lambda i: _subtree(sk, i))
         G, P = forward_kinematics(sk, G_new)
     if not ivcs:
         # 第三节超出"随第二节刚性转动"的部分（模型系），一半加到第二节：第二节就大致指向第二、三节合起来的方向，

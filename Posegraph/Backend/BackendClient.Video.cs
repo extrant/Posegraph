@@ -83,6 +83,29 @@ public sealed partial class BackendClient
         return await resp.Content.ReadAsStringAsync();
     }
 
+    /// <summary>只重算第 first~last 帧的骨骼（改了时间轴修正后），返回这几帧和骨骼列表。</summary>
+    public async Task<ClipFrames> RebuildFramesAsync(string rawId, ClipRebuildRequest request, int first, int last)
+    {
+        using var resp = await _http.PostAsJsonAsync(Url($"/raws/{rawId}/clip"), request with { Frames = [first, last] }, Json);
+        return (await ReadAsync<ClipFrames>(resp))!;
+    }
+
+    /// <summary>暂停在第 frame 帧时用户在 Brio 里改了骨骼：pose 是读回的姿势、shown 是播放器写的那一帧 → 这一帧的修正（delta）。</summary>
+    public async Task<EditBones> CaptureEditAsync(string rawId, ClipRebuildRequest request, int person, int frame, string pose, string shown)
+    {
+        using var resp = await _http.PostAsJsonAsync(Url($"/raws/{rawId}/edits/capture"),
+            new EditFrameRequest(request.People, request.Smooth, person, frame, pose, shown, null), Json);
+        return (await ReadAsync<EditBones>(resp))!;
+    }
+
+    /// <summary>复制骨骼姿势：第 frame 帧（带上已有修正）这组骨骼（edits.GROUPS）相对父骨骼的朝向。</summary>
+    public async Task<EditBones> PoseEditAsync(string rawId, ClipRebuildRequest request, int person, int frame, string group)
+    {
+        using var resp = await _http.PostAsJsonAsync(Url($"/raws/{rawId}/edits/pose"),
+            new EditFrameRequest(request.People, request.Smooth, person, frame, null, null, group), Json);
+        return (await ReadAsync<EditBones>(resp))!;
+    }
+
     /// <summary>播放时放的音乐：path（原视频或音频文件）从 start 到 end 秒（原视频时间），按速度变速、按音量缩放的 WAV。</summary>
     public async Task<byte[]> AudioWavAsync(string path, double start, double end, float speed, float volume)
     {
@@ -129,11 +152,38 @@ public sealed record RawInfo(string RawId, int Frames, int People, int[] Faces);
 public sealed record ClipRebuildPerson(
     [property: System.Text.Json.Serialization.JsonPropertyName("race")] string? Race,
     [property: System.Text.Json.Serialization.JsonPropertyName("reference")] string? Reference,
-    [property: System.Text.Json.Serialization.JsonPropertyName("params")] RetargetParams Params);
+    [property: System.Text.Json.Serialization.JsonPropertyName("params")] RetargetParams Params)
+{
+    /// <summary>这个人的时间轴修正（Clip.Edits 里 Person 是他的）。</summary>
+    [System.Text.Json.Serialization.JsonPropertyName("edits")] public List<Posegraph.Video.ClipKey> Edits { get; init; } = [];
+}
 
 public sealed record ClipRebuildRequest(
     [property: System.Text.Json.Serialization.JsonPropertyName("people")] ClipRebuildPerson[] People,
-    [property: System.Text.Json.Serialization.JsonPropertyName("smooth")] double Smooth);
+    [property: System.Text.Json.Serialization.JsonPropertyName("smooth")] double Smooth)
+{
+    /// <summary>[first, last]：只重算这几帧（RebuildFramesAsync 设）。</summary>
+    [System.Text.Json.Serialization.JsonPropertyName("frames")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public int[]? Frames { get; init; }
+}
+
+public sealed record EditFrameRequest(
+    [property: System.Text.Json.Serialization.JsonPropertyName("people")] ClipRebuildPerson[] People,
+    [property: System.Text.Json.Serialization.JsonPropertyName("smooth")] double Smooth,
+    [property: System.Text.Json.Serialization.JsonPropertyName("person")] int Person,
+    [property: System.Text.Json.Serialization.JsonPropertyName("frame")] int Frame,
+    [property: System.Text.Json.Serialization.JsonPropertyName("pose")] string? Pose,
+    [property: System.Text.Json.Serialization.JsonPropertyName("shown")] string? Shown,
+    [property: System.Text.Json.Serialization.JsonPropertyName("group")] string? Group);
+
+/// <summary>只重算一段的结果：Range = [first, last]，People[p] 的骨骼列表和这几帧（每帧 骨骼数 × 10）。</summary>
+public sealed record ClipFrames(int[] Range, ClipFramesPerson[] People);
+
+public sealed record ClipFramesPerson(string[] Bones, float[][] Frames);
+
+/// <summary>收进来的修正 / 复制的骨骼朝向：骨骼名 → 四元数 xyzw；Changed：改了哪些骨骼。</summary>
+public sealed record EditBones(Dictionary<string, float[]> Bones, string[]? Changed);
 
 public sealed record RenderInfo(string RenderId, int Width, int Height, string Codec, string? Music = null, string? Warning = null);
 

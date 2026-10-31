@@ -123,28 +123,7 @@ class CameraTracksTest(unittest.TestCase):
 
 
 class CameraSolveTest(unittest.TestCase):
-    def test_rotation_vs_translation(self):
-        rng = np.random.default_rng(0)
-        f = 500.0
-        K = np.array([[f, 0, 320], [0, f, 180], [0, 0, 1.0]])
-
-        def case(rot, t):
-            uv = np.c_[rng.uniform(20, 620, 400), rng.uniform(20, 340, 400)]
-            z = rng.uniform(2, 12, 400)
-            X = np.c_[(uv[:, 0] - 320) / f * z, (uv[:, 1] - 180) / f * z, z]
-            Y = rot.apply(X) + t
-            uv2 = np.c_[f * Y[:, 0] / Y[:, 2] + 320, f * Y[:, 1] / Y[:, 2] + 180] + rng.normal(0, 0.3, (400, 2))
-            t_try = motion._solve_translation(rot, X, uv2, K)
-            return np.median(motion._reproject(rot, np.zeros(3), X, uv2, K)), np.median(motion._reproject(rot, t_try, X, uv2, K)), t_try
-
-        e0, e1, _ = case(R.from_euler("y", np.radians(1.0)), np.zeros(3))
-        self.assertLess(e0, motion.PARALLAX_MIN_PX)        # 纯转动：不加平移
-        e0, e1, t = case(R.identity(), np.array([0.0, 0.0, 0.3]))
-        self.assertGreater(e0, motion.PARALLAX_MIN_PX)
-        self.assertLess(e1, motion.PARALLAX_GAIN * e0)     # 推镜头：加上平移误差明显变小
-        self.assertAlmostEqual(t[2], 0.3, delta=0.02)
-
-    def test_tracker_recovers_pan_without_depth(self):
+    def test_tracker_recovers_pan(self):
         import cv2
 
         rng = np.random.default_rng(1)
@@ -152,7 +131,7 @@ class CameraSolveTest(unittest.TestCase):
         base = cv2.cvtColor(base, cv2.COLOR_GRAY2RGB)
         f = 900.0
         K = np.array([[f, 0, 640], [0, f, 360], [0, 0, 1.0]])
-        tracker = motion.CameraTracker(None)
+        tracker = motion.CameraTracker()
         for k in range(6):
             rot = R.from_euler("y", np.radians(0.5 * k)).as_matrix()
             frame = cv2.warpPerspective(base, K @ rot.T @ np.linalg.inv(K), (1280, 720))
@@ -167,51 +146,23 @@ class CameraSolveTest(unittest.TestCase):
 
 
 class PersonOffsetTest(unittest.TestCase):
-    def test_side_by_side_and_depth_fix(self):
+    def test_side_by_side(self):
         n = 6
         geo = lambda p: motion.FrameGeometry(R.identity(), np.array(p, float), np.zeros(3), np.zeros(3), 1.0)
         main = [geo([0, 0, 5.0])] * n
         other = [geo([1, 0, 5.0])] * n
-        offset, both = motion.person_offsets(main, other, None, 10, 0)
+        offset, both = motion.person_offsets(main, other, 10, 0)
         self.assertTrue(both.all())
         np.testing.assert_allclose(offset[:, [0, 2, 3]], [[1, 0, 0]] * n, atol=1e-6)   # 相机系 x 向右 = 模型系 +x
-        # 场景深度说配角其实远 20%（SAM 把两人估成一样远）：沿视线往后挪
-        depth = np.array([[5.0] * n, [6.0] * n])
-        offset, _ = motion.person_offsets(main, other, depth, 10, 0)
-        np.testing.assert_allclose(offset[:, 0], 1.2, atol=1e-6)
-        np.testing.assert_allclose(offset[:, 2], -1.0, atol=1e-6)                    # 离镜头更远 = 模型系 -z
 
     def test_missing_frames_interpolated(self):
         geo = lambda p: motion.FrameGeometry(R.identity(), np.array(p, float), np.zeros(3), np.zeros(3), 1.0)
         main = [geo([0, 0, 5.0])] * 5
         other = [geo([0.1 * k, 0, 5.0]) for k in range(5)]
         other[2] = None
-        offset, both = motion.person_offsets(main, other, None, 10, 0)
+        offset, both = motion.person_offsets(main, other, 10, 0)
         self.assertFalse(both[2])
         self.assertAlmostEqual(offset[2, 0], 0.2, places=6)
-
-
-
-class GravityTest(unittest.TestCase):
-    def test_floor_seen_once_propagates_with_camera_turn(self):
-        n = 6
-        pitch = R.from_euler("x", np.radians(8))            # 镜头一开始往下俯 8°
-        steps = [[0, 0, 0, 1, 0, 0, 0]] + [list(R.from_euler("x", np.radians(1)).as_quat()) + [0, 0, 0]] * (n - 1)   # 之后每帧再俯 1°
-        cam = motion.CameraSteps(np.array(steps, float), np.r_[False, [True] * (n - 1)], "rotation")
-        up0 = pitch.apply([0, -1.0, 0])                       # 第 0 帧相机系里的「上」
-        quats, have = motion.gravity_upright({0: up0}, cam, None, n)
-        self.assertTrue(have.all())
-        for k in range(n):
-            cam_k = R.from_euler("x", np.radians(1 * k)) * pitch
-            up_k = cam_k.apply([0, -1.0, 0])
-            model_up = R.from_quat(quats[k]).apply(up_k * np.array([1, -1, -1.0]))
-            np.testing.assert_allclose(model_up, [0, 1, 0], atol=1e-6)
-
-    def test_segment_without_floor_untouched(self):
-        n = 4
-        breaks = np.array([False, False, True, False])
-        quats, have = motion.gravity_upright({0: np.array([0, -1.0, 0])}, None, breaks, n)
-        self.assertEqual(have.tolist(), [True, True, False, False])
 
 
 

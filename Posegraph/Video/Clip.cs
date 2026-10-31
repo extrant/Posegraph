@@ -59,6 +59,9 @@ public sealed class Clip
     /// <summary>镜头整体调整（meta.view；每个片段各存一份）。</summary>
     public ClipView View { get; set; } = ClipView.Default;
 
+    /// <summary>时间轴修正的关键帧（meta.edits），按时间排好。骨骼帧里已经带上了它们（后端生成时施加）。</summary>
+    public List<ClipKey> Edits { get; set; } = [];
+
     /// <summary>有走位和镜头轨道（新版后端识别 / 重算的）。</summary>
     public bool HasWalkTracks => Root.Length == FrameCount && FrameCount > 0 && Tracks.ContainsKey("original");
 
@@ -112,6 +115,7 @@ public sealed class Clip
             Smooth = (double?)root["smooth"] ?? 0.5,
             VideoPath = (string?)meta?["videoPath"],
             View = ClipView.FromJson(meta?["view"]),
+            Edits = (meta?["edits"] as JsonArray)?.Select(ClipKey.FromJson).OfType<ClipKey>().OrderBy(k => k.Time).ToList() ?? [],
             Root = walk,
             Tracks = tracks,
             Motion = motion,
@@ -158,7 +162,7 @@ public sealed class Clip
     /// raw：识别原始数据文件名（和片段同目录）。overwrite：同名就覆盖（重算），否则重名自动加编号。
     /// </summary>
     public static string Save(string resultJson, string baseName, string videoName, string? body, string? raw, bool overwrite,
-                              string? videoPath = null, ClipView? view = null)
+                              string? videoPath = null, ClipView? view = null, IReadOnlyList<ClipKey>? edits = null)
     {
         var root = JsonNode.Parse(resultJson)!.AsObject();
         var race = (string?)root["people"]?.AsArray().FirstOrDefault()?["race"];
@@ -169,6 +173,7 @@ public sealed class Clip
             ["race"] = race, ["body"] = body, ["raw"] = raw, ["videoPath"] = videoPath,
         };
         if (view is not null && view != ClipView.Default) root["meta"]!["view"] = view.ToJson();
+        if (edits is { Count: > 0 }) root["meta"]!["edits"] = new JsonArray(edits.Select(k => (JsonNode)k.ToJson()).ToArray());
         Directory.CreateDirectory(Folder);
         var path = System.IO.Path.Combine(Folder, SafeName(name) + ".pgclip");
         if (!overwrite) path = Library.ImageLibrary.Unique(path);
@@ -183,6 +188,31 @@ public sealed class Clip
         if (root["meta"] is not JsonObject meta) root["meta"] = meta = new JsonObject();
         if (view == ClipView.Default) meta.Remove("view");
         else meta["view"] = view.ToJson();
+        var temp = path + ".tmp";
+        File.WriteAllText(temp, root.ToJsonString());
+        File.Move(temp, path, true);
+    }
+
+    /// <summary>
+    /// 时间轴修正改了以后写回片段文件：meta.edits 换成 edits，person 这个人从第 first 帧起的骨骼帧换成 frames
+    /// （后端只重算了受影响的那几帧）。先写临时文件再替换。骨骼列表和文件里的不一样时抛异常（调用方改走整段重算）。
+    /// </summary>
+    public static void SaveEdits(string path, IReadOnlyList<ClipKey> edits, int person = 0, int first = 0, float[][]? frames = null,
+                                 string[]? bones = null)
+    {
+        var root = JsonNode.Parse(File.ReadAllText(path))!.AsObject();
+        if (root["meta"] is not JsonObject meta) root["meta"] = meta = new JsonObject();
+        if (edits.Count == 0) meta.Remove("edits");
+        else meta["edits"] = new JsonArray(edits.Select(k => (JsonNode)k.ToJson()).ToArray());
+        if (frames is { Length: > 0 })
+        {
+            var p = root["people"]!.AsArray()[person]!;
+            var fileBones = p["bones"]!.AsArray().Select(b => (string)b!).ToArray();
+            if (bones is not null && !bones.SequenceEqual(fileBones)) throw new InvalidOperationException("bones changed");
+            var list = p["frames"]!.AsArray();
+            for (var i = 0; i < frames.Length && first + i < list.Count; i++)
+                list[first + i] = new JsonArray(frames[i].Select(v => (JsonNode)Math.Round(v, 6)).ToArray());
+        }
         var temp = path + ".tmp";
         File.WriteAllText(temp, root.ToJsonString());
         File.Move(temp, path, true);

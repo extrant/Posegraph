@@ -21,7 +21,7 @@ namespace Posegraph.UI;
 /// 第一版只认一个人、一个角色；视频里有切镜时只提示（截取一段连续镜头）。
 /// 片段可以录成视频（ClipRecorder：逐帧摆好再截游戏画面，后端编码成 mp4，存在 文档\Posegraph\Videos）。
 /// </summary>
-public sealed class VideoWindow : Window, IDisposable
+public sealed partial class VideoWindow : Window, IDisposable
 {
     private static readonly Vector4 Green = PosegraphTheme.Green;
     private static readonly Vector4 Yellow = PosegraphTheme.Yellow;
@@ -111,9 +111,29 @@ public sealed class VideoWindow : Window, IDisposable
             DrawRecognize();
         }
         ImGui.Separator();
+        SyncActors();
+        PollBrioEdits();
         DrawPlayer();
         if (_status.Length > 0) UiText.Fit(_status, _statusColor);
         WatchActorBody();
+    }
+
+    /// <summary>
+    /// 角色列表变了（重进 GPose、换场景、Brio 删了角色）后，选着的角色编号可能已经不存在：主角换成选中 / 第一个角色，
+    /// 配角不存在的清掉；和播放器手上的不一样就同步过去（不然播放器拿旧编号一直「找不到角色」）。录制、重算时不动。
+    /// </summary>
+    private void SyncActors()
+    {
+        if (_recorder.Running || _rebuilding) return;
+        var actors = _main.Actors;
+        bool Exists(int? index) => index is { } i && actors.Any(x => x.Index == i);
+        if (!Exists(_actor)) _actor = Exists(_main.SelectedActor) ? _main.SelectedActor : actors.Length > 0 ? actors[0].Index : null;
+        for (var i = 0; i < _extraActors.Count; i++)
+            if (!Exists(_extraActors[i]) || _extraActors[i] == _actor) _extraActors[i] = null;
+        if (_player.Clip is not { } clip || _actor is null) return;
+        FillExtraActors(clip.People.Length);
+        List<int?> want = [_actor, .. _extraActors.Take(clip.People.Length - 1)];
+        if (!want.SequenceEqual(_player.Actors)) _player.SetActors(want);
     }
 
     /// <summary>识别 / 重算参数里的表情部分（开关、强度、分项权重）。</summary>
@@ -188,9 +208,12 @@ public sealed class VideoWindow : Window, IDisposable
             }
             body ??= clip.People.Length > 1 ? await BodiesAsync(actors, clip.People.Length) : (await _main.ActorBodyAsync(actor))?.Body;
             var raw = await _main.Client.UploadRawAsync(await File.ReadAllBytesAsync(rawPath));
-            var json = await _main.Client.RebuildClipAsync(raw.RawId, new ClipRebuildRequest([.. people], clip.Smooth));
-            var path = Clip.Save(json, clip.BaseName, clip.Video, body, Path.GetFileName(rawPath), overwrite: true, clip.VideoPath, clip.View);
+            var request = new ClipRebuildRequest([.. people], clip.Smooth);
+            var json = await _main.Client.RebuildClipAsync(raw.RawId, RequestWithEdits(request, clip.Edits));
+            var path = Clip.Save(json, clip.BaseName, clip.Video, body, Path.GetFileName(rawPath), overwrite: true, clip.VideoPath, clip.View,
+                                 clip.Edits);
             var rebuilt = Clip.Load(path);
+            RememberEditContext(path, rebuilt.RawPath, request, raw.RawId);
             _player.Load(rebuilt, actors);
             _player.Seek(time);
             SetStatus(done + Loc.F("（{0}）", rebuilt.Name), Green);
@@ -574,6 +597,8 @@ public sealed class VideoWindow : Window, IDisposable
                 var path = Clip.Save(json, name, Path.GetFileName(_videoPath) ?? "", body, raw, overwrite: false, _videoPath);
                 var clip = Clip.Load(path);
                 _player.Load(clip, actors);
+                RememberEditContext(path, clip.RawPath,
+                                    new ClipRebuildRequest([.. people.Select(p => new ClipRebuildPerson(p.Race, p.Reference, p.Params))], _config.VideoSmooth));
                 var missing = clip.People.Sum(p => p.Missing.Count(m => m));
                 SetStatus(Loc.F("识别完成（{0:0} 秒），已存成片段 {1}{2}", job.Elapsed, Path.GetFileName(path),
                                 missing > 0 ? Loc.F("；{0} 帧没识别到人，用前后插值补上", missing) : ""), Green);
@@ -620,7 +645,15 @@ public sealed class VideoWindow : Window, IDisposable
             DrawExtraActors(clip.People.Length, apply: true);
         }
         if (!_main.InGpose) ImGui.TextColored(Yellow, Loc.T("进入 GPose 后才能播放"));
-        if (_player.Actor is null) ImGui.TextColored(Yellow, Loc.T("先在上面选一个游戏角色"));
+        if (_video is null)
+        {
+            // 只打开了片段（没载入视频）：识别区不显示，在这里选主角
+            ImGui.AlignTextToFramePadding();
+            ImGui.TextUnformatted(Loc.T("角色"));
+            ImGui.SameLine();
+            DrawActorCombo();
+        }
+        if (_player.Actor is null) ImGui.TextColored(Yellow, Loc.T("先选一个游戏角色（进 GPose 后才有）"));
 
         using var recording = ImRaii.Disabled(_recorder.Running);
         using (ImRaii.Disabled(!_main.InGpose || _player.Actor is null))
@@ -642,6 +675,7 @@ public sealed class VideoWindow : Window, IDisposable
             ImGui.SetNextItemWidth(-1);
             if (ImGui.SliderFloat("##clipTime", ref t, 0f, (float)clip.Duration, Loc.T("%.2f 秒"))) _player.Seek(t);
         }
+        if (_main.InGpose && _player.Actor is not null) DrawTimeline(clip);
 
         var loop = _player.Loop;
         if (ImGui.Checkbox(Loc.T("循环"), ref loop))
@@ -773,7 +807,7 @@ public sealed class VideoWindow : Window, IDisposable
             var how = m.Camera switch
             {
                 "depth" => Loc.T("推拉摇移都解出来了"),
-                "rotation" => Loc.T("只解出镜头转动（没装深度模型，推拉移按没动算）"),
+                "rotation" => Loc.T("只解出镜头转动（推拉移按没动算）"),
                 _ => Loc.T("没解出来，按固定机位算"),
             };
             var text = Loc.F("原视频镜头：{0}，可信 {1:P0}", how, m.Solved);

@@ -46,7 +46,6 @@ BOX_JUMP = 0.6            # 多人时框的高度和前后 BOX_WINDOW_SECONDS �
 BOX_WINDOW_SECONDS = 1.0
 APPEARANCE_KEEP = 0.9     # 外观模板的更新：每次可靠匹配后 新 = 0.9 × 旧 + 0.1 × 这一帧
 UPRIGHT_SIGMA_SECONDS = 1.5
-FLOOR_EVERY_SECONDS = 0.5   # 每隔这么久在深度图里找一次地面（重力方向按地面定，比按人的姿势估准：跳舞的人本来就会倾斜）
 FACE_MIN_SIGMA_SECONDS = 0.08   # 表情至少按这么宽的高斯平滑（眨眼约 0.1~0.15 秒，还留得住）
 FPS_CHOICES = (5, 10, 15, 30)
 
@@ -482,6 +481,7 @@ class PersonSpec:
     reference_lengths: bool = True
     ivcs: bool = True
     params: object | None = None      # tuning.RetargetParams
+    edits: list | None = None         # 时间轴修正的关键帧（edits.Key），片段生成时按帧插值施加
 
 
 @dataclass
@@ -509,7 +509,6 @@ class Raw:
     faces: list[list[FaceObs | None]]            # [人][帧]，没开表情 / 没找到脸为 None
     camera: object | None = None                 # motion.CameraSteps：原视频镜头每一步的运动（旧数据没有）
     breaks: np.ndarray | None = None             # (帧,) bool：这一帧是切镜（主角在画面里跳了位置）
-    scene_depth: np.ndarray | None = None        # (人, 帧) 每人根节点处的场景深度（MoGe 的米，没有为 nan），多人站位校正远近
 
     def human(self, p: int, k: int) -> dict | None:
         h = self.humans[p][k]
@@ -533,8 +532,6 @@ def raw_to_bytes(raw: Raw) -> bytes:
         meta["camMode"] = raw.camera.mode
     if raw.breaks is not None:
         arrays["breaks"] = np.asarray(raw.breaks, bool)
-    if raw.scene_depth is not None:
-        arrays["scene_depth"] = np.asarray(raw.scene_depth, np.float32)
     for p, frames in enumerate(raw.humans):
         valid = np.array([h is not None for h in frames])
         arrays[f"p{p}_valid"] = valid
@@ -591,9 +588,8 @@ def raw_from_bytes(data: bytes) -> Raw:
 
             camera = CameraSteps(z["cam_steps"].astype(np.float64), z["cam_ok"].astype(bool), str(meta.get("camMode", "none")))
         breaks = z["breaks"].astype(bool) if "breaks" in z else None
-        scene_depth = z["scene_depth"].astype(np.float64) if "scene_depth" in z else None
         return Raw(float(meta["fps"]), float(meta["start"]), list(meta["times"]), tuple(meta["imageSize"]), z["upright"].astype(np.float64),
-                   humans, rest, faces, camera, breaks, scene_depth)
+                   humans, rest, faces, camera, breaks)
 
 
 @dataclass
@@ -649,14 +645,14 @@ class Cancelled(Exception):
 
 def run_job(job: Job, info: VideoInfo, estimate: Callable, detect_people: Callable, retarget: Callable,
             camera_local: Callable, upright_of: Callable, face: FaceHooks | None = None,
-            depth_of: Callable | None = None, geometry_of: Callable | None = None) -> None:
+            geometry_of: Callable | None = None, hand_detect: Callable | None = None) -> None:
     """estimate(rgb, boxes) → EstimateResult；detect_people(rgb) → [框]；
     retarget(human, image_size, person_spec, upright) → RetargetResult；camera_local(human, rt) → dict；
     upright_of(human, image_size) → 四元数 xyzw 或 None（站姿重力校正，脚不在画面里 / 不是站姿时 None）；
-    face：表情（只对参数里开了 face 的人做），None 不做。depth_of(rgb) → depth.PhotoDepth 或 None（镜头解算用深度，
-    没有时只解转动）；geometry_of(human, rt) → motion.FrameGeometry（角色走位用，None 时片段不带走位）。
+    face：表情（只对参数里开了 face 的人做），None 不做；geometry_of(human, rt) → motion.FrameGeometry（角色走位用，None 时片段不带走位）；
+    hand_detect(rgb, human) → hands.detect 的结果（手指精修），None 不做。
     结果在 job.result，原始数据在 job.raw（换种族重算用）。"""
-    raw = recognize(job, info, estimate, detect_people, upright_of, face, depth_of)
+    raw = recognize(job, info, estimate, detect_people, upright_of, face, hand_detect)
     job.raw = raw
     job.state, job.done = "retargeting", 0
 
@@ -671,9 +667,9 @@ def run_job(job: Job, info: VideoInfo, estimate: Callable, detect_people: Callab
 
 
 def recognize(job: Job, info: VideoInfo, estimate: Callable, detect_people: Callable, upright_of: Callable,
-              face: FaceHooks | None = None, depth_of: Callable | None = None) -> Raw:
-    """1~3 步：找人跟踪、逐帧识别（+ 面捕）、镜头运动解算、重力校正平滑。和种族无关，结果存成 Raw。"""
-    from .motion import FLOOR_ENOUGH, FLOOR_RETURN_DEG, CameraTracker, floor_up, gravity_upright
+              face: FaceHooks | None = None, hand_detect: Callable | None = None) -> Raw:
+    """1~3 步：找人跟踪、逐帧识别（+ 面捕、手指精修）、镜头运动解算、重力校正平滑。和种族无关，结果存成 Raw。"""
+    from .motion import CameraTracker
 
     spec = job.spec
     times = sample_times(spec.start, spec.end, spec.fps)
@@ -720,66 +716,49 @@ def recognize(job: Job, info: VideoInfo, estimate: Callable, detect_people: Call
     faces: list[list[FaceObs | None]] = [[None] * n for _ in range(people)]
     rest: list[np.ndarray | None] = [None] * people
     want_face = [face is not None and bool(getattr(p.params, "face", False)) for p in spec.people]
+    hand_found: list[list[dict | None]] = [[None] * n for _ in range(people)]
     uprights = np.full((n, 4), np.nan)
-    tracker = CameraTracker(depth_of)
-    scene_depth = np.full((people, n), np.nan)
-    floors: dict[int, np.ndarray] = {}
-    floor_every = max(1, round(FLOOR_EVERY_SECONDS * spec.fps))
-    floor_hits, turned = 0, 0.0   # 这个镜头里找到地面的次数、上次找到后镜头转了多少度
+    tracker = CameraTracker()
     for k, rgb in iter_frames(info, times, stop):
         present = [p for p in range(people) if boxes[k][p] is not None]
-        focal, root_cam = None, None
-        roots: dict[int, np.ndarray] = {}
-        feet: list = []
+        focal = None
         if present:
             result = estimate(rgb, np.array([boxes[k][p] for p in present], dtype=np.float32))
             for p, h in zip(present, result.humans):
                 human = _human_dict(h, result.image_size)
-                if human.get("keypoints_2d") is not None:
-                    feet += np.asarray(human["keypoints_2d"], float)[[13, 14, 15, 17, 18, 20], :2].tolist()   # MHR70：踝、大脚趾、脚跟
-                if people > 1 and human.get("keypoints_2d") is not None:
-                    kp = np.asarray(human["keypoints_2d"], float)[:, :2]
-                    roots[p] = np.vstack([kp[[5, 6, 9, 10]], kp[[5, 6, 9, 10]].mean(axis=0, keepdims=True),
-                                          (kp[[5, 6]].mean(axis=0) + kp[[9, 10]].mean(axis=0) * 2)[None] / 3])   # MHR70：5、6 肩，9、10 髋；加躯干中心、偏下
                 if p == 0 or focal is None:
                     focal = float(human["focal_length"])
-                if p == 0:
-                    root_cam = np.asarray(human["cam_t"], float) + np.asarray(human["joint_coords"], float).mean(axis=0)
                 if p == 0 and (u := upright_of(human, result.image_size)) is not None:
                     uprights[k] = u
                 if rest[p] is None and human.get("rest_vertices") is not None:
                     rest[p] = np.asarray(human["rest_vertices"], dtype=np.float32)
                 if want_face[p]:
                     faces[p][k] = face.analyze(rgb, human, result.image_size)
+                if hand_detect is not None:
+                    hand_found[p][k] = hand_detect(rgb, human)
                 humans[p][k] = {key: human[key] for key in HUMAN_KEYS}
         exclude = list(detections[k]) + [b for b in boxes[k] if b is not None]
         try:
-            for p, d in (tracker.add(rgb, exclude, focal, root_cam, roots if people > 1 else None) or {}).items():
-                scene_depth[p, k] = d
-            if breaks[k]:
-                floor_hits, turned = 0, 0.0
-            turned += getattr(tracker, "last_turn", 0.0)
-            if k % floor_every == 0 and feet and (floor_hits < FLOOR_ENOUGH or turned > FLOOR_RETURN_DEG):
-                if (up := floor_up(getattr(tracker, "last_depth", None), exclude, np.array(feet), (info.width, info.height))) is not None:
-                    floors[k] = up
-                    floor_hits, turned = floor_hits + 1, 0.0
-        except Exception:   # 镜头解算、找地面只是锦上添花：出错就当这一帧没解出来
+            tracker.add(rgb, exclude, focal)
+        except Exception:   # 镜头解算只是锦上添花：出错就当这一帧没解出来
             tracker = _FailedTracker(tracker, n)
         job.done = k + 1
     check()
 
-    # 3. 重力校正（全员共用）：按地面定的段用地面；一次地面都没找到的镜头，按主角站姿估、时间上重度平滑
+    if hand_detect is not None:
+        from .hands import refine_track
+
+        for p in range(people):
+            humans[p] = refine_track(humans[p], hand_found[p], spec.fps)
+
+    # 3. 重力校正（全员共用）：按主角站姿估、时间上重度平滑
     camera = tracker.result()
     valid = ~np.isnan(uprights[:, 0])
     if valid.any():
         upright = smooth_quats(fill_gaps(np.where(valid[:, None], uprights, 0), valid), UPRIGHT_SIGMA_SECONDS * spec.fps)
     else:
         upright = np.tile([0.0, 0.0, 0.0, 1.0], (n, 1))
-    if floors:
-        by_floor, have = gravity_upright(floors, camera, breaks, n)
-        upright[have] = smooth_quats(np.where(have[:, None], by_floor, upright), 0.3 * spec.fps)[have]
-    return Raw(spec.fps, spec.start, times, (info.width, info.height), upright, humans, rest, faces, camera, breaks,
-               scene_depth if people > 1 else None)
+    return Raw(spec.fps, spec.start, times, (info.width, info.height), upright, humans, rest, faces, camera, breaks)
 
 
 class _FailedTracker:
@@ -789,8 +768,8 @@ class _FailedTracker:
         self._tracker = tracker
         self._n = n
 
-    def add(self, *args, **kwargs) -> dict:
-        return {}
+    def add(self, *args, **kwargs) -> None:
+        pass
 
     def result(self):
         from .motion import CameraSteps
@@ -805,9 +784,15 @@ class _FailedTracker:
 
 def build_clip(raw: Raw, people: list[PersonSpec], smooth_amount: float, retarget: Callable, camera_local: Callable,
                face: FaceHooks | None = None, progress: Callable[[int], None] = lambda k: None,
-               check: Callable[[], None] = lambda: None, geometry_of: Callable | None = None) -> dict:
+               check: Callable[[], None] = lambda: None, geometry_of: Callable | None = None,
+               frame_range: tuple[int, int] | None = None) -> dict:
     """4~6 步：逐帧重定向、镜头、表情，时间平滑，出片段。people 的种族 / 骨长 / 参数可以和识别时不同（换种族重算）。
-    geometry_of 给了时另出主角的走位和三条镜头轨道（motion.world_tracks）。"""
+    geometry_of 给了时另出主角的走位和三条镜头轨道（motion.world_tracks）。people 带时间轴修正（edits）时，
+    每帧按 edits.at 插值后交给 retarget(…, edits=…)。
+    frame_range=(a, b)：只重算第 a~b 帧的骨骼（改了时间轴修正后用），前后多算平滑核那么宽，结果和整段重算一样；
+    返回 {"range": [a, b], "people": [{"bones", "frames"}]}，镜头、走位不算。"""
+    from . import edits as edit_keys
+
     n = len(raw.times)
     count = min(len(people), len(raw.humans))
     upright_seq = [R.from_quat(q) for q in raw.upright]
@@ -821,13 +806,24 @@ def build_clip(raw: Raw, people: list[PersonSpec], smooth_amount: float, retarge
     face_locals: list[list[tuple | None]] = [[None] * n for _ in range(count)]
     geos: list = [None] * n
     person_geos: list[list] = [[None] * n for _ in range(count)]   # 每个人每帧的几何（多人站位用）
-    for k in range(n):
+    sigma = float(np.clip(smooth_amount, 0, 1)) * 0.12 * raw.fps   # 最多 0.12 秒的高斯
+    window = range(n)
+    if frame_range is not None:
+        first, last = max(0, frame_range[0]), min(n - 1, frame_range[1])
+        margin = len(_gaussian(max(sigma, FACE_MIN_SIGMA_SECONDS * raw.fps))) // 2 + 1
+        window = range(max(0, first - margin), min(n, last + margin + 1))
+    for k in window:
         check()
         for p in range(count):
             human = raw.human(p, k)
             if human is None:
                 continue
-            rt = retarget(human, raw.image_size, people[p], upright_seq[k])
+            keys = people[p].edits
+            frame_edits = edit_keys.at(keys, k / raw.fps) if keys else None
+            if frame_edits:
+                rt = retarget(human, raw.image_size, people[p], upright_seq[k], edits=frame_edits)
+            else:
+                rt = retarget(human, raw.image_size, people[p], upright_seq[k])
             if names[p] is None:
                 names[p] = list(rt.bones)
                 frames[p] = np.zeros((n, len(names[p]), 10))
@@ -836,6 +832,10 @@ def build_clip(raw: Raw, people: list[PersonSpec], smooth_amount: float, retarge
                     pos, q, sc = rt.bones[name]
                     frames[p][k, b] = np.r_[pos, q, sc]
             valid_frames[p, k] = True
+            if frame_range is not None:
+                if want_face[p] and raw.faces[p][k] is not None:
+                    face_locals[p][k] = face.solve(p, raw.faces[p][k])
+                continue
             if p == 0:
                 cams[k] = camera_local(human, rt)
             if geometry_of is not None and (p == 0 or count > 1):
@@ -846,8 +846,10 @@ def build_clip(raw: Raw, people: list[PersonSpec], smooth_amount: float, retarge
                 face_locals[p][k] = face.solve(p, raw.faces[p][k])
         progress(k + 1)
 
+    if frame_range is not None:
+        return _clip_window(raw, people, face, names, frames, valid_frames, face_locals, want_face, sigma, window, (first, last))
+
     # 5~6. 表情挂到头上，平滑
-    sigma = float(np.clip(smooth_amount, 0, 1)) * 0.12 * raw.fps   # 最多 0.12 秒的高斯
     face_frames = [0] * count
     for p in range(count):
         if names[p] is None or "j_kao" not in names[p]:
@@ -871,8 +873,7 @@ def build_clip(raw: Raw, people: list[PersonSpec], smooth_amount: float, retarge
         for p in range(1, count):
             if not clip_people[p]["bones"]:
                 continue
-            depth = raw.scene_depth[[0, p]] if raw.scene_depth is not None and len(raw.scene_depth) > p else None
-            offset, together = person_offsets(person_geos[0], person_geos[p], depth, raw.fps, sigma)
+            offset, together = person_offsets(person_geos[0], person_geos[p], raw.fps, sigma)
             clip_people[p]["offset"] = np.round(offset, 5).tolist()
             clip_people[p]["together"] = int(together.sum())
     camera = smooth_camera(cams, sigma * 1.5)
@@ -904,6 +905,26 @@ def build_clip(raw: Raw, people: list[PersonSpec], smooth_amount: float, retarge
             person["offset"] = np.round(offset, 5).tolist()
             person["footSlide"] = [round(before, 3), round(after, 3)]
     return result
+
+
+def _clip_window(raw: Raw, people: list[PersonSpec], face: FaceHooks | None, names: list, frames: list, valid: np.ndarray,
+                 face_locals: list, want_face: list[bool], sigma: float, window: range, keep: tuple[int, int]) -> dict:
+    """build_clip 只算一段时：在窗口里挂表情、平滑，只交回第 keep 段的帧。"""
+    w = slice(window.start, window.stop)
+    a, b = keep[0] - window.start, keep[1] - window.start + 1
+    out = []
+    for p in range(len(names)):
+        if names[p] is None:
+            out.append({"bones": [], "frames": []})
+            continue
+        fr, bones = frames[p][w], names[p]
+        if want_face[p] and "j_kao" in bones:
+            added = _add_face(face, p, face_locals[p][w], fr, bones, valid[p][w], max(sigma, FACE_MIN_SIGMA_SECONDS * raw.fps))
+            if added is not None:
+                fr, bones, _ = added
+        sm = smooth_frames(fr, valid[p][w], sigma)[a:b]
+        out.append({"bones": bones, "frames": np.round(sm.reshape(len(sm), -1), 6).tolist(), "race": people[p].race})
+    return {"range": list(keep), "people": out}
 
 
 def _add_face(face: FaceHooks | None, person: int, locals_: list[tuple | None], frames: np.ndarray, names: list[str],

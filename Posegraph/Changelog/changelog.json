@@ -5,6 +5,36 @@
   },
   "entries": [
     {
+      "version": "0.7.0",
+      "date": "2026-11-01",
+      "title": {
+        "zh": "视频动作：逐帧识别视频，在游戏里播放、修正、录制",
+        "en": "Video motion: recognize a video frame by frame, then play, correct and record it in game"
+      },
+      "items": {
+        "zh": [
+          "视频动作识别（测试）：工具栏的胶片按钮打开视频窗口。载入视频，拖到某一帧点「找人」再点选人物，选起止时间和帧率（5 / 10 / 15 / 30 帧每秒），后端逐帧识别动作、表情和原视频镜头的运动，存成片段（文档\\Posegraph\\Clips），在 GPose 里逐帧播放。识别时可以关掉窗口，完成后自动载入",
+          "两种镜头：「跟拍」角色原地不动，镜头按原视频的构图移动；「走动」角色按视频在场景里走（脚踩着地不打滑），机位可选原运镜、固定机位、平滑跟拍、定点摇镜，原视频镜头拍不到人的几段可以换成自动镜头",
+          "镜头整体调整：推近、变焦、上下左右平移、环绕、俯仰、侧倾，自动镜头的跟踪点（头 / 胸 / 腰 / 全身）和「全身入画」，每个片段各存一份",
+          "多人同场：画面上多选几个人（先点的是主角），每人配一个游戏角色，按视频里的站位一起播放，双人舞、拥抱、对练都行；抱紧时被挡住的人也跟得住",
+          "时间轴修正：暂停后在 Brio 里拖骨骼，点「收进修正」就成了这一帧的关键帧，前后按影响范围自动过渡（渐入渐出，或保持到下一个关键帧）；可以复制某个关键帧的改动，或当前帧一组骨骼的姿势（比如一只手的手势），贴到别的帧或一段区间；能撤销。改完只重算受影响的那几帧",
+          "播放时同步放原视频（或同名音频文件）的音乐，音乐当时钟不卡不重；片段可以逐帧录成视频，可配音乐",
+          "换种族、改体型自动重算：片段旁边存着识别原始数据，播放的角色种族或体型变了就按新骨架重算骨骼、站位、镜头和表情，不用重新识别",
+          "修复：灯光跟随角色时左右摇摆；重进 GPose 后视频播放器找不到角色"
+        ],
+        "en": [
+          "Video motion recognition (beta): the film button on the toolbar opens the video window. Load a video, scrub to a frame, click \"Find people\" and pick someone, choose the start, end and frame rate (5 / 10 / 15 / 30 fps); the backend recognizes the motion, facial expressions and the original camera movement frame by frame and saves a clip (Documents\\Posegraph\\Clips) that plays frame by frame in GPose. You can close the window while it works; the clip loads when it's done",
+          "Two camera modes: \"Follow\" keeps the character in place and moves the camera with the video's framing; \"Walk\" moves the character through the scene like in the video (feet stay planted), with original camera, fixed, smooth follow or pan shots, and an automatic camera for the parts where the original camera loses the person",
+          "Overall camera adjustments: dolly, zoom, shift, orbit, tilt and roll, plus the auto camera's tracking point (head / chest / hips / whole body) and \"Fit whole body\", saved per clip",
+          "Several people: pick several people in the frame (the first one is the lead), give each a game character, and they play together at the video's positions - couple dances, hugs, sparring; people hidden in a hug are kept track of",
+          "Timeline corrections: pause, move bones in Brio and click \"Keep as correction\" to make a keyframe on that frame; neighbouring frames blend by its range (ease in and out, or hold to the next keyframe). Copy a keyframe's change, or a bone group's pose on the current frame (for example a hand gesture), and paste it to another frame or a range; undo is available. Only the affected frames are rebuilt",
+          "Music from the video (or an audio file with the same name) plays along, with the music as the clock so it never stutters or repeats; clips can be recorded to video frame by frame, with music",
+          "Automatic rebuild for another race or body: the recognition data is kept next to the clip, so when the playing character's race or body changes the bones, positions, camera and expressions are rebuilt for the new skeleton without recognizing again",
+          "Fixes: lights swaying left and right while following the character; the video player losing the character after re-entering GPose"
+        ]
+      }
+    },
+    {
       "version": "0.6.0",
       "date": "2026-10-29",
       "title": {

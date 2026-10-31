@@ -23,17 +23,18 @@
 |---|---|---|---|
 | `posegraph-face-1.zip` | 约 64MB | 面捕（面部表情、头部跟脸） | [GitHub](https://github.com/extrant/Posegraph/releases/download/backend-components-1/posegraph-face-1.zip) |
 | `posegraph-depth-1.zip` | 约 400MB | 深度图（镜头焦距、地面） | [GitHub](https://github.com/extrant/Posegraph/releases/download/backend-components-1/posegraph-depth-1.zip) |
-| `Posegraph-0.5.0.zip` | 约 5MB | 后端代码 | [GitHub](https://github.com/extrant/Posegraph/archive/refs/tags/v0.5.0.zip) |
+| `posegraph-audio-2.zip` | 约 70MB | 音频（视频播放、录制时放音乐，0.7.0 起） | [GitHub](https://github.com/extrant/Posegraph/releases/download/backend-components-2/posegraph-audio-2.zip) |
+| `Posegraph-0.7.0.zip` | 约 5MB | 后端代码 | [GitHub](https://github.com/extrant/Posegraph/archive/refs/tags/v0.7.0.zip) |
 
-- 两个组件都在 [backend-components-1](https://github.com/extrant/Posegraph/releases/tag/backend-components-1) 页面；后端代码在
-  [v0.5.0](https://github.com/extrant/Posegraph/releases/tag/v0.5.0) 页面最下面的 **Source code (zip)**。
+- 面捕、深度图在 [backend-components-1](https://github.com/extrant/Posegraph/releases/tag/backend-components-1) 页面，音频在 [backend-components-2](https://github.com/extrant/Posegraph/releases/tag/backend-components-2) 页面；后端代码在
+  [v0.7.0](https://github.com/extrant/Posegraph/releases/tag/v0.7.0) 页面最下面的 **Source code (zip)**。
 - GitHub 打不开时，可以在链接前面加加速前缀再打开，例如 `https://gh-proxy.org/https://github.com/extrant/Posegraph/releases/download/backend-components-1/posegraph-face-1.zip`。
 - 组件只装一次：以后的版本只要组件没变，就不用再下。
 - 只能联网更新代码、组件下载不动时：只手动装组件（第 2 步），然后回插件里点「更新后端」，它会跳过已经装好的组件，只下载约 5MB 的代码。
 
 ## 2. 解压组件
 
-两个组件的做法一样，以 `posegraph-face-1.zip` 为例。压缩包里是 `python` 和 `backend` 两个文件夹，
+每个组件的做法一样，以 `posegraph-face-1.zip` 为例。压缩包里是 `python` 和 `backend` 两个文件夹（音频组件只有 `python`），
 要让它们**和一键包里的同名文件夹合并**。
 
 **用 Windows 自带的解压（右键「全部解压缩」）：**
@@ -61,17 +62,17 @@
 
 ## 3. 换后端代码
 
-1. 解压 `Posegraph-0.5.0.zip`（解压到哪里都行，比如桌面）。
+1. 解压 `Posegraph-0.7.0.zip`（解压到哪里都行，比如桌面）。
 2. 打开一键包文件夹里的 `backend`，把里面原来的 `src` 文件夹**改名**为 `src.old`（留作备份，确认新版能用后可以删掉）。
-3. 打开刚解压出来的 `Posegraph-0.5.0\backend`，把里面的 `src` 文件夹**复制**到一键包的 `backend` 文件夹里。
+3. 打开刚解压出来的 `Posegraph-0.7.0\backend`，把里面的 `src` 文件夹**复制**到一键包的 `backend` 文件夹里。
 
-完成后应该是：`D:\Posegraph-Backend\backend\src\posegraph\version.json` 里写着 `"version": "0.5.0"`。
+完成后应该是：`D:\Posegraph-Backend\backend\src\posegraph\version.json` 里写着 `"version": "0.7.0"`。
 
 ## 4. 检查
 
 回到游戏，插件 **设置** 页：
 
-- 显示「后端版本 0.5.0，插件 v0.5.0」和 **已是最新**，就全部装好了。
+- 显示「后端版本 0.7.0，插件 v0.7.0」和 **已是最新**，就全部装好了。
 - 还显示「还缺组件：…」：对应的组件没解压到位，回第 2 步看那几个文件在不在。
 - 还显示可更新：第 3 步的 `src` 没换对，看 `version.json` 里的版本号。
 
@@ -96,8 +97,9 @@
 |---|---|
 | `posegraph-face-1.zip` | `ac62fb58b2a7600f73c48f08811e6bd15a47f1104fb8dd1f00b9f6fd24604721` |
 | `posegraph-depth-1.zip` | `23e387d0008c7065fd5573d7b7fec8b28ca7997a899fff4efb4e1eabd80b03bf` |
+| `posegraph-audio-2.zip` | `91e63c7c0d97fca103b499437d57cc93246828cc5305732a6356e3a6f3fee378` |
 
-对不上就不要用，重新下载。后端代码 `Posegraph-0.5.0.zip` 每次从 GitHub 下载时会重新打包，没有固定的校验值，建议自己从 GitHub 下载。
+对不上就不要用，重新下载。后端代码 `Posegraph-0.7.0.zip` 每次从 GitHub 下载时会重新打包，没有固定的校验值，建议自己从 GitHub 下载。
 
 另一种省事的办法：把核对过的组件压缩包放进一键包文件夹下的 `.download` 文件夹（没有就新建），改名为 `face.zip` / `depth.zip`，
 再在插件里点「更新后端」。插件会先检查这里的文件，校验对得上就直接安装、不再下载（这时只需要能连上 GitHub 下载约 5MB 的代码）。

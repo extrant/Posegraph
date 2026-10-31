@@ -392,6 +392,31 @@ class JobTest(unittest.TestCase):
             self.assertAlmostEqual(f[11], 1.7, delta=0.001)                  # j_kao 的高度跟着新骨架
             self.assertAlmostEqual(f[20], 0.002 * k, delta=0.0005)           # 新的表情权重
 
+            # 只重算一段（改时间轴修正后用）：和整段重算的同几帧一样
+            cam = lambda human, rt: {"position": [0, 1, 3], "forward": [0, 0, -1], "up": [0, 1, 0], "fovY": 40.0}
+            part = video.build_clip(raw, spec2, 0.3, retarget_taller, cam, strong, frame_range=(5, 9))
+            self.assertEqual(part["range"], [5, 9])
+            self.assertEqual(part["people"][0]["bones"], p2["bones"])
+            np.testing.assert_allclose(part["people"][0]["frames"], p2["frames"][5:10], atol=1e-5)
+
+            # 时间轴修正：第 1.0 秒（第 10 帧）的关键帧，前后 0.3 秒渐入渐出，交给 retarget(…, edits=…)
+            def retarget_edits(human, image_size, person, upright, edits=None):
+                rt = retarget(human, image_size, person, upright)
+                w = edits["j_kao"].w if edits and "j_kao" in edits else 0.0
+                pos, q, sc = rt.bones["j_kao"]
+                rt.bones["j_kao"] = (pos + [w, 0, 0], q, sc)
+                return rt
+
+            from posegraph import edits
+            key = edits.Key(1.0, {"j_kao": np.array([0, 0, 0, 1.0])}, ease=0.3)
+            spec3 = [video.PersonSpec([10, 0, 40, 40], "c0201", params=params, edits=[key])]
+            edited = video.build_clip(raw, spec3, 0.0, retarget_edits, cam, strong)["people"][0]["frames"]
+            x = [f[10] for f in edited]
+            self.assertAlmostEqual(x[10], 1.0, places=6)
+            self.assertAlmostEqual(x[6], 0.0, places=6)
+            self.assertAlmostEqual(x[9], 1.0, places=6)                     # 离关键帧 0.1 秒：还在完全按修正的那一段
+            self.assertTrue(0 < x[8] < 1)
+
     def test_cancel(self):
         with tempfile.TemporaryDirectory() as d:
             path = Path(d) / "d.avi"

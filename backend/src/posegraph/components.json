@@ -1,5 +1,5 @@
 {
-  "tag": "backend-components-1",
+  "tag": "backend-components-2",
   "components": [
     {
       "id": "face",
@@ -24,6 +24,17 @@
       "url": "https://github.com/extrant/Posegraph/releases/download/backend-components-1/posegraph-depth-1.zip",
       "size": 419807657,
       "sha256": "23e387d0008c7065fd5573d7b7fec8b28ca7997a899fff4efb4e1eabd80b03bf"
+    },
+    {
+      "id": "audio",
+      "name": "音频（视频播放、录制时放音乐）",
+      "nameEn": "Audio (music for video playback and recording)",
+      "check": [
+        "python/Lib/site-packages/av/__init__.py"
+      ],
+      "url": "https://github.com/extrant/Posegraph/releases/download/backend-components-2/posegraph-audio-2.zip",
+      "size": 73754999,
+      "sha256": "91e63c7c0d97fca103b499437d57cc93246828cc5305732a6356e3a6f3fee378"
     }
   ]
 }

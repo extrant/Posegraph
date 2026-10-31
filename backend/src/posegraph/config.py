@@ -24,6 +24,8 @@ class Settings:
     detector_dir: Path = field(default_factory=lambda: Path(_env("DETECTOR_DIR", str(SERVICE_ROOT / "checkpoints" / "detectors"))))
     # 面捕模型（MediaPipe Face Landmarker，见 face.py）
     face_model: Path = field(default_factory=lambda: Path(_env("FACE_MODEL", str(SERVICE_ROOT / "checkpoints" / "face" / "face_landmarker.task"))))
+    # 手部关键点模型（MediaPipe Hand Landmarker，见 hands.py）：SAM 估错的手指按它重算
+    hand_model: Path = field(default_factory=lambda: Path(_env("HAND_MODEL", str(SERVICE_ROOT / "checkpoints" / "hand" / "hand_landmarker.task"))))
     # 插件 /posegraph facedump 导出的游戏表情动画（见 face_rig.py）；插件启动后端时传准确路径（文档文件夹可能被移动过）
     face_dump_dir: Path = field(default_factory=lambda: Path(_env("FACE_DUMP", str(Path.home() / "Documents" / "Posegraph" / "FaceDump"))))
     # 深度模型（MoGe-2，合并模式的镜头 / 遮罩 / 远近 / 地面，见 depth.py）
@@ -47,6 +49,9 @@ class Settings:
     backbone_scale: float = field(default_factory=lambda: float(_env("BACKBONE_SCALE", "1")))
     # 深度步（MoGe，见 depth.py）：镜头焦距、多人按深度修遮罩和远近、找地面扶正。装了 MoGe 才生效
     use_depth: bool = field(default_factory=lambda: _env("USE_DEPTH", "1") == "1")
+    # 手指精修（实验，默认关）：装了手部关键点模型时，认得出的手按它重算手指（hands.py）。2026-11-01 实测不够稳，
+    # 先用 SAM 自带的手指，不准的地方用户在时间轴上手动修正；POSEGRAPH_HAND_REFINE=1 打开
+    hand_refine: bool = field(default_factory=lambda: _env("HAND_REFINE", "0") == "1")
     # 批量识别并行数（实验，见 parallel_batch.py）：1 不并行；2–8 时只有插件标了 parallel 的批量请求共享一份模型并行
     recognition_parallelism: int = field(default_factory=lambda: min(8, max(1, int(_env("RECOGNITION_PARALLELISM", "1")))))
     # 总开关：设为 1 时完全不用共享模型并行（出问题时临时关闭，所有识别走原串行）

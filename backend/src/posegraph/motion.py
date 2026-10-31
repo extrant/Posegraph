@@ -1,10 +1,8 @@
 """视频里谁在动：解算原视频镜头的运动，分出角色在场景里的走位，再给走动模式配镜头。
 
 识别时（和种族无关，存进 Raw）：
-- CameraTracker：逐采样帧在背景上找角点（框掉画面里所有人），用光流跟到下一帧。
-  有深度（MoGe）时按这一帧的深度把角点变成 3D，和下一帧的 2D 位置解 PnP，得到镜头的转动 + 平移；
-  没有深度时按单应矩阵只解转动（摇镜头、俯仰、手持晃动）。深度按「人的 cam_t ÷ 这里的深度」换到 SAM 的尺度。
-  跟丢（切镜、叠化、背景太单调）的那一步标成不可用，片段生成时在那里分段
+- CameraTracker：逐采样帧在背景上找角点（框掉画面里所有人），用光流跟到下一帧，按单应矩阵只解转动
+  （摇镜头、俯仰、手持晃动；推拉移按没动算，不用深度图）。跟丢（切镜、叠化、背景太单调）的那一步标成不可用，片段生成时在那里分段
 
 片段生成时（build_clip 调 world_tracks，按种族骨长）：
 - 角色走位 root：第 k 帧角色的模型系 → 第一帧角色的模型系 = 把「相机 k 系 → 模型 k 系」和镜头运动串起来，
@@ -31,10 +29,7 @@ MAX_CORNERS = 600
 MIN_INLIERS = 25            # 一步至少这么多内点才信
 MIN_INLIER_SHARE = 0.35     # 且内点占跟上的点至少这么多
 MAX_STEP_DEG = 25.0         # 一步（采样间隔）里镜头最多转这么多，再多当解错了
-MAX_STEP_METERS = 1.5       # 一步里镜头最多平移这么多（SAM 尺度，米）
 PERSON_MARGIN = 0.12        # 人物框往外扩这么多再框掉（衣摆、头发、影子）
-PARALLAX_MIN_PX = 0.4       # 只按转动解时重投影误差中位数（缩小图像素）超过这么多，才考虑镜头有平移…
-PARALLAX_GAIN = 0.7         # …且加上平移后误差降到这么多倍以下
 
 FOOT_LOW = 0.08             # 脚离这附近最低处不到这么高（米）…
 FOOT_STILL = 0.5            # …且水平速度低于这么多（米/秒）算踩着地（人离镜头的远近每帧有十几厘米的识别抖动）
@@ -64,30 +59,23 @@ PAN_FOV_RANGE = (8.0, 60.0) # 定点摇镜的视角范围（度）
 @dataclass
 class CameraSteps:
     """镜头解算结果：steps[k] = 第 k-1 帧相机系 → 第 k 帧相机系的刚体变换（四元数 xyzw + 平移，SAM 尺度），
-    ok[k] = 这一步可信（ok[0] 恒为 False）；mode：depth（转动 + 平移）/ rotation（只有转动）/ none。"""
+    ok[k] = 这一步可信（ok[0] 恒为 False）；mode：rotation（只有转动）/ none；旧数据还可能是 depth（转动 + 平移）。"""
     steps: np.ndarray       # (帧, 7)
     ok: np.ndarray          # (帧,) bool
     mode: str
 
 
 class CameraTracker:
-    """逐帧喂 add()，最后 result()。depth_of(rgb) → depth.PhotoDepth 或 None（没装深度模型）。"""
+    """逐帧喂 add()，最后 result()。"""
 
-    def __init__(self, depth_of=None):
-        self._depth_of = depth_of
-        self._prev = None            # (灰度图, 角点 (n,2) 缩小后像素, 3D (n,3) 或 None)
+    def __init__(self):
+        self._prev = None            # (灰度图, 角点 (n,2) 缩小后像素)
         self._steps: list[np.ndarray] = []
         self._ok: list[bool] = []
-        self._ratios: list[float] = []
         self._focal: float | None = None   # 解算用的焦距（第一帧定下，原图像素）
-        self._depth_used = False
-        self.last_depth = None             # 最近一帧的深度（depth.PhotoDepth），找地面用
-        self.last_turn = 0.0
 
-    def add(self, rgb: np.ndarray, exclude: list, focal: float | None, root_cam: np.ndarray | None = None,
-            roots: dict[int, np.ndarray] | None = None) -> dict[int, float]:
-        """exclude：这一帧所有人物框（原图像素）；focal：SAM 的焦距（没有深度时用）；root_cam：主角根节点在相机系的位置（深度换尺度）。
-        roots：每个人（序号 → 躯干关键点的原图像素 (k, 2)）；返回每个人躯干处的场景深度（MoGe 的米，没深度时为空），多人站位按它校正远近。"""
+    def add(self, rgb: np.ndarray, exclude: list, focal: float | None) -> None:
+        """exclude：这一帧所有人物框（原图像素）；focal：SAM 的焦距。"""
         import cv2
 
         h, w = rgb.shape[:2]
@@ -98,9 +86,8 @@ class CameraTracker:
             x1, y1, x2, y2 = b
             mx, my = (x2 - x1) * PERSON_MARGIN, (y2 - y1) * PERSON_MARGIN
             cv2.rectangle(mask, (int((x1 - mx) * s), int((y1 - my) * s)), (int((x2 + mx) * s), int((y2 + my) * s)), 0, -1)
-        depth = self._depth_of(rgb) if self._depth_of is not None else None
         if self._focal is None:
-            self._focal = float(depth.focal) if depth is not None else float(focal or max(w, h))
+            self._focal = float(focal or max(w, h))
         f = self._focal * s
         K = np.array([[f, 0, gray.shape[1] / 2], [0, f, gray.shape[0] / 2], [0, 0, 1]])
 
@@ -108,37 +95,16 @@ class CameraTracker:
         if self._prev is not None:
             ok, step = self._solve(self._prev, gray, K)
         self._steps.append(step)
-        self.last_turn = float(np.degrees(R.from_quat(step[:4]).magnitude())) if ok else 0.0   # 这一步镜头转了多少度
         self._ok.append(ok)
 
         pts = cv2.goodFeaturesToTrack(gray, MAX_CORNERS, 0.01, 8, mask=mask)
         pts = np.zeros((0, 2), np.float32) if pts is None else pts.reshape(-1, 2)
-        p3 = None
-        if depth is not None and len(pts):
-            self._depth_used = True
-            dh, dw = depth.depth.shape
-            u = np.clip((pts[:, 0] / s * dw / w).astype(int), 0, dw - 1)
-            v = np.clip((pts[:, 1] / s * dh / h).astype(int), 0, dh - 1)
-            z = depth.depth[v, u]
-            good = depth.valid[v, u] & np.isfinite(z) & (z > 0)
-            pts, z = pts[good], z[good]
-            p3 = np.c_[(pts[:, 0] - K[0, 2]) / f * z, (pts[:, 1] - K[1, 2]) / f * z, z]
-            if root_cam is not None and root_cam[2] > 0 and focal:
-                # 人在画面上的位置按 SAM 自己的焦距投影；这里的深度 × 比例 = SAM 的距离
-                ru = int(np.clip(focal * root_cam[0] / root_cam[2] + w / 2, 0, w - 1) * dw / w)
-                rv = int(np.clip(focal * root_cam[1] / root_cam[2] + h / 2, 0, h - 1) * dh / h)
-                patch = depth.depth[max(0, rv - 3):rv + 4, max(0, ru - 3):ru + 4]
-                patch = patch[np.isfinite(patch) & (patch > 0)]
-                if len(patch):
-                    self._ratios.append(float(root_cam[2] / np.median(patch)))
-        self._prev = (gray, pts.astype(np.float32), p3)
-        self.last_depth = depth
-        return {p: d for p, r in (roots or {}).items() if depth is not None and (d := _depth_at(depth, r, w, h)) is not None}
+        self._prev = (gray, pts.astype(np.float32))
 
     def _solve(self, prev, gray, K):
         import cv2
 
-        g0, p0, p3 = prev
+        g0, p0 = prev
         identity = np.r_[0, 0, 0, 1, 0, 0, 0].astype(float)
         if len(p0) < MIN_INLIERS:
             return False, identity
@@ -148,7 +114,7 @@ class CameraTracker:
         if good.sum() < MIN_INLIERS:
             return False, identity
         a, b = p0[good], p1[good]
-        # 先按「只转不移」解（单应矩阵 → 转动）：远处背景接近一个平面时，转动和平移很难分开，摇镜头最常见
+        # 按「只转不移」解（单应矩阵 → 转动）：远处背景接近一个平面时，转动和平移本来就很难分开，摇镜头最常见
         H, inl = cv2.findHomography(a, b, cv2.RANSAC, 2.0)
         if H is None or inl is None or inl.sum() < max(MIN_INLIERS, MIN_INLIER_SHARE * len(a)):
             return False, identity
@@ -156,75 +122,16 @@ class CameraTracker:
         Rm = u @ vt
         if np.linalg.det(Rm) < 0:
             return False, identity
-        rot, t = R.from_matrix(Rm), np.zeros(3)
-        if p3 is not None:
-            # 有深度时再看要不要平移：近处、远处的点移动得不一样（视差）才算镜头在走，平移要让重投影误差明显变小
-            X = p3[good].astype(np.float64)
-            t_try = _solve_translation(rot, X, b, K)
-            e0, e1 = _reproject(rot, np.zeros(3), X, b, K), _reproject(rot, t_try, X, b, K)
-            if np.median(e0) > PARALLAX_MIN_PX and np.median(e1) < PARALLAX_GAIN * np.median(e0):
-                keep = e1 < 3.0
-                if keep.sum() >= MIN_INLIERS:
-                    rvec, tvec = cv2.solvePnPRefineLM(X[keep], b[keep].astype(np.float64), K, None,
-                                                      rot.as_rotvec().reshape(3, 1), t_try.reshape(3, 1))
-                    rot, t = R.from_rotvec(rvec.ravel()), tvec.ravel()
+        rot = R.from_matrix(Rm)
         if np.degrees(rot.magnitude()) > MAX_STEP_DEG:
             return False, identity
-        return True, np.r_[rot.as_quat(), t]
+        return True, np.r_[rot.as_quat(), np.zeros(3)]
 
     def result(self) -> CameraSteps:
         steps = np.array(self._steps, float).reshape(-1, 7)
         ok = np.array(self._ok, bool)
-        mode = "depth" if self._depth_used else ("rotation" if ok.any() else "none")
-        if len(self._ratios) and mode == "depth":
-            steps[:, 4:7] *= float(np.median(self._ratios))   # 深度的米 → SAM 的米
-        too_far = np.linalg.norm(steps[:, 4:7], axis=1) > MAX_STEP_METERS
-        ok &= ~too_far
         steps[~ok] = [0, 0, 0, 1, 0, 0, 0]
-        return CameraSteps(steps, ok, mode)
-
-
-def _reproject(rot: R, t: np.ndarray, X: np.ndarray, uv: np.ndarray, K: np.ndarray) -> np.ndarray:
-    Y = rot.apply(X) + t
-    z = np.clip(Y[:, 2], 1e-6, None)
-    proj = np.c_[K[0, 0] * Y[:, 0] / z + K[0, 2], K[1, 1] * Y[:, 1] / z + K[1, 2]]
-    return np.linalg.norm(proj - uv, axis=1)
-
-
-def _solve_translation(rot: R, X: np.ndarray, uv: np.ndarray, K: np.ndarray) -> np.ndarray:
-    """转动定了，按 (u - cx)(r3·X + tz) = fx (r1·X + tx) 这类线性方程解平移（Huber 加权迭代三次）。"""
-    Y = rot.apply(X)
-    du, dv = uv[:, 0] - K[0, 2], uv[:, 1] - K[1, 2]
-    f = K[0, 0]
-    A = np.zeros((2 * len(X), 3))
-    rhs = np.zeros(2 * len(X))
-    A[0::2, 0], A[0::2, 2], rhs[0::2] = f, -du, du * Y[:, 2] - f * Y[:, 0]
-    A[1::2, 1], A[1::2, 2], rhs[1::2] = f, -dv, dv * Y[:, 2] - f * Y[:, 1]
-    w = np.ones(len(rhs))
-    t = np.zeros(3)
-    for _ in range(3):
-        t, *_ = np.linalg.lstsq(A * w[:, None], rhs * w, rcond=None)
-        r = np.abs(A @ t - rhs) / np.clip(np.repeat(Y[:, 2] + t[2], 2), 1e-3, None)
-        w = 1.0 / np.sqrt(np.maximum(1.0, r / 2.0))
-    return t
-
-
-TORSO_DEPTH_PERCENTILE = 25   # 躯干几个点的深度取偏近的一端：人在画面里小时有的点会漏到背后的墙上（背景总比人远）
-
-
-def _depth_at(depth, points: np.ndarray, w: int, h: int) -> float | None:
-    """躯干关键点（原图像素）处的场景深度：每点 3×3 中位数，再取 TORSO_DEPTH_PERCENTILE 分位（MoGe 的米）；都在画面外时 None。"""
-    dh, dw = depth.depth.shape
-    values = []
-    for x, y in np.asarray(points, float).reshape(-1, 2):
-        if not (0 <= x < w and 0 <= y < h):
-            continue
-        u, v = int(x * dw / w), int(y * dh / h)
-        patch = depth.depth[max(0, v - 1):v + 2, max(0, u - 1):u + 2]
-        patch = patch[np.isfinite(patch) & (patch > 0)]
-        if len(patch):
-            values.append(float(np.median(patch)))
-    return float(np.percentile(values, TORSO_DEPTH_PERCENTILE)) if len(values) >= 2 else None
+        return CameraSteps(steps, ok, "rotation" if ok.any() else "none")
 
 
 # ---------------------------------------------------------------- 角色走位、镜头轨道
@@ -687,105 +594,13 @@ def partner_steps(raw, person: int, root: np.ndarray, offset: np.ndarray, feet: 
     return out, before, after
 
 
-FLOOR_MAX_TILT_DEG = 35.0    # 看不到脚时：地面法线和镜头「上」最多差这么多（再斜多半是墙、台面）
-FLOOR_MIN_SHARE_NO_FEET = 0.05   # 且至少占画面这么多
-FLOOR_LOW_ROWS = 0.55        # 且这块面的点大多在画面下面（行号中位数在这个比例以下）
-FLOOR_ITERS = 150            # 视频里每次找地面的拟合轮数、采样点数（照片用 400 / 60000；视频要找很多次，地面又大，少一些够用）
-FLOOR_SAMPLES = 20000
-FLOOR_ENOUGH = 3             # 同一个镜头里找到这么多次地面就够了…
-FLOOR_RETURN_DEG = 5.0       # …除非镜头又转了这么多度（摇镜头后地面在画面里的样子变了）
-
-
-def floor_up(depth, boxes: list, feet: np.ndarray, size: tuple[int, int]) -> np.ndarray | None:
-    """这一帧深度图里的地面，返回「上」方向（相机系，y 朝下所以 y < 0）；找不到 None。
-    看得到脚时找脚踩着的那块面（depth.find_floor）；脚不在画面里（近景、半身）时，取人下方、面积最大、接近水平的平面。
-    boxes：所有人物框（原图像素，框掉不算地面）；feet：脚踝、脚尖、脚跟的原图像素 (k, 2)；size：原图 (宽, 高)。"""
-    from .depth import find_floor
-
-    if depth is None:
-        return None
-    feet = np.asarray(feet, float).reshape(-1, 2)
-    if not ((feet[:, 0] >= 0) & (feet[:, 0] < size[0]) & (feet[:, 1] >= 0) & (feet[:, 1] < size[1])).sum() >= 2:
-        return _floor_without_feet(depth, boxes, size)
-    dh, dw = depth.depth.shape
-    sx, sy = dw / size[0], dh / size[1]
-    people = np.zeros((max(1, len(boxes)), dh, dw), bool)
-    for i, (x1, y1, x2, y2) in enumerate(boxes):
-        people[i, max(0, int(y1 * sy)):int(y2 * sy) + 1, max(0, int(x1 * sx)):int(x2 * sx) + 1] = True
-    pix = [(int(np.clip(x * sx, 0, dw - 1)), int(np.clip(y * sy, 0, dh - 1))) for x, y in np.asarray(feet).reshape(-1, 2)
-           if 0 <= x < size[0] and 0 <= y < size[1]]
-    found = find_floor(depth, people, pix, iters=FLOOR_ITERS, samples=FLOOR_SAMPLES)
-    if found is None:
-        return None
-    n = np.asarray(found[0], float)
-    return n if n[1] < 0 else -n
-
-
-def _floor_without_feet(depth, boxes: list, size: tuple[int, int]) -> np.ndarray | None:
-    from .depth import _planes
-
-    dh, dw = depth.depth.shape
-    sx, sy = dw / size[0], dh / size[1]
-    keep = depth.valid & np.isfinite(depth.points).all(-1)
-    for x1, y1, x2, y2 in boxes:
-        keep[max(0, int(y1 * sy)):int(y2 * sy) + 1, max(0, int(x1 * sx)):int(x2 * sx) + 1] = False
-    rows = np.nonzero(keep)[0]
-    pts = depth.points[keep]
-    if len(pts) < 500:
-        return None
-    rng = np.random.default_rng(0)
-    pick = rng.choice(len(pts), min(len(pts), FLOOR_SAMPLES), replace=False)
-    sample, sample_rows = pts[pick], rows[pick]
-    up = np.array([0.0, -1.0, 0.0])
-    best = None
-    for n, d, k in _planes(sample, up, 4, FLOOR_ITERS, 0.03, rng):
-        near = np.abs(sample @ n + d) < 0.03 * np.maximum(1, sample[:, 2] / 3)
-        share = k / len(sample) * keep.sum() / (dh * dw)
-        tilt = np.degrees(np.arccos(np.clip(n @ up, -1, 1)))
-        low = np.median(sample_rows[near]) / dh if near.any() else 0.0
-        if tilt <= FLOOR_MAX_TILT_DEG and share >= FLOOR_MIN_SHARE_NO_FEET and low >= FLOOR_LOW_ROWS and (best is None or share > best[0]):
-            best = (share, n)
-    if best is None:
-        return None
-    n = np.asarray(best[1], float)
-    return n if n[1] < 0 else -n
-
-
-def gravity_upright(floor: dict[int, np.ndarray], cam: CameraSteps | None, breaks: np.ndarray | None, n: int) -> tuple[np.ndarray, np.ndarray]:
-    """按地面定每帧的重力校正（四元数 xyzw，和身体估的 upright 同一个意思：相机系翻成模型系后转到 y 朝上）。
-    floor：第 k 帧找到的地面「上」方向（相机系）。同一个镜头（两次切镜之间）里，各帧的观测用镜头解算的转动换到段首相机系
-    取中位数，再换回每一帧——镜头在转、地面只在少数几帧看得见也能用。返回 (四元数 (帧, 4), 这一帧有没有按地面定)。"""
-    steps = cam.steps if cam is not None else np.tile([0, 0, 0, 1, 0, 0, 0], (n, 1)).astype(float)
-    out = np.tile([0.0, 0.0, 0.0, 1.0], (n, 1))
-    have = np.zeros(n, bool)
-    starts = [0] + [k for k in range(1, n) if breaks is not None and breaks[k]] + [n]
-    for a, b in zip(starts[:-1], starts[1:]):
-        rot = [R.identity()]
-        for k in range(a + 1, b):
-            rot.append(rot[-1] * R.from_quat(steps[k, :4]).inv())   # 第 k 帧相机系 → 段首相机系
-        obs = [rot[k - a].apply(floor[k]) for k in range(a, b) if k in floor]
-        if not obs:
-            continue
-        g = np.median(np.array(obs), axis=0)
-        g /= max(np.linalg.norm(g), 1e-9)
-        for k in range(a, b):
-            up_cam = rot[k - a].inv().apply(g)
-            out[k] = R.align_vectors([[0.0, 1.0, 0.0]], [up_cam * _FLIP])[0].as_quat()
-            have[k] = True
-    return out, have
-
-
 PERSON_SIGMA_SECONDS = 0.3   # 配角站位的平滑（各人远近是分别估的，有抖动）
 PERSON_MEDIAN_SECONDS = 0.35 # 平滑前先按前后这么多秒取中值，去掉单帧跳变
-DEPTH_FIX_SIGMA_SECONDS = 1.0
-DEPTH_FIX_RANGE = (0.5, 2.0)
 
 
-def person_offsets(main: list, other: list, scene_depth: np.ndarray | None, fps: float, sigma: float) -> tuple[np.ndarray, np.ndarray]:
+def person_offsets(main: list, other: list, fps: float, sigma: float) -> tuple[np.ndarray, np.ndarray]:
     """配角每帧相对主角的站位：配角模型系 → 主角模型系（同一帧、同一台相机），只留水平位置和转向：(帧, 4) [x, 0, z, yaw]。
-    main / other：每帧的 FrameGeometry（没识别到为 None）；scene_depth：(2, 帧) 两人根节点处的场景深度（MoGe），
-    SAM 对每个人的远近是分别估的，两人前后差常有几十厘米：按场景深度之比把配角沿视线挪到对的远近（主角不动）。
-    返回 (站位, 两人都识别到的帧)。"""
+    main / other：每帧的 FrameGeometry（没识别到为 None）。返回 (站位, 两人都识别到的帧)。"""
     from .video import fill_gaps, smooth
 
     n = len(main)
@@ -793,26 +608,9 @@ def person_offsets(main: list, other: list, scene_depth: np.ndarray | None, fps:
     out = np.zeros((n, 4))
     if not both.any():
         return out, both
-    # 远近校正：配角该在的深度 / SAM 估的深度 = (场景深度比) / (SAM 深度比)
-    fix = np.full(n, np.nan)
-    if scene_depth is not None:
-        for k in np.flatnonzero(both):
-            d0, d1 = scene_depth[0, k], scene_depth[1, k]
-            z0, z1 = main[k].origin_cam()[2], other[k].origin_cam()[2]
-            if np.isfinite(d0) and np.isfinite(d1) and d0 > 0 and z0 > 0 and z1 > 0:
-                fix[k] = (d1 / d0) / (z1 / z0)
-    have = np.isfinite(fix)
-    if have.any():
-        # 先按 DEPTH_FIX_SIGMA_SECONDS 的窗口取中值去掉跳变（某几帧取到了别人或背景），再平滑
-        filled = fill_gaps(np.where(have, fix, 1.0), have)
-        win = max(1, round(DEPTH_FIX_SIGMA_SECONDS * fps))
-        filled = np.array([np.median(filled[max(0, k - win):k + win + 1]) for k in range(n)])
-        fix = np.clip(smooth(filled, DEPTH_FIX_SIGMA_SECONDS * fps), *DEPTH_FIX_RANGE)
-    else:
-        fix = np.ones(n)
     for k in np.flatnonzero(both):
         g0, g1 = main[k], other[k]
-        o = g0.to_model(g1.origin_cam() * fix[k])
+        o = g0.to_model(g1.origin_cam())
         rel = g0.rot_to_model() * g1.rot_to_model().inv()
         out[k] = [o[0], 0.0, o[2], _yaw_of(rel)]
     # 先中值滤波去掉单帧跳变（某一帧检测框跳到别处、两人认反），再平滑

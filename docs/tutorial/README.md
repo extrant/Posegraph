@@ -44,8 +44,9 @@ The UI screenshots are made with the [offline screenshot tool](../../tools/UiPre
 13. [Keeping Brio edits in the library](#13-keeping-brio-edits-in-the-library)
 14. [Lighting](#14-lighting)
 15. [Framing and screenshots](#15-framing-and-screenshots)
-16. [Updates](#16-updates)
-17. [FAQ](#17-faq)
+16. [Video motion (beta)](#16-video-motion-beta)
+17. [Updates](#17-updates)
+18. [FAQ](#18-faq)
 
 ---
 
@@ -271,7 +272,54 @@ The crop button in the second toolbar row.
 - In GPose it shows and sets the **equivalent full-frame focal length** (the 35 mm, 85 mm photographers talk about).
 - **Screenshot** captures the game's own render inside the frame, saved to Documents\Posegraph\Screenshots by default; the button next to it opens the folder.
 
-## 16. Updates
+## 16. Video motion (beta)
+
+Recognize the motion in a video frame by frame and play it in GPose like an animation, then correct it or record it to video. The film button in the second toolbar row opens the video window.
+
+**Recognize**
+
+1. "Open video…" (mp4 / mov / webm / mkv / avi). The first 10 seconds are selected by default: scrub to where you want and click "Set start" / "Set end".
+2. Scrub to a frame where the person is clear, click "Find people" and click the person in the frame. For couple dances, hugs or sparring you can **pick several**: the first one is the lead, then choose a game character for each.
+3. Pick the "Frame rate": 5 / 10 fps is enough for slow motion, use 15 / 30 for fast dancing. "Smoothing" removes frame-to-frame jitter; too much makes fast moves sluggish.
+   Tick "Expression" to capture the face frame by frame (more conservative than for photos).
+4. "Recognize". The backend works through the frames (about half a second per frame on GPU, so a one-minute video at 10 fps takes about 5 minutes). You can close the window; the clip is saved and loaded when it's done.
+   Clips are saved in Documents\Posegraph\Clips; open them again with "Open clip…".
+
+**Play**
+
+- Enter GPose, choose the character and press play. "Music" plays the video's music (or an audio file with the same name in the same folder) in sync.
+- **Follow**: the character stays in place and the camera moves with the video's framing every frame - handheld and tracking shots look closest to the original.
+- **Walk**: the character moves through the scene like in the video, feet planted. "Shot" offers Original camera, Fixed camera, Smooth follow or Fixed-point pan;
+  "When the actor is off screen" can replace the parts where the original camera looks away with an automatic camera.
+- **Camera adjustments**: dolly, zoom, shift, orbit, tilt and roll; the "Tracking point" sets whether the automatic camera aims at the head, chest, hips or whole body; "Keep whole body in frame" keeps raised hands and kicks in frame.
+  Saved per clip.
+- When the playing character's race or body changes (Glamourer), the clip is rebuilt for the new skeleton automatically, without recognizing again.
+- "Save current frame to Brio pose library" saves the frame on screen as a Brio pose.
+
+**Timeline corrections**
+
+Fix what recognition got wrong (fingers especially) by hand; corrections are saved in the clip and kept when rebuilding for another race and when recording. Open "Timeline corrections" below the player:
+
+1. Pause on the frame to fix and move bones directly in **Brio**.
+2. The panel says "The pose at x s was changed in Brio"; click **Keep as correction** and that frame becomes a keyframe (a diamond on the track). "Revert" discards the change.
+3. Select a keyframe to change its "Range": **Ease in and out** (over the transition time on each side: fully corrected close to the keyframe, then blending back to the original motion)
+   or **Hold to next** (held until the next keyframe of these bones). You can also remove the correction on a single bone.
+4. **Copy correction** copies the selected keyframe's change, which follows the original motion wherever you paste it; **Copy pose** copies how a bone group looks on the current frame
+   (left hand, right hand, both hands, arms, head and neck, whole body) and pastes it as is - use this when you need the same hand gesture many times.
+5. **Paste to current frame**, or mark a range with "In" and "Out" and **Paste to range**: held across the range, fading out after the out point.
+6. On the track, click empty space to jump to that frame, drag a diamond to move it, right-click a diamond to copy or delete it; undo if you change your mind.
+
+Each change only rebuilds the affected frames (a few dozen frames take a second or two). The first correction after opening an older clip rebuilds the whole clip once to read the character's current bone lengths.
+Face bones and helper bones such as shoulders and elbows can't be kept (helper bones follow the main bones automatically).
+
+**Record to video**
+
+"Record video" poses each frame and captures the game screen, saved to Documents\Posegraph\Videos, optionally with the video's music. Don't move the camera or windows while recording.
+
+Current limits: fingers come straight from the recognition model and are often wrong for small or blurry hands - fix them with timeline corrections; for videos with cuts, select one continuous shot;
+when the person is small in the frame (wide shots), motion and expressions get worse.
+
+## 17. Updates
 
 - **Plugin**: updates automatically through the plugin repository. The changelog pops up the first time you open the main window after an update.
 - **Backend**: after a plugin update the Settings tab shows the backend version. When it's older, click the download button next to it:
@@ -283,7 +331,7 @@ The crop button in the second toolbar row.
 
 ![Changelog](images/en/tut-changelog.png)
 
-## 17. FAQ
+## 18. FAQ
 
 **Recognition is slow / not enough VRAM**
 Keep the device on Auto; with less than 3 GB of VRAM it uses the CPU automatically. CPU recognition takes about 10–20 s
