@@ -2,7 +2,7 @@
 name = "posegraph"
 version = "0.6.0"
 description = "Posegraph backend: image -> 3D human pose -> FFXIV Brio pose"
-requires-python = ">=3.11,<3.12"
+requires-python = ">=3.11,<3.13"
 dependencies = [
     "fastapi>=0.115",
     "uvicorn>=0.30",
@@ -17,7 +17,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# SAM 3D Body 推理所需（torch/torchvision 需另外按 CUDA 版本安装，见 scripts/setup_sam3d.ps1）
+# SAM 3D Body 推理所需（torch/torchvision 需另外按 CUDA / ROCm 版本安装，见 scripts/setup_sam3d.ps1）
 sam3d = [
     "pytorch-lightning",
     "yacs",
