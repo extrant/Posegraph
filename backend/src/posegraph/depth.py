@@ -192,7 +192,7 @@ def _planes(sample: np.ndarray, up: np.ndarray, count: int, iters: int, tol: flo
 
 def find_floor(photo: PhotoDepth, people: np.ndarray, feet: list[tuple[int, int]] | None = None,
                torsos: list[np.ndarray] | None = None, bodies: list[np.ndarray] | None = None, scale: float = 1.0,
-               iters: int = 400, tol: float = 0.03):
+               iters: int = 400, tol: float = 0.03, samples: int = 60000):
     """
     地面。返回 (法线, d)（相机系、MoGe 尺度，n·p + d = 0，法线朝上）；没有为 None。
     只在看得见脚时找：在不是人的像素里找最大的几个平面，取脚踩着的那个（脚上的点离它最近、而且不到 15cm）——
@@ -214,7 +214,7 @@ def find_floor(photo: PhotoDepth, people: np.ndarray, feet: list[tuple[int, int]
     if len(pts) < 500:
         return None
     rng = np.random.default_rng(0)
-    sample = pts[rng.choice(len(pts), min(len(pts), 60000), replace=False)]
+    sample = pts[rng.choice(len(pts), min(len(pts), samples), replace=False)]
     up = np.array([0.0, -1.0, 0.0])
     total = P.shape[0] * P.shape[1]
     best = None

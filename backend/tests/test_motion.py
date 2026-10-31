@@ -214,5 +214,46 @@ class GravityTest(unittest.TestCase):
         self.assertEqual(have.tolist(), [True, True, False, False])
 
 
+
+class StepTest(unittest.TestCase):
+    def test_planted_feet_do_not_slide_and_follow_true_path(self):
+        # 真实走位：每帧往 +x 走 0.05 米；左脚 0~9 帧踩着、右脚 10~19 帧踩着；识别估的位置有 ±10 厘米抖动
+        n, rng = 20, np.random.default_rng(0)
+        true = np.c_[0.05 * np.arange(n), np.zeros(n)]
+        left_world, right_world = np.array([0.3, 0.1]), np.array([0.8, -0.1])
+        feet = {"j_asi_d_l": np.zeros((n, 3)), "j_asi_d_r": np.zeros((n, 3))}
+        for k in range(n):
+            feet["j_asi_d_l"][k, [0, 2]] = left_world - true[k]
+            feet["j_asi_d_r"][k, [0, 2]] = right_world - true[k]
+        contacts = {"j_asi_d_l": np.arange(n) < 11, "j_asi_d_r": np.arange(n) >= 10}   # 第 10 帧双脚着地
+        base = true + rng.normal(0, 0.1, (n, 2))
+        yaw = np.zeros(n)
+        out = motion.step_odometry(base, yaw, feet, contacts)
+        self.assertGreater(motion.contact_slide(base, yaw, feet, contacts, 10), 0.5)
+        self.assertLess(motion.contact_slide(out, yaw, feet, contacts, 10), 1e-6)
+        # 和真实走位只差一个常数（起点的抖动）：形状对了
+        diff = out - true
+        np.testing.assert_allclose(diff, np.tile(diff[0], (n, 1)), atol=0.05)
+
+    def test_contact_from_2d_keypoints(self):
+        import sys
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+        from posegraph import video
+
+        n = 8
+        humans = []
+        for k in range(n):
+            kp = np.zeros((70, 2))
+            kp[17] = [500, 900]                 # 左脚跟一直不动：踩着
+            kp[20] = [600 + 40 * k, 900]        # 右脚跟每帧挪 40 像素：在迈步
+            humans.append({"keypoints_2d": kp, "focal_length": 1000.0, "cam_t": np.array([0, 0, 5.0]), "bbox": [400, 100, 700, 950],
+                           **{key: np.zeros((2, 3)) for key in ("joint_global_rots", "joint_coords", "rest_joint_coords", "rest_joint_rots")}})
+        raw = video.Raw(10.0, 0.0, [k / 10 for k in range(n)], (1280, 1000), np.tile([0, 0, 0, 1.0], (n, 1)), [humans], [None], [[None] * n])
+        feet = {"j_asi_d_l": np.zeros((n, 3)), "j_asi_d_r": np.zeros((n, 3))}
+        c = motion.foot_contacts(raw, 0, feet, 10)
+        self.assertTrue(c["j_asi_d_l"][1:-1].all())
+        self.assertFalse(c["j_asi_d_r"].any())
+
+
 if __name__ == "__main__":
     unittest.main()

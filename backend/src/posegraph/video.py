@@ -673,7 +673,7 @@ def run_job(job: Job, info: VideoInfo, estimate: Callable, detect_people: Callab
 def recognize(job: Job, info: VideoInfo, estimate: Callable, detect_people: Callable, upright_of: Callable,
               face: FaceHooks | None = None, depth_of: Callable | None = None) -> Raw:
     """1~3 步：找人跟踪、逐帧识别（+ 面捕）、镜头运动解算、重力校正平滑。和种族无关，结果存成 Raw。"""
-    from .motion import CameraTracker, floor_up, gravity_upright
+    from .motion import FLOOR_ENOUGH, FLOOR_RETURN_DEG, CameraTracker, floor_up, gravity_upright
 
     spec = job.spec
     times = sample_times(spec.start, spec.end, spec.fps)
@@ -725,6 +725,7 @@ def recognize(job: Job, info: VideoInfo, estimate: Callable, detect_people: Call
     scene_depth = np.full((people, n), np.nan)
     floors: dict[int, np.ndarray] = {}
     floor_every = max(1, round(FLOOR_EVERY_SECONDS * spec.fps))
+    floor_hits, turned = 0, 0.0   # 这个镜头里找到地面的次数、上次找到后镜头转了多少度
     for k, rgb in iter_frames(info, times, stop):
         present = [p for p in range(people) if boxes[k][p] is not None]
         focal, root_cam = None, None
@@ -755,9 +756,13 @@ def recognize(job: Job, info: VideoInfo, estimate: Callable, detect_people: Call
         try:
             for p, d in (tracker.add(rgb, exclude, focal, root_cam, roots if people > 1 else None) or {}).items():
                 scene_depth[p, k] = d
-            if k % floor_every == 0 and feet:
+            if breaks[k]:
+                floor_hits, turned = 0, 0.0
+            turned += getattr(tracker, "last_turn", 0.0)
+            if k % floor_every == 0 and feet and (floor_hits < FLOOR_ENOUGH or turned > FLOOR_RETURN_DEG):
                 if (up := floor_up(getattr(tracker, "last_depth", None), exclude, np.array(feet), (info.width, info.height))) is not None:
                     floors[k] = up
+                    floor_hits, turned = floor_hits + 1, 0.0
         except Exception:   # 镜头解算、找地面只是锦上添花：出错就当这一帧没解出来
             tracker = _FailedTracker(tracker, n)
         job.done = k + 1
@@ -885,6 +890,19 @@ def build_clip(raw: Raw, people: list[PersonSpec], smooth_amount: float, retarge
         result["root"] = np.round(tracks["root"], 5).tolist()
         result["cameras"] = {k: rounded(v) for k, v in tracks["cameras"].items()}
         result["motion"] = tracks["info"]
+        # 配角也按踩着的脚推站位（换到场景里推，再换回相对主角）
+        from .motion import partner_steps
+
+        for p in range(1, count):
+            person = clip_people[p]
+            if "offset" not in person or not person["bones"]:
+                continue
+            fr = np.array(person["frames"]).reshape(n, len(person["bones"]), 10)
+            feet = {b: fr[:, person["bones"].index(b), 0:3] for b in ("j_asi_d_l", "j_asi_e_l", "j_asi_d_r", "j_asi_e_r")
+                    if b in person["bones"]}
+            offset, before, after = partner_steps(raw, p, tracks["root"], np.array(person["offset"]), feet, raw.fps, tracks["breaks"])
+            person["offset"] = np.round(offset, 5).tolist()
+            person["footSlide"] = [round(before, 3), round(after, 3)]
     return result
 
 

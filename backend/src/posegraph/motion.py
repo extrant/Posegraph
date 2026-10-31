@@ -43,6 +43,17 @@ YAW_SIGMA_SECONDS = 0.1
 FOOT_WINDOW_SECONDS = 1.0   # 「附近最低处」的时间窗
 JUMP_METERS_PER_SECOND = 6.0   # 镜头解算断开时，角色按「镜头没动」算出来移动得比这还快，就当切镜分段
 
+# 踩地（二维）：脚跟 / 脚尖在画面上的移动（扣掉镜头运动后）按人的身高换成米每秒，低于这个算踩着
+CONTACT_SPEED = 0.3
+CONTACT_HEIGHT = 0.10       # 且脚离附近（前后 FOOT_WINDOW_SECONDS）最低处不到这么高（米，模型系）
+BODY_HEIGHT_M = 1.7         # 人物框高度当这么多米（只用来把像素换成米，粗一点没关系）
+STEP_DRIFT_GAIN = 0.2       # 每迈出新的一步，把累积的偏差往识别估的位置拉回这么多（防止长时间走偏；踩着的脚照样不动）
+GAP_FRAMES = 3              # 两只脚都没踩地不超过这么多帧时延续踩地时的速度
+FOOT_POINTS = {             # 模型系的骨骼 ← MHR70 的二维关键点（脚跟用脚踝骨代表）
+    "j_asi_d_l": 17, "j_asi_e_l": 15,
+    "j_asi_d_r": 20, "j_asi_e_r": 18,
+}
+
 FOLLOW_SIGMA_SECONDS = 0.8  # 平滑跟拍：机位跟角色的平滑
 AIM_SIGMA_SECONDS = 0.25    # 镜头瞄准点（胸口）的平滑
 FACING_SIGMA_SECONDS = 2.0  # 面朝方向的平滑（转圈不算转向）
@@ -71,6 +82,7 @@ class CameraTracker:
         self._focal: float | None = None   # 解算用的焦距（第一帧定下，原图像素）
         self._depth_used = False
         self.last_depth = None             # 最近一帧的深度（depth.PhotoDepth），找地面用
+        self.last_turn = 0.0
 
     def add(self, rgb: np.ndarray, exclude: list, focal: float | None, root_cam: np.ndarray | None = None,
             roots: dict[int, np.ndarray] | None = None) -> dict[int, float]:
@@ -96,6 +108,7 @@ class CameraTracker:
         if self._prev is not None:
             ok, step = self._solve(self._prev, gray, K)
         self._steps.append(step)
+        self.last_turn = float(np.degrees(R.from_quat(step[:4]).magnitude())) if ok else 0.0   # 这一步镜头转了多少度
         self._ok.append(ok)
 
         pts = cv2.goodFeaturesToTrack(gray, MAX_CORNERS, 0.01, 8, mask=mask)
@@ -402,6 +415,111 @@ def _contacts(root, feet, fps, valid):
     return contacts, worlds
 
 
+def foot_contacts(raw, person: int, feet: dict[str, np.ndarray], fps: float, breaks: np.ndarray | None = None) -> dict[str, np.ndarray]:
+    """每个脚部点（脚跟、脚尖）每帧是否踩着地：二维关键点前后帧的移动扣掉镜头这一步造成的移动，按人物框高度换成米每秒，
+    前后两步的平均低于 CONTACT_SPEED，且这只脚在模型系里离附近最低处不到 CONTACT_HEIGHT。feet：{骨骼名: (帧, 3) 模型系位置}。"""
+    n = len(raw.times)
+    steps = raw.camera.steps if raw.camera is not None else np.tile([0, 0, 0, 1, 0, 0, 0], (n, 1)).astype(float)
+    cut = np.zeros(n, bool) if breaks is None else np.asarray(breaks, bool)
+    win = max(1, round(FOOT_WINDOW_SECONDS * fps / 2))
+    out = {}
+    for name, kp in FOOT_POINTS.items():
+        if name not in feet:
+            continue
+        speed = np.full(n, np.nan)   # 第 k-1 → k 帧这一步
+        for k in range(1, n):
+            a, b = raw.human(person, k - 1), raw.human(person, k)
+            if a is None or b is None or cut[k]:
+                continue
+            pa, pb = np.asarray(a["keypoints_2d"], float)[kp, :2], np.asarray(b["keypoints_2d"], float)[kp, :2]
+            w, h = raw.image_size
+            fa, fb = float(a["focal_length"]), float(b["focal_length"])
+            z = float(a["cam_t"][2])
+            X = np.array([(pa[0] - w / 2) / fa * z, (pa[1] - h / 2) / fa * z, z])   # 上一帧这个点（当它在世界里没动）
+            Y = R.from_quat(steps[k, :4]).apply(X) + steps[k, 4:7]
+            if Y[2] <= 1e-3:
+                continue
+            guess = np.array([fb * Y[0] / Y[2] + w / 2, fb * Y[1] / Y[2] + h / 2])
+            box = np.asarray(b["bbox"], float)
+            meters_per_px = BODY_HEIGHT_M / max(box[3] - box[1], 1.0)
+            speed[k] = float(np.linalg.norm(pb - guess)) * meters_per_px * fps
+        both = np.vstack([speed, np.r_[speed[1:], np.nan]])
+        still = np.nanmean(np.where(np.isfinite(both), both, np.nan), axis=0) if n else speed
+        height = feet[name][:, 1]
+        low = np.array([height[max(0, k - win):k + win + 1].min() for k in range(n)])
+        contact = np.nan_to_num(still, nan=np.inf) < CONTACT_SPEED
+        contact &= height <= low + CONTACT_HEIGHT
+        # 只踩了一帧的不算（多半是挥脚时刚好慢了一下）
+        lone = contact & ~np.r_[False, contact[:-1]] & ~np.r_[contact[1:], False]
+        out[name] = contact & ~lone
+    return out
+
+
+def step_odometry(base: np.ndarray, yaw: np.ndarray, feet: dict[str, np.ndarray], contacts: dict[str, np.ndarray],
+                  breaks: np.ndarray | None = None) -> np.ndarray:
+    """按踩着的脚推水平位置：base (帧, 2) 识别估的水平位置（x、z），yaw 每帧转向，feet 脚部点模型系位置，contacts 每点是否踩地。
+    踩着的点钉在场景里不动，人的位置 = 钉住的点 - 转向 × 这一帧它在模型系里的位置（几只脚一起踩着取平均）；
+    都没踩地时跟着识别估的位移走；每迈出新的一步把累积偏差往识别估的位置拉回 STEP_DRIFT_GAIN。返回 (帧, 2)。"""
+    n = len(base)
+    out = np.array(base, float, copy=True)
+    if n == 0:
+        return out
+    cut = np.zeros(n, bool) if breaks is None else np.asarray(breaks, bool)
+
+    def world(name, k, pos):
+        c, s = np.cos(yaw[k]), np.sin(yaw[k])
+        x, z = feet[name][k, 0], feet[name][k, 2]
+        return pos + np.array([c * x + s * z, -s * x + c * z])
+
+    pos = np.array(base[0], float)
+    anchors: dict[str, np.ndarray] = {}
+    landed: dict[str, int] = {}        # 每个点这次是第几帧落地的
+    velocity, since = np.zeros(2), 99   # 最近踩着地时每帧的位移；离上次踩着地过了几帧
+    for k in range(n):
+        if k > 0 and not cut[k]:
+            # 刚离地（迈步、小跳）：延续踩地时的速度；离地久了才跟识别估的位移（它前后方向抖得厉害）
+            pos = pos + (velocity if since <= GAP_FRAMES else base[k] - base[k - 1])
+        if cut[k]:
+            anchors.clear()
+        planted = [name for name in contacts if contacts[name][k]]
+        for name in list(anchors):
+            if name not in planted:
+                del anchors[name]
+        held = [name for name in planted if name in anchors]
+        if held:
+            # 只钉最早落地的那只脚（正在承重的）；同一只脚的脚跟、脚尖一起取平均。两只脚都着地时识别的脚距每帧有误差，
+            # 两只都钉就只能取平均、两只都滑；钉住承重脚，误差留给刚落地的那只
+            first = min(held, key=lambda name: landed[name])
+            side = first[-1]
+            pins = [name for name in held if name[-1] == side]
+            new = np.mean([anchors[name] - (world(name, k, np.zeros(2))) for name in pins], axis=0)
+            velocity, since = new - out[k - 1] if k > 0 else np.zeros(2), 0
+            pos = new
+        else:
+            since += 1
+        if not held and planted:
+            pos = pos + STEP_DRIFT_GAIN * (base[k] - pos)   # 新的一步落地：往识别估的位置拉回一点
+        for name in planted:
+            if name not in anchors:
+                anchors[name] = world(name, k, pos)
+                landed[name] = k
+        out[k] = pos
+    return out
+
+
+def contact_slide(xz: np.ndarray, yaw: np.ndarray, feet: dict[str, np.ndarray], contacts: dict[str, np.ndarray], fps: float) -> float:
+    """踩地时脚部点在场景里的平均水平速度（米/秒），看防滑效果。"""
+    speeds = []
+    for name, c in contacts.items():
+        cs, sn = np.cos(yaw), np.sin(yaw)
+        x, z = feet[name][:, 0], feet[name][:, 2]
+        w = np.c_[xz[:, 0] + cs * x + sn * z, xz[:, 1] - sn * x + cs * z]
+        both = c[1:] & c[:-1]
+        speeds.append(np.linalg.norm(np.diff(w, axis=0), axis=1)[both] * fps)
+    s = np.concatenate(speeds) if speeds else np.zeros(0)
+    return float(s.mean()) if len(s) else 0.0
+
+
 def lock_feet(root: np.ndarray, feet: dict[str, np.ndarray], fps: float, valid: np.ndarray) -> np.ndarray:
     """脚底防滑：feet = {名: (帧, 3) 模型系位置}（脚踝、脚尖），root 同 root_track。
     踩地的帧把脚在场景里的位置钉在踩下去那一刻，差多少挪角色的根；没踩地时保持当前修正量。返回修正后的 root。"""
@@ -525,9 +643,17 @@ def world_tracks(raw, geos: list, names: list[str], frames: np.ndarray, valid: n
     root[:, [0, 2]] = smooth(root[:, [0, 2]], max(sigma, ROOT_SIGMA_SECONDS * fps))
     root[:, 3] = smooth(root[:, 3], max(sigma, YAW_SIGMA_SECONDS * fps))
     feet = {b: bone(b) for b in ("j_asi_d_l", "j_asi_e_l", "j_asi_d_r", "j_asi_e_r") if bone(b) is not None}
-    before = foot_slide(root, feet, fps, valid)
-    root = lock_feet(root, feet, fps, valid)
-    after = foot_slide(root, feet, fps, valid)
+    contacts = foot_contacts(raw, 0, feet, fps, breaks)
+    if any(c.any() for c in contacts.values()):
+        # 二维判踩地 + 踩着的脚推走位
+        before = (float(np.mean([c.mean() for c in contacts.values()])), contact_slide(root[:, [0, 2]], root[:, 3], feet, contacts, fps))
+        root[:, [0, 2]] = step_odometry(root[:, [0, 2]], root[:, 3], feet, contacts, breaks)
+        after = (before[0], contact_slide(root[:, [0, 2]], root[:, 3], feet, contacts, fps))
+    else:
+        # 没有二维关键点（旧数据）：按三维高度和速度判踩地，挪根防滑
+        before = foot_slide(root, feet, fps, valid)
+        root = lock_feet(root, feet, fps, valid)
+        after = foot_slide(root, feet, fps, valid)
     face_arr = np.array([f if f is not None else np.nan for f in facing], float)
     have = ~np.isnan(face_arr)
     face_arr = _unwrap_fill(np.where(have, face_arr, 0.0), have) if have.any() else np.zeros(n)
@@ -540,12 +666,34 @@ def world_tracks(raw, geos: list, names: list[str], frames: np.ndarray, valid: n
             "breaks": [round(raw.times[k], 2) for k in np.flatnonzero(breaks)],
             "travel": round(float(np.sum(np.linalg.norm(np.diff(root[:, [0, 2]], axis=0), axis=1))), 2) if n > 1 else 0.0,
             "footContact": round(after[0], 3), "footSlide": [round(before[1], 3), round(after[1], 3)]}
-    return {"root": root, "cameras": cams, "info": info}
+    return {"root": root, "cameras": cams, "info": info, "breaks": breaks}
+
+
+def partner_steps(raw, person: int, root: np.ndarray, offset: np.ndarray, feet: dict[str, np.ndarray], fps: float,
+                  breaks: np.ndarray | None) -> tuple[np.ndarray, float, float]:
+    """配角也按踩着的脚推：先换到场景里（主角走位 × 站位），推完再换回相对主角的站位。返回 (新站位, 推之前、之后的踩地滑动)。"""
+    cs, sn = np.cos(root[:, 3]), np.sin(root[:, 3])
+    world = np.c_[root[:, 0] + cs * offset[:, 0] + sn * offset[:, 2], root[:, 2] - sn * offset[:, 0] + cs * offset[:, 2]]
+    yaw = root[:, 3] + offset[:, 3]
+    contacts = foot_contacts(raw, person, feet, fps, breaks)
+    if not any(c.any() for c in contacts.values()):
+        return offset, 0.0, 0.0
+    before = contact_slide(world, yaw, feet, contacts, fps)
+    world = step_odometry(world, yaw, feet, contacts, breaks)
+    after = contact_slide(world, yaw, feet, contacts, fps)
+    out = offset.copy()
+    dx, dz = world[:, 0] - root[:, 0], world[:, 1] - root[:, 2]
+    out[:, 0], out[:, 2] = cs * dx - sn * dz, sn * dx + cs * dz
+    return out, before, after
 
 
 FLOOR_MAX_TILT_DEG = 35.0    # 看不到脚时：地面法线和镜头「上」最多差这么多（再斜多半是墙、台面）
 FLOOR_MIN_SHARE_NO_FEET = 0.05   # 且至少占画面这么多
 FLOOR_LOW_ROWS = 0.55        # 且这块面的点大多在画面下面（行号中位数在这个比例以下）
+FLOOR_ITERS = 150            # 视频里每次找地面的拟合轮数、采样点数（照片用 400 / 60000；视频要找很多次，地面又大，少一些够用）
+FLOOR_SAMPLES = 20000
+FLOOR_ENOUGH = 3             # 同一个镜头里找到这么多次地面就够了…
+FLOOR_RETURN_DEG = 5.0       # …除非镜头又转了这么多度（摇镜头后地面在画面里的样子变了）
 
 
 def floor_up(depth, boxes: list, feet: np.ndarray, size: tuple[int, int]) -> np.ndarray | None:
@@ -566,7 +714,7 @@ def floor_up(depth, boxes: list, feet: np.ndarray, size: tuple[int, int]) -> np.
         people[i, max(0, int(y1 * sy)):int(y2 * sy) + 1, max(0, int(x1 * sx)):int(x2 * sx) + 1] = True
     pix = [(int(np.clip(x * sx, 0, dw - 1)), int(np.clip(y * sy, 0, dh - 1))) for x, y in np.asarray(feet).reshape(-1, 2)
            if 0 <= x < size[0] and 0 <= y < size[1]]
-    found = find_floor(depth, people, pix)
+    found = find_floor(depth, people, pix, iters=FLOOR_ITERS, samples=FLOOR_SAMPLES)
     if found is None:
         return None
     n = np.asarray(found[0], float)
@@ -586,11 +734,11 @@ def _floor_without_feet(depth, boxes: list, size: tuple[int, int]) -> np.ndarray
     if len(pts) < 500:
         return None
     rng = np.random.default_rng(0)
-    pick = rng.choice(len(pts), min(len(pts), 40000), replace=False)
+    pick = rng.choice(len(pts), min(len(pts), FLOOR_SAMPLES), replace=False)
     sample, sample_rows = pts[pick], rows[pick]
     up = np.array([0.0, -1.0, 0.0])
     best = None
-    for n, d, k in _planes(sample, up, 4, 300, 0.03, rng):
+    for n, d, k in _planes(sample, up, 4, FLOOR_ITERS, 0.03, rng):
         near = np.abs(sample @ n + d) < 0.03 * np.maximum(1, sample[:, 2] / 3)
         share = k / len(sample) * keep.sum() / (dh * dw)
         tilt = np.degrees(np.arccos(np.clip(n @ up, -1, 1)))
