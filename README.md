@@ -44,7 +44,7 @@ Posegraph plugin (in game, ImGui)  ── HTTP (127.0.0.1) ──►  Posegraph 
 - **Facial expressions (beta)**: the photo's expression becomes the game's face bones, at the photo's actual amount and within the game's limits;
   eyelids, brows, mouth, jaw and gaze can be tuned separately, and face capture also corrects the head direction.
 - **Keep Brio edits in the library**: bones you change in Brio after applying become this image's correction in one click.
-- **Lighting**: 11 one-click lighting setups plus "Match the photo" (estimates the key light and colors from the photo), placed around the character and camera with full-body coverage, saved with gallery images, and a separate 3D window for adjusting each light and adding effects.
+- **Lighting**: 11 one-click lighting setups plus "Match the photo" (estimates the key light and colors from the photo), placed around the character and camera with full-body coverage, saved with gallery images, and a separate 3D window for adjusting each light and adding effects; several people can share one set of lights or get one each (with any set adjustable on its own).
 - **Framing and screenshots**: framing guide, guides, equivalent full-frame focal length, photo overlay, one-click screenshots of the game's own render.
 - **Video motion (beta)**: recognizes the motion, expressions and camera movement of a video frame by frame and plays it in GPose (camera-following or walking through the scene, several camera styles); several people at once; timeline corrections (keep bones changed in Brio as keyframes, copy and paste them to other frames); music in sync and recording to video.
 - **Export** Brio `.pose` files.

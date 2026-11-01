@@ -135,16 +135,19 @@ public sealed class LibraryWindow : Window, IDisposable
         var folder = _folder;
         var query = _search;
         var favorites = _favoritesOnly;
+        var sort = (LibrarySort)_config.LibrarySort;
+        var ascending = _config.LibrarySortAscending;
         _scanTask = Task.Run(() =>
         {
             try
             {
                 if (!Directory.Exists(folder)) folder = _library.Root;
                 var listing = ImageLibrary.List(folder);
+                listing = listing with { Folders = _library.Sort(listing.Folders, sort, ascending), Images = _library.Sort(listing.Images, sort, ascending) };
                 foreach (var sub in listing.Folders)
                     _folderInfo[sub] = ImageLibrary.FolderSummary(sub);
                 _listing = listing;
-                _searchResults = query.Trim().Length > 0 || favorites ? _library.Search(folder, query, favorites) : null;
+                _searchResults = query.Trim().Length > 0 || favorites ? _library.Sort(_library.Search(folder, query, favorites), sort, ascending) : null;
             }
             catch (Exception ex)
             {
@@ -275,11 +278,52 @@ public sealed class LibraryWindow : Window, IDisposable
             if (IconButton("##cancelQueue", FontAwesomeIcon.Stop, Loc.T("停止批量识别（正在识别的那张会做完）"))) _recognition.CancelPending();
         }
         ImGui.SameLine();
+        DrawSort();
+        ImGui.SameLine();
         var size = _config.LibraryThumbSize;
         ImGui.SetNextItemWidth(Math.Min(140 * ImGuiHelpers.GlobalScale, Math.Max(60, ImGui.GetContentRegionAvail().X)));
         if (ImGui.SliderFloat("##thumb", ref size, 64, 256, Loc.T("缩略图 %.0f")))
             _config.LibraryThumbSize = size;
         if (ImGui.IsItemDeactivatedAfterEdit()) _pi.SavePluginConfig(_config);
+    }
+
+    private static readonly (LibrarySort Value, string Label)[] Sorts =
+    [
+        (LibrarySort.Name, "名称"),
+        (LibrarySort.Modified, "改动时间"),
+        (LibrarySort.Added, "添加时间"),
+    ];
+
+    /// <summary>排序方式和正序 / 倒序；换成按时间排时默认新的在前。</summary>
+    private void DrawSort()
+    {
+        var sort = (LibrarySort)_config.LibrarySort;
+        var current = Array.FindIndex(Sorts, s => s.Value == sort);
+        ImGui.SetNextItemWidth(90 * ImGuiHelpers.GlobalScale);
+        if (ImGui.BeginCombo("##sort", Loc.T(Sorts[Math.Max(0, current)].Label)))
+        {
+            foreach (var (value, label) in Sorts)
+                if (ImGui.Selectable(Loc.T(label), value == sort) && value != sort)
+                {
+                    _config.LibrarySort = (int)value;
+                    _config.LibrarySortAscending = value == LibrarySort.Name;
+                    _pi.SavePluginConfig(_config);
+                    _refresh = true;
+                }
+            ImGui.EndCombo();
+        }
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip(Loc.T("排序。改动时间：图片文件改过，或在 Posegraph 里存了修正、灯光，取最晚的；添加时间：导入或复制进图库的时间"));
+        ImGui.SameLine();
+        var ascending = _config.LibrarySortAscending;
+        var tip = sort == LibrarySort.Name ? (ascending ? Loc.T("正序：A→Z（点击反过来）") : Loc.T("倒序：Z→A（点击反过来）"))
+                                           : (ascending ? Loc.T("旧的在前（点击反过来）") : Loc.T("新的在前（点击反过来）"));
+        if (IconButton("##sortDir", ascending ? FontAwesomeIcon.SortAmountUp : FontAwesomeIcon.SortAmountDown, tip))
+        {
+            _config.LibrarySortAscending = !ascending;
+            _pi.SavePluginConfig(_config);
+            _refresh = true;
+        }
     }
 
     private string SourceName(string root)

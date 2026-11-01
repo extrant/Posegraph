@@ -80,6 +80,9 @@ public class Configuration : IPluginConfiguration
     public List<Library.LibrarySource> LibrarySources { get; set; } = new();
     public string LibraryFolder { get; set; } = "";
     public float LibraryThumbSize { get; set; } = 120;
+    /// <summary>图库排序（Library.LibrarySort）和方向；时间排序默认新的在前。</summary>
+    public int LibrarySort { get; set; }
+    public bool LibrarySortAscending { get; set; } = true;
 
     /// <summary>看过更新日志的插件版本：与当前版本不同时，第一次打开主窗口弹出更新日志。</summary>
     public string LastChangelog { get; set; } = "";
@@ -138,6 +141,9 @@ public class Configuration : IPluginConfiguration
 
     /// <summary>灯光的打光范围：auto（看游戏镜头拍到多少）/ face / half / full。</summary>
     public string LightFraming { get; set; } = "auto";
+
+    /// <summary>灯光照谁：single（主窗口选的角色）/ group（勾选的人一套灯罩住）/ each（每人一套）/ auto（近的合一套、远的各一套）。</summary>
+    public string LightPeople { get; set; } = "single";
 
     /// <summary>灯光：3D 布光窗口（贴在灯光窗口右边）展开着。</summary>
     public bool LightSceneOpen { get; set; } = true;

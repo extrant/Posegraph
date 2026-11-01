@@ -5,6 +5,28 @@
   },
   "entries": [
     {
+      "version": "0.7.2",
+      "date": "2026-11-01",
+      "title": {
+        "zh": "多人打光：人散开的大场景也都照得到；图库排序",
+        "en": "Lighting several people, even spread out in large scenes; library sorting"
+      },
+      "items": {
+        "zh": [
+          "多人打光：灯光窗口新增「照谁」——单人；一组（勾选的人当成一组，一套灯拉远、光斑放宽罩住所有人）；每人一套（每个人身上各摆一套，主光在同一侧，灯的范围收紧到主要照自己）；自动（约 2.5 米内的人合用一套，远的另起一套）。人散开的大场景里，远处的角色也照得到。GPose 角色默认全部勾上，主窗口选的角色总是照",
+          "单独调某一套灯：多套灯时在「调哪一套」里选，或在 3D 布光里点那一套的灯，只改这一套、别的不变；单独调过的可以「恢复成和其他套一样」",
+          "图库排序：名称、改动时间（图片文件改过，或在 Posegraph 里存了修正、灯光，取最晚的）、添加时间，可切正序 / 倒序，记住上次的选择",
+          "修复：3D 布光窗口开着时，灯光窗口里「打光范围」等下拉框点开就关上"
+        ],
+        "en": [
+          "Lighting several people: the lighting window has a new \"Light who\" - one person; as a group (the ticked people as one group, one set of lights moved back and widened to cover everyone); each person (a set of lights on each person, key light on the same side, each set's range tightened to mostly light its own person); auto (people within about 2.5 m share a set, people further away get their own). Spread-out characters in large scenes are lit too. All GPose characters are ticked by default, and the character chosen in the main window is always lit",
+          "Adjust one set separately: with several sets, pick one under \"Adjust\" or click its lights in the 3D lighting view to change only that set; a separately adjusted set can go back to \"Same as the other sets\"",
+          "Library sorting: name, modified (when the image file changed or you saved corrections or lighting for it in Posegraph, whichever is latest), or added, ascending or descending, remembered between sessions",
+          "Fix: drop-downs such as \"Light area\" in the lighting window closed right after opening while the 3D lighting window was open"
+        ]
+      }
+    },
+    {
       "version": "0.7.1",
       "date": "2026-11-01",
       "title": {

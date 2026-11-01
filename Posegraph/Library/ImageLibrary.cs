@@ -33,6 +33,14 @@ public sealed class LibraryIndex
 
 public sealed record FolderListing(string Path, string[] Folders, string[] Images);
 
+/// <summary>图库排序：名称；改动时间（图片文件改过，或在 Posegraph 里存了修正 / 灯光，取最晚的）；添加时间（导入、复制进来的时间）。</summary>
+public enum LibrarySort
+{
+    Name,
+    Modified,
+    Added,
+}
+
 /// <summary>导入结果：新复制的、内容重复而跳过的（来源文件 → 图库里已有的那张）、超出数量上限跳过的张数。</summary>
 public sealed class ImportResult
 {
@@ -126,6 +134,46 @@ public sealed class ImageLibrary
         catch
         {
             return (0, null);
+        }
+    }
+
+    /// <summary>
+    /// 按 sort 排好顺序（文件夹、图片各自排；文件夹的改动 / 添加时间取文件夹本身的）。读不到时间的排在最后。
+    /// 改动时间里的「存了修正 / 灯光」只查哈希备忘（识别或存修正时记下的），不为排序去读图片算哈希。
+    /// </summary>
+    public string[] Sort(IEnumerable<string> paths, LibrarySort sort, bool ascending)
+    {
+        var list = paths.ToList();
+        if (sort == LibrarySort.Name)
+        {
+            list.Sort(StringComparer.CurrentCultureIgnoreCase);
+            if (!ascending) list.Reverse();
+            return [.. list];
+        }
+        var keys = list.ToDictionary(p => p, p => SortTime(p, sort), StringComparer.OrdinalIgnoreCase);
+        var ordered = ascending
+            ? list.OrderBy(p => keys[p] ?? DateTime.MaxValue)
+            : list.OrderByDescending(p => keys[p] ?? DateTime.MinValue);
+        return [.. ordered.ThenBy(p => p, StringComparer.CurrentCultureIgnoreCase)];
+    }
+
+    private DateTime? SortTime(string path, LibrarySort sort)
+    {
+        try
+        {
+            var info = new FileInfo(path);
+            if (!info.Exists && !Directory.Exists(path)) return null;
+            FileSystemInfo item = info.Exists ? info : new DirectoryInfo(path);
+            if (sort == LibrarySort.Added) return item.CreationTimeUtc;
+            var time = item.LastWriteTimeUtc;
+            if (info.Exists && KnownHash(path) is { } sha1)
+                foreach (var extra in new[] { FixPath(sha1), LightPath(sha1) })
+                    if (File.Exists(extra) && File.GetLastWriteTimeUtc(extra) is var t && t > time) time = t;
+            return time;
+        }
+        catch
+        {
+            return null;
         }
     }
 

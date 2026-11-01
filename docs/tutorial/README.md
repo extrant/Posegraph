@@ -150,6 +150,7 @@ The first button in the second toolbar row opens the library.
 - **Add folder** adds an existing image folder as a source (nothing is copied).
 - Organize with folders, tags (search `#tag`) and favorites; rename, move, or delete to the Recycle Bin.
 - A green check means the image has been recognized; select several and right-click → Recognize to batch them.
+- **Sorting**: the drop-down left of the thumbnail size sorts by name, modified (the image changed or you saved corrections or lighting for it in Posegraph, whichever is latest) or added; the button next to it switches ascending / descending.
 - **Double-click** opens an image in the main window; **right-click** has extra views, save to the Brio pose library and more.
 
 ## 9. Extra views: fixing front/back depth
@@ -250,6 +251,12 @@ with "Follow character" on they are placed again when Posegraph changes the char
   light aimed behind the character is added. The swatches below show the colors picked from the photo.
 - **Light area**: face / half body / full body. "Auto" (the default) follows how much the game camera shows - feet visible is full body,
   waist visible is half body, otherwise the face. For larger areas the lights move further away and widen so the whole character is lit.
+- **Light who**: one person (only the character chosen in the main window); as a group (the ticked people as one group, one set of lights covering
+  everyone, for consistent light); each person (a set of lights on each person, however spread out); auto (people within about 2.5 m share a set,
+  people further away get their own). Tick the characters to light below; all are ticked by default and the main window's character is always lit.
+  With many people and lights, the groups furthest from the camera are left unlit first (the window says so).
+- **Adjust one set separately**: with several sets, pick one under "Adjust" (at the top of the 3D lighting window and above "Adjust each light"),
+  or click its lights in the 3D lighting view, to change only that set; "Same as the other sets" undoes the separate changes.
 - The sliders adjust overall brightness, warmth, light distance and fill (lower fill gives a higher light ratio; turn it down when the scene
   itself is already bright).
 - **Save to this image**: stores the current lights with the main window's image; they are restored whenever that image's pose is applied

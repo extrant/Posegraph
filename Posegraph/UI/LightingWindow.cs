@@ -17,6 +17,7 @@ namespace Posegraph.UI;
 /// 3D 布光（拖灯、拖对准点、光锥和光照预览球）在贴着右边的 LightingSceneWindow 里，点「3D 布光」展开 / 收起；
 /// 方案最前面是「照片同款」：按主窗口照片里人物脸上的明暗估出主光，照着摆（后端 lighting.py）；「照片配色」只按照片换颜色。
 /// 方案下面是跟随角色、自动调亮度这些开关，和把灯光存进主窗口当前图片（图库）。
+/// 「照谁」：单人 / 一组（一套灯罩住勾选的人）/ 每人一套 / 自动（近的合一套、远的各一套），人散开的大场景也都照得到。
 /// 下面「逐盏调整」给熟悉打光的人：每盏灯的方位、仰角、距离、颜色、光斑、灯头偏角都能改，可独显 / 关掉，改好可存成自己的方案。
 /// </summary>
 public sealed class LightingWindow : Window
@@ -34,6 +35,7 @@ public sealed class LightingWindow : Window
     private readonly Func<Task<PhotoLighting?>> _photoLighting;
     private readonly Func<string?> _imageSha1;
     private readonly ImageLibrary _library;
+    private readonly Func<(int Index, string Name)[]> _actors;
     private string _status = "";
     private Vector4 _statusColor = Grey;
     private PhotoLighting? _photo;        // 最近一次从照片估的光（画照片颜色色块用）和它对应的图
@@ -44,7 +46,8 @@ public sealed class LightingWindow : Window
     private bool _openSelected;   // 下一帧把选中的灯在「逐盏调整」里展开
 
     public LightingWindow(LightingService service, Configuration config, IDalamudPluginInterface pi, Func<int?> actor, Func<bool> inGpose,
-                          Func<bool> hasPhoto, Func<Task<PhotoLighting?>> photoLighting, Func<string?> imageSha1, ImageLibrary library)
+                          Func<bool> hasPhoto, Func<Task<PhotoLighting?>> photoLighting, Func<string?> imageSha1, ImageLibrary library,
+                          Func<(int Index, string Name)[]> actors)
         : base(Loc.T("Posegraph 灯光") + "###PosegraphLighting")
     {
         _service = service;
@@ -56,6 +59,7 @@ public sealed class LightingWindow : Window
         _photoLighting = photoLighting;
         _imageSha1 = imageSha1;
         _library = library;
+        _actors = actors;
         _service.Notice += (text, ok) => SetStatus(text, ok ? Green : Yellow);
         Size = new Vector2(540, 760);
         SizeCondition = ImGuiCond.FirstUseEver;
@@ -165,7 +169,115 @@ public sealed class LightingWindow : Window
         if (Check(Loc.T("跟随角色"), _config.LightFollowSubject, v => _config.LightFollowSubject = v,
                   Loc.T("Posegraph 给这个角色换了姿势、或角色被挪动 / 转身后，自动重新读脸再摆（在 Brio 里手动掰骨骼不算，掰完点「重新摆」）")))
             _pi.SavePluginConfig(_config);
+        DrawPeople();
         DrawLibraryRow();
+    }
+
+    /// <summary>第 g 套的名字：「第 N 套：角色名…」，单独调过的加标记。</summary>
+    public string GroupLabel(int g)
+    {
+        var names = _actors().ToDictionary(a => a.Index, a => a.Name);
+        var members = g < _service.GroupMembers.Count ? _service.GroupMembers[g] : [];
+        var who = string.Join("、", members.Select(i => names.GetValueOrDefault(i, "?")));
+        return Loc.F("第 {0} 套：{1}", g + 1, who) + (_service.IsOwn(g) ? Loc.T("（单独调过）") : "");
+    }
+
+    /// <summary>
+    /// 多人打光时选调哪一套：所有套一起调，或者单独调某一套（其他套不变）；单独调过的可以恢复成和其他套一样。
+    /// 3D 布光窗口顶上和「逐盏调整」上面都有。只有一套灯时不显示。
+    /// </summary>
+    public void DrawGroupPicker()
+    {
+        var count = _service.Groups.Count;
+        if (count < 2) return;
+        var scale = ImGuiHelpers.GlobalScale;
+        ImGui.AlignTextToFramePadding();
+        ImGui.TextUnformatted(Loc.T("调哪一套"));
+        ImGui.SameLine();
+        ImGui.SetNextItemWidth(Math.Min(260 * scale, Math.Max(120 * scale, ImGui.GetContentRegionAvail().X * 0.6f)));
+        var current = _service.SelectedGroup is { } g ? GroupLabel(g) : Loc.T("所有套一起调");
+        if (ImGui.BeginCombo("##lightGroup", current))
+        {
+            if (ImGui.Selectable(Loc.T("所有套一起调"), _service.SelectedGroup is null)) Select(null);
+            for (var i = 0; i < count; i++)
+                if (ImGui.Selectable(GroupLabel(i) + "##group" + i, _service.SelectedGroup == i)) Select(i);
+            ImGui.EndCombo();
+        }
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip(Loc.T("所有套一起调：改的灯所有人都跟着变（单独调过的那几套除外）。\n"
+                                   + "选某一套：只改这一套，别的套不变。在 3D 布光里点别的那套的灯或圈也能选中它"));
+        if (_service.SelectedGroup is { } selected && _service.IsOwn(selected))
+        {
+            ImGui.SameLine();
+            if (ImGui.SmallButton(Loc.T("恢复成和其他套一样")))
+            {
+                _service.ResetGroup(selected);
+                SetStatus(Loc.F("第 {0} 套已恢复成和其他套一样", selected + 1), Grey);
+            }
+        }
+
+        void Select(int? group)
+        {
+            _service.SelectGroup(group);
+            _service.Refresh();
+        }
+    }
+
+    private static readonly (string Key, string Label, string Tip)[] PeopleModes =
+    [
+        ("single", "单人", "只照主窗口选的角色"),
+        ("group", "一组", "勾选的人当成一组：一套灯拉远、光斑放宽罩住所有人，光线统一。人离得很远（十几米）时会偏暗、偏平"),
+        ("each", "每人一套", "每个勾选的人身上各摆一套同样的灯（主光都在画面同一侧），人散得再开都照得到；人多时灯多，可能掉帧"),
+        ("auto", "自动", "离得近（约 2.5 米内）的人合用一套灯，离得远的各自另起一套"),
+    ];
+
+    /// <summary>照谁：单人 / 一组 / 每人一套 / 自动；不是单人时列出 GPose 角色勾选（默认全选，主窗口选的角色总是照）。改了马上重摆。</summary>
+    private void DrawPeople()
+    {
+        var scale = ImGuiHelpers.GlobalScale;
+        var changed = false;
+        ImGui.AlignTextToFramePadding();
+        ImGui.TextUnformatted(Loc.T("照谁"));
+        foreach (var (key, label, tip) in PeopleModes)
+        {
+            ImGui.SameLine();
+            if (ImGui.RadioButton(Loc.T(label) + "##people" + key, _config.LightPeople == key) && _config.LightPeople != key)
+            {
+                _config.LightPeople = key;
+                _pi.SavePluginConfig(_config);
+                changed = true;
+            }
+            if (ImGui.IsItemHovered()) ImGui.SetTooltip(Loc.T(tip));
+        }
+        if (_config.LightPeople != "single")
+        {
+            var primary = _actor();
+            var first = true;
+            foreach (var (index, name) in _actors())
+            {
+                var label = index == primary ? Loc.F("{0}（主）", name) : name;
+                if (!first) UiText.SameLineIfFits(UiText.CheckboxWidth(label));
+                first = false;
+                var on = index == primary || !_service.Excluded.Contains(index);
+                using (ImRaii.Disabled(index == primary))
+                    if (ImGui.Checkbox(label + "##light" + index, ref on))
+                    {
+                        if (on) _service.Excluded.Remove(index);
+                        else _service.Excluded.Add(index);
+                        changed = true;
+                    }
+                if (index == primary && ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
+                    ImGui.SetTooltip(Loc.T("主窗口选的角色总是照（灯的方向按他定）"));
+            }
+            if (_service.Active is not null && _service.PeopleCount > 0)
+            {
+                var info = Loc.F("照 {0} 个人，{1} 套灯", _service.PeopleCount, _service.Groups.Count - _service.DroppedGroups);
+                if (_service.DroppedGroups > 0) ImGui.TextColored(Yellow, info + Loc.F("；灯太多，离镜头远的 {0} 组没打（可以改用「一组」或「自动」）", _service.DroppedGroups));
+                else ImGui.TextDisabled(info);
+            }
+        }
+        if (changed && _service.Active is not null)
+            Run(() => _service.ReplaceAsync(_actor()), Loc.T("已按新的「照谁」重新摆"));
     }
 
     private static readonly string[] FramingKeys = ["auto", "face", "half", "full"];
@@ -259,6 +371,7 @@ public sealed class LightingWindow : Window
             ImGui.TextDisabled(Loc.T("先在上面选一个方案"));
             return;
         }
+        DrawGroupPicker();
         var changed = false;
         for (var i = 0; i < _service.Lights.Count; i++)
         {

@@ -270,11 +270,65 @@ public static class LightRigs
         _ => s with { Center = s.Face, Reach = Subject.FaceReach * s.Scale, DistanceScale = 1f },
     };
 
+    /// <summary>
+    /// 几个人合成一组打光：灯围着整组的中心摆，聚光的光斑罩住所有人，灯拉远到至少 GroupDistance 倍半径
+    /// （近处、远处的人离灯的远近差得少，亮度差不多），Solve 按距离平方把亮度补回来。只有一个人时同 Framed。
+    /// 打光范围决定算哪些点：脸 = 各人的脸；半身 = 脸和腰；全身 = 脸和脚。朝向取各人脸朝向的平均（转圈站时退回第一个人的）。
+    /// </summary>
+    public static Subject Group(IReadOnlyList<Subject> people, LightFraming framing)
+    {
+        if (people.Count == 1) return Framed(people[0], framing);
+        var points = new List<Vector3>();
+        foreach (var p in people)
+        {
+            points.Add(p.Face);
+            if (framing == LightFraming.Half && p.Pelvis is { } pelvis) points.Add(pelvis);
+            if (framing == LightFraming.Full && p.Feet is { } feet) points.Add(feet);
+        }
+        var min = points.Aggregate(Vector3.Min);
+        var max = points.Aggregate(Vector3.Max);
+        var center = (min + max) / 2;
+        var scale = people.Average(p => p.Scale);
+        var reach = points.Max(p => Vector3.Distance(p, center)) + 0.2f * scale;
+        var forward = people.Aggregate(Vector3.Zero, (a, p) => a + p.Forward);
+        forward = forward.Length() > 0.3f * people.Count ? Vector3.Normalize(forward) : people[0].Forward;
+        var up = Vector3.Normalize(people.Aggregate(Vector3.Zero, (a, p) => a + p.Up));
+        var face = people.Aggregate(Vector3.Zero, (a, p) => a + p.Face) / people.Count;
+        var single = Framed(people[0], framing).DistanceScale;
+        return new Subject(face, forward, up, scale)
+        {
+            Pelvis = people[0].Pelvis, Feet = people[0].Feet, Side = people[0].Side,
+            Center = center, Reach = reach,
+            DistanceScale = MathF.Max(single, GroupDistance * reach / (KeyDistance * scale)),
+        };
+    }
+
+    public const float GroupDistance = 1.6f;   // 一组打光：灯离中心至少这么多倍的半径
+    private const float KeyDistance = 2f;      // 方案里主光的一般距离（米，人族中原），换算灯要拉多远用
+
+    /// <summary>
+    /// 按远近分组：脸的水平距离在 meters 以内的人（连着也算）合成一组。返回每组的人的下标，组按第一个人的下标排，组里按下标排。
+    /// </summary>
+    public static List<List<int>> Cluster(IReadOnlyList<Subject> people, float meters)
+    {
+        var group = Enumerable.Range(0, people.Count).ToArray();
+        int Find(int i) => group[i] == i ? i : group[i] = Find(group[i]);
+        for (var i = 0; i < people.Count; i++)
+            for (var j = i + 1; j < people.Count; j++)
+            {
+                var d = people[i].Face - people[j].Face;
+                if (MathF.Sqrt(d.X * d.X + d.Z * d.Z) <= meters) group[Find(j)] = Find(i);
+            }
+        return [.. Enumerable.Range(0, people.Count).GroupBy(Find).Select(g => g.OrderBy(i => i).ToList()).OrderBy(g => g[0])];
+    }
+
     /// <summary>主光在哪一侧（1 右、-1 左），见 Frame。</summary>
     public static float SideOf(Subject subject, Vector3? camera) => Frame(subject with { Side = null }, camera).Side;
 
-    /// <summary>按人物和镜头位置算出每盏灯的世界状态。camera 为 null 时把脸朝向当成镜头方向。</summary>
-    public static List<LightState> Solve(IEnumerable<LightSpec> lights, Subject subject, Vector3? camera, RigTweaks tweaks, float time = 0)
+    /// <summary>按人物和镜头位置算出每盏灯的世界状态。camera 为 null 时把脸朝向当成镜头方向。
+    /// tight：每人一套灯时收紧灯的照射范围（主要只照到自己这一组，旁边的人不会被几套灯叠着照得过亮）。</summary>
+    public static List<LightState> Solve(IEnumerable<LightSpec> lights, Subject subject, Vector3? camera, RigTweaks tweaks, float time = 0,
+                                         bool tight = false)
     {
         var up = Vector3.UnitY;
         var (toCamera, camRight, side) = Frame(subject, camera);
@@ -297,8 +351,9 @@ public static class LightRigs
             // 光斑至少罩住要照的范围（照脸时几乎不影响，照全身时窄光会被放宽）
             var angle = l.Kind == LightKind.Point ? l.SpotAngle
                 : MathF.Max(l.SpotAngle, 2 * MathF.Atan(subject.Reach * 1.1f / distance) * 180f / MathF.PI);
+            var range = tight ? MathF.Max(distance + subject.Reach * 2f + 0.5f, 2.5f) : MathF.Max(distance * 2.5f + 2f, 5f);
             result.Add(new LightState(l.Kind, position, LookRotation(Aim(subject.Center - position, l.AimYaw, l.AimPitch)), color,
-                                      MathF.Max(distance * 2.5f + 2f, 5f), angle, l.Softness, l.Shadows, l.Falloff));
+                                      range, angle, l.Softness, l.Shadows, l.Falloff));
         }
         return result;
     }

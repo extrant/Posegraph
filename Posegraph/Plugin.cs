@@ -90,8 +90,10 @@ public sealed class Plugin : IDalamudPlugin
         _main.ToggleLibrary = _library.Toggle;
         _lighting = new Lighting.LightingService(framework, clientState, applier, _config, gameGui);
         _lighting.CurrentImage = () => _main.CurrentImageSha1 is { } sha ? (sha, _main.Library.ReadLighting(sha)) : null;
+        _lighting.Others = () => [.. _main.Actors.Select(a => a.Index).Where(i => !_lighting.Excluded.Contains(i))];
         _lightingWindow = new LightingWindow(_lighting, _config, pi, () => _main.SelectedActor, () => clientState.IsGPosing,
-                                             () => _main.HasPhoto, _main.PhotoLightingAsync, () => _main.CurrentImageSha1, _main.Library);
+                                             () => _main.HasPhoto, _main.PhotoLightingAsync, () => _main.CurrentImageSha1, _main.Library,
+                                             () => _main.Actors);
         _windows.AddWindow(_lightingWindow);
         var lightingScene = new LightingSceneWindow(_lighting, _config, pi, _lightingWindow);
         _windows.AddWindow(lightingScene);

@@ -69,6 +69,7 @@ public sealed class LightingScene(LightingService service, Configuration config)
         if (config.LightShowCamera && service.CameraPose is { } pose) DrawCamera(pose, subject);
         if (config.LightShowOrbit && service.SelectedLight is { } sel && sel < states.Count) DrawOrbit(subject, states[sel].Position);
         for (var i = 0; i < states.Count; i++) DrawLight(i, states[i], subject);
+        DrawOtherGroups(camera);
         if (config.LightShowPreview) DrawPreviewSphere(subject, states);
         _view.End();
         if (_view.Hovered && _drag == DragTarget.None)
@@ -208,6 +209,43 @@ public sealed class LightingScene(LightingService service, Configuration config)
         _view.Circle(subject.Face - subject.Forward * 0.04f * subject.Scale, _view.Forward, head, BodyColor, 2f);
         _view.Line(subject.Face, subject.Face + subject.Forward * 0.25f * subject.Scale, new Vector4(1f, 0.8f, 0.3f, 0.9f), 2f);
         _view.Text(subject.Face + subject.Forward * 0.27f * subject.Scale, Loc.T("脸朝向"), new Vector4(1f, 0.8f, 0.3f, 0.8f), new Vector2(4, -6));
+    }
+
+    /// <summary>
+    /// 多人打光时其他套的灯：画成淡色小点、连到那套中心的细线和「第 N 套」；点那套的圈或灯就选中它单独调
+    /// （灯光窗口「调哪一套」同步）。正在调的那套按正常的样子画（Draw 里的 subject）。
+    /// </summary>
+    private void DrawOtherGroups(Vector3? camera)
+    {
+        var editing = service.SelectedGroup ?? 0;
+        var mouse = ImGui.GetMousePos();
+        int? clicked = null;
+        for (var g = 0; g < service.Groups.Count; g++)
+        {
+            if (g == editing) continue;
+            var other = service.Groups[g];
+            var near = false;
+            _view.Circle(other.Center, _view.Forward, other.Reach, Faint with { W = 0.18f }, 1f, 48);
+            _view.Text(other.Center + Vector3.UnitY * other.Reach, Loc.F("第 {0} 套", g + 1), Faint with { W = 0.7f }, new Vector2(4, -6));
+            if (_view.Project(other.Center) is { } c && Vector2.Distance(c, mouse) < 24) near = true;
+            foreach (var light in LightRigs.Solve(service.LightsFor(g), other, camera, service.Tweaks, service.Time))
+            {
+                _view.Line(light.Position, other.Center, Faint with { W = 0.15f }, 1f);
+                _view.Circle(light.Position, _view.Forward, 0.06f, Faint with { W = 0.5f }, 2f, 12);
+                if (_view.Project(light.Position) is { } p && Vector2.Distance(p, mouse) < 12) near = true;
+            }
+            if (near && _view.Hovered && _drag == DragTarget.None)
+            {
+                ImGui.SetTooltip(Loc.F("点击单独调第 {0} 套", g + 1));
+                if (ImGui.IsMouseClicked(ImGuiMouseButton.Left)) clicked = g;
+            }
+        }
+        if (clicked is { } pick)
+        {
+            service.SelectGroup(pick);
+            service.Refresh();
+            _frameAll = true;
+        }
     }
 
     private void DrawCamera(CameraPose pose, Subject subject)

@@ -59,6 +59,7 @@ public sealed class LightingSceneWindow : Window
     /// <summary>
     /// 两个窗口一起前置：点中其中一个，另一个也提到最上面，焦点留在点中的那个。
     /// 等松开鼠标再做——按下的那一帧就换焦点会打断正在拖的灯。灯光窗口先画，这里两个窗口的焦点都已更新。
+    /// 有弹出框（打光范围之类的下拉框、右键菜单）开着时也先不做：换焦点会把刚打开的下拉框关掉。
     /// </summary>
     private void RaiseTogether()
     {
@@ -66,6 +67,11 @@ public sealed class LightingSceneWindow : Window
         if (focused is not null && focused != _lastFocused) _raise = focused;
         _lastFocused = focused;
         if (_raise is not { } target || ImGui.IsMouseDown(ImGuiMouseButton.Left)) return;
+        if (ImGui.IsPopupOpen("", ImGuiPopupFlags.AnyPopupId | ImGuiPopupFlags.AnyPopupLevel))
+        {
+            _raise = null;   // 用户在弹出框里操作，不再补前置（关掉弹出框时焦点回到原窗口，不用再提）
+            return;
+        }
         (target == this ? (Window)_lighting : this).BringToFront();
         target.BringToFront();   // 后提的拿到焦点
         _raise = null;
@@ -113,6 +119,7 @@ public sealed class LightingSceneWindow : Window
         ImGui.SameLine();
         if (ImGui.SmallButton(Loc.T("专业选项") + "##proLight")) ImGui.OpenPopup("##lightPro");
         DrawProOptions();
+        _lighting.DrawGroupPicker();
         // 3D 视图用满剩下的高度，留出下面灯按钮的一行
         var height = Math.Max(200 * ImGuiHelpers.GlobalScale, ImGui.GetContentRegionAvail().Y - ImGui.GetFrameHeightWithSpacing() * 1.5f);
         _scene.Draw(new Vector2(ImGui.GetContentRegionAvail().X, height));
