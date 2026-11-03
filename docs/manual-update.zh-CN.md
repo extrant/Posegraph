@@ -5,10 +5,13 @@
 插件里的「更新后端」会自动下载后端代码和新功能要的组件。如果插件里下载不了（连不上 GitHub、加速前缀也不行），
 可以自己用浏览器下载，或者找已经下好的朋友要压缩包，然后按下面的步骤解压。
 
-整个过程只是把几个压缩包**解压到一键包文件夹里**，不用重新下载 4GB 的一键包。
+能连上网的话，最省事的是**再运行一次一键安装脚本 `Install-Posegraph.bat`，选这个后端文件夹**：它会核对每个文件，
+缺的组件、旧的代码都会补上（安装脚本可以换国内镜像、加速站或自己的代理）。下面是完全手动的办法。
 
-下文的「一键包文件夹」指你解压一键包得到的那个文件夹，里面能看到 `python`、`backend` 两个文件夹和 `Start-Backend.bat`，
-比如 `D:\Posegraph-Backend`。
+整个过程只是把几个压缩包**解压到后端文件夹里**，不用重装后端。
+
+下文的「后端文件夹」指安装脚本装好的那个文件夹（以前下载的一键包解压出来的文件夹也一样），里面能看到 `python`、`backend`
+两个文件夹和 `Start-Backend.bat`，比如 `D:\Posegraph-Backend`。
 
 ---
 
@@ -36,36 +39,36 @@
 ## 2. 解压组件
 
 每个组件的做法一样，以 `posegraph-face-1.zip` 为例。压缩包里是 `python` 和 `backend` 两个文件夹（音频组件只有 `python`），
-要让它们**和一键包里的同名文件夹合并**。
+要让它们**和后端文件夹里的同名文件夹合并**。
 
 **用 Windows 自带的解压（右键「全部解压缩」）：**
 
 1. 右键压缩包 → **全部解压缩…**
-2. 点 **浏览…** 选一键包文件夹（比如 `D:\Posegraph-Backend`）。
+2. 点 **浏览…** 选后端文件夹（比如 `D:\Posegraph-Backend`）。
 3. **重点**：确认地址栏里最后**没有**多出 `\posegraph-face-1`。Windows 会自动在后面加上压缩包的名字，要把它删掉，
    地址应该正好是 `D:\Posegraph-Backend`。
 4. 点 **提取**。提示有同名文件时选 **替换目标中的文件**。
 
 **用 7-Zip / Bandizip / WinRAR：**
 
-1. 把压缩包放进一键包文件夹（和 `python`、`backend` 放在一起）。
+1. 把压缩包放进后端文件夹（和 `python`、`backend` 放在一起）。
 2. 右键 → **解压到当前文件夹**（7-Zip 是「提取到当前位置」，Bandizip 是「解压到当前文件夹」，WinRAR 是「解压到当前文件夹」）。
    不要选「解压到 posegraph-face-1\」。
 3. 提示覆盖时选 **全部覆盖**。
 
-解压对了的话，这些文件存在（把 `D:\Posegraph-Backend` 换成你的一键包文件夹）：
+解压对了的话，这些文件存在（把 `D:\Posegraph-Backend` 换成你的后端文件夹）：
 
 - 面捕：`D:\Posegraph-Backend\python\Lib\site-packages\mediapipe\__init__.py` 和 `D:\Posegraph-Backend\backend\checkpoints\face\face_landmarker.task`
 - 深度图：`D:\Posegraph-Backend\python\Lib\site-packages\moge\__init__.py` 和 `D:\Posegraph-Backend\backend\checkpoints\moge\model.pt`
 
 如果多出了一个 `D:\Posegraph-Backend\posegraph-face-1\python\…` 这样的文件夹，说明解压到了子文件夹里：
-把 `posegraph-face-1` 里面的 `python`、`backend` 两个文件夹剪切到一键包文件夹，合并、覆盖，再删掉空的 `posegraph-face-1`。
+把 `posegraph-face-1` 里面的 `python`、`backend` 两个文件夹剪切到后端文件夹，合并、覆盖，再删掉空的 `posegraph-face-1`。
 
 ## 3. 换后端代码
 
 1. 解压 `Posegraph-0.7.1.zip`（解压到哪里都行，比如桌面）。
-2. 打开一键包文件夹里的 `backend`，把里面原来的 `src` 文件夹**改名**为 `src.old`（留作备份，确认新版能用后可以删掉）。
-3. 打开刚解压出来的 `Posegraph-0.7.1\backend`，把里面的 `src` 文件夹**复制**到一键包的 `backend` 文件夹里。
+2. 打开后端文件夹里的 `backend`，把里面原来的 `src` 文件夹**改名**为 `src.old`（留作备份，确认新版能用后可以删掉）。
+3. 打开刚解压出来的 `Posegraph-0.7.1\backend`，把里面的 `src` 文件夹**复制**到后端文件夹的 `backend` 文件夹里。
 
 完成后应该是：`D:\Posegraph-Backend\backend\src\posegraph\version.json` 里写着 `"version": "0.7.1"`。
 
@@ -103,5 +106,5 @@
 
 对不上就不要用，重新下载。后端代码 `Posegraph-0.7.1.zip` 每次从 GitHub 下载时会重新打包，没有固定的校验值，建议自己从 GitHub 下载。
 
-另一种省事的办法：把核对过的组件压缩包放进一键包文件夹下的 `.download` 文件夹（没有就新建），改名为 `face.zip` / `depth.zip`，
+另一种省事的办法：把核对过的组件压缩包放进后端文件夹下的 `.download` 文件夹（没有就新建），改名为 `face.zip` / `depth.zip`，
 再在插件里点「更新后端」。插件会先检查这里的文件，校验对得上就直接安装、不再下载（这时只需要能连上 GitHub 下载约 5MB 的代码）。

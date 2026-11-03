@@ -82,14 +82,14 @@ Posegraph 不在 Dalamud 官方仓库里，从自定义仓库安装：
 ### 更新
 
 - **插件**：通过插件仓库自动更新。
-- **后端（一键包用户）**：插件更新后，设置页会显示「后端版本 …，插件 …」。后端比插件旧时，点旁边的下载按钮。
+- **后端**：插件更新后，设置页会显示「后端版本 …，插件 …」。后端比插件旧时，点旁边的下载按钮。
   插件会从本仓库对应标签下载同版本的源码（`archive/refs/tags/vX.Y.Z.zip`），替换 `backend\src`；
   新功能要的 Python 包和模型做成**组件**（`backend/src/posegraph/components.json` 列出，文件在 Release
-  [backend-components-1](https://github.com/extrant/Posegraph/releases/tag/backend-components-1)），缺哪个下载哪个、校验 SHA-256 后解压进一键包。
-  老一键包点一次更新就补齐面捕（约 64MB）和深度图（约 400MB），不用重新下载整个一键包。
+  [backend-components-1](https://github.com/extrant/Posegraph/releases/tag/backend-components-1)），缺哪个下载哪个、校验 SHA-256 后解压进后端文件夹。
+  老版本的后端点一次更新就补齐面捕（约 64MB）和深度图（约 400MB），不用重装。
   旧版保留为 `backend\src.bak`，新版启动失败会自动回滚。连不上 GitHub 时可以填加速前缀，例如 `https://gh-proxy.org/`。
   插件里下载不了时可以手动下载、解压，见 [手动更新后端](docs/manual-update.zh-CN.md)（组件压缩包也可以朋友之间传，附校验方法）。
-- Python / PyTorch 本身要换时（插件会提示，一键包的 `runtime.json` 低于新版后端的要求）、换了显卡、或者后端坏了：
+- Python / PyTorch 本身要换时（插件会提示，后端文件夹的 `runtime.json` 低于新版后端的要求）、换了显卡、或者后端坏了：
   **再运行一次 `Install-Posegraph.bat`，选同一个文件夹**，它会核对每个文件，只补缺的、换不对的。
 - 源码安装：用 `git pull` 或切换到同版本标签更新。
 
@@ -210,7 +210,7 @@ powershell -ExecutionPolicy Bypass -File packaging\build_backend_package.ps1 `
 ## 许可证
 
 Posegraph 自身的代码（插件、后端、脚本）以 [MIT 许可证](LICENSE) 授权（0.3.8 及之前的版本为 PolyForm Noncommercial License 1.0.0）。
-第三方组件仍按各自的许可证，其中后端一键包附带的 SAM 3D Body 代码与权重为 Meta 的 SAM License。
+第三方组件仍按各自的许可证，其中安装脚本装进后端的 SAM 3D Body 代码与权重为 Meta 的 SAM License。
 
 ## 致谢
 

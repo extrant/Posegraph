@@ -91,18 +91,18 @@ and add `Posegraph.dll` under *Dev Plugin Locations*.
 ### Updating
 
 - **Plugin**: updates automatically through the plugin repository.
-- **Backend (package users)**: after the plugin updates, *Settings* shows "Backend …, plugin …". When the backend is older,
+- **Backend**: after the plugin updates, *Settings* shows "Backend …, plugin …". When the backend is older,
   click the download button next to it. The plugin downloads the matching source from this repository's tag
   (`archive/refs/tags/vX.Y.Z.zip`) and replaces `backend\src`. Python packages and models that new features need are
   **components** (listed in `backend/src/posegraph/components.json`, files in the
   [backend-components-1](https://github.com/extrant/Posegraph/releases/tag/backend-components-1) release): missing ones are
-  downloaded, checked against SHA-256 and unpacked into the package, so older packages get face capture (about 64 MB) and
-  depth (about 400 MB) with one click instead of a new full download.
+  downloaded, checked against SHA-256 and unpacked into the backend folder, so older backends get face capture (about 64 MB) and
+  depth (about 400 MB) with one click instead of a reinstall.
   The previous version is kept as `backend\src.bak` and restored automatically if the new one fails to start.
   If GitHub is unreachable, set a mirror prefix such as `https://gh-proxy.org/`.
   If downloads fail in the plugin, download and unpack the files by hand: see [Updating the backend by hand](docs/manual-update.md)
   (component archives can be shared between users; checksums included).
-- When Python / PyTorch itself changes (the plugin tells you: the package's `runtime.json` is older than what the new
+- When Python / PyTorch itself changes (the plugin tells you: the backend folder's `runtime.json` is older than what the new
   backend requires), after changing GPUs, or if the backend is broken: **run `Install-Posegraph.bat` again and pick the same
   folder**. It checks every file and only adds what's missing or replaces what's wrong.
 - Source installs: update with `git pull` / checkout of the same tag.
@@ -240,8 +240,8 @@ The backend (127.0.0.1:42430) exposes `GET /health`, `POST /sessions`, `GET /ses
 
 Posegraph's own code (plugin, backend, scripts) is licensed under the [MIT License](LICENSE)
 (versions up to 0.3.8 were released under the PolyForm Noncommercial License 1.0.0).
-Third-party components keep their own licenses; in particular, the SAM 3D Body code and weights shipped in the
-backend package are under Meta's SAM License.
+Third-party components keep their own licenses; in particular, the SAM 3D Body code and weights the installer puts in the
+backend are under Meta's SAM License.
 
 ## Credits
 

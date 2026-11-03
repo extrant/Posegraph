@@ -6,10 +6,14 @@
 (GitHub unreachable, even with a download prefix), download the files in a browser or get the archives from a friend
 who already has them, then unpack them as described below.
 
-All you do is **unpack a few archives into the package folder**; there's no need to download the 4 GB package again.
+If you can get online at all, the easiest fix is to **run the installer `Install-Posegraph.bat` again and choose this
+backend folder**: it checks every file and adds missing components and newer code (it can use mainland mirrors, accelerators
+or your own proxy). The fully manual way is below.
 
-"Package folder" below means the folder you got from unpacking the one-click package: it contains the `python` and
-`backend` folders and `Start-Backend.bat`, e.g. `D:\Posegraph-Backend`.
+All you do is **unpack a few archives into the backend folder**; there's no need to reinstall the backend.
+
+"Backend folder" below means the folder the installer set up (or the folder of a previously downloaded one-click
+package): it contains the `python` and `backend` folders and `Start-Backend.bat`, e.g. `D:\Posegraph-Backend`.
 
 ---
 
@@ -40,35 +44,35 @@ All you do is **unpack a few archives into the package folder**; there's no need
 ## 2. Unpack the components
 
 Every component works the same way; `posegraph-face-1.zip` is the example (the audio component only has `python`). The archive contains a `python` and a
-`backend` folder, which have to **merge with the folders of the same name in the package**.
+`backend` folder, which have to **merge with the folders of the same name in the backend folder**.
 
 **With Windows' built-in extractor (right-click → Extract All):**
 
 1. Right-click the archive → **Extract All…**
-2. Click **Browse…** and pick the package folder (e.g. `D:\Posegraph-Backend`).
+2. Click **Browse…** and pick the backend folder (e.g. `D:\Posegraph-Backend`).
 3. **Important**: make sure the path does **not** end with an extra `\posegraph-face-1`. Windows appends the archive's
    name; delete it so the path is exactly `D:\Posegraph-Backend`.
 4. Click **Extract**. When asked about existing files, choose **Replace the files in the destination**.
 
 **With 7-Zip / Bandizip / WinRAR:**
 
-1. Put the archive in the package folder (next to `python` and `backend`).
+1. Put the archive in the backend folder (next to `python` and `backend`).
 2. Right-click → **Extract Here** (not "Extract to posegraph-face-1\").
 3. Choose **Yes to All** / overwrite when asked.
 
-If it went right, these files exist (replace `D:\Posegraph-Backend` with your package folder):
+If it went right, these files exist (replace `D:\Posegraph-Backend` with your backend folder):
 
 - Face capture: `D:\Posegraph-Backend\python\Lib\site-packages\mediapipe\__init__.py` and `D:\Posegraph-Backend\backend\checkpoints\face\face_landmarker.task`
 - Depth: `D:\Posegraph-Backend\python\Lib\site-packages\moge\__init__.py` and `D:\Posegraph-Backend\backend\checkpoints\moge\model.pt`
 
 If you ended up with something like `D:\Posegraph-Backend\posegraph-face-1\python\…`, it went into a subfolder: move the
-`python` and `backend` folders inside `posegraph-face-1` up into the package folder (merge, overwrite), then delete the empty `posegraph-face-1`.
+`python` and `backend` folders inside `posegraph-face-1` up into the backend folder (merge, overwrite), then delete the empty `posegraph-face-1`.
 
 ## 3. Replace the backend code
 
 1. Unpack `Posegraph-0.7.1.zip` anywhere (the desktop is fine).
-2. In the package's `backend` folder, **rename** the existing `src` folder to `src.old` (a backup; delete it once the new version works).
-3. **Copy** the `src` folder from the unpacked `Posegraph-0.7.1\backend` into the package's `backend` folder.
+2. In the backend folder's `backend` folder, **rename** the existing `src` folder to `src.old` (a backup; delete it once the new version works).
+3. **Copy** the `src` folder from the unpacked `Posegraph-0.7.1\backend` into the backend folder's `backend` folder.
 
 Afterwards `D:\Posegraph-Backend\backend\src\posegraph\version.json` says `"version": "0.7.1"`.
 
@@ -109,6 +113,6 @@ its SHA-256 before unpacking:
 If it doesn't match, don't use it; download it again. The backend code `Posegraph-0.7.1.zip` is repackaged by GitHub on
 each download and has no fixed checksum, so it's best to get it from GitHub yourself.
 
-A shortcut: put the verified component archives in a `.download` folder inside the package folder (create it if needed),
+A shortcut: put the verified component archives in a `.download` folder inside the backend folder (create it if needed),
 rename them to `face.zip` / `depth.zip`, then click "Update backend" in the plugin. It checks that folder first and
 installs matching files without downloading them (it still needs GitHub for the ~5 MB code).

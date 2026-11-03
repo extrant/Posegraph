@@ -1,7 +1,8 @@
 # Third-party notices
 
-Posegraph builds on the following work. The backend package redistributes the items marked with ★;
-their license texts are in the package's `LICENSES` folder.
+Posegraph builds on the following work. The backend set up by the installer contains the items marked with ★
+(downloaded from their original sources, or from this project's component archives); their license texts are in the
+backend folder's `LICENSES` folder.
 
 | Component | Use | License |
 |---|---|---|

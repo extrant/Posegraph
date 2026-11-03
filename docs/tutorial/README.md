@@ -339,10 +339,10 @@ when the person is small in the frame (wide shots), motion and expressions get w
 - **Plugin**: updates automatically through the plugin repository. The changelog pops up the first time you open the main window after an update.
 - **Backend**: after a plugin update the Settings tab shows the backend version. When it's older, click the download button next to it:
   it downloads the matching backend code and **adds whichever components new features need (face capture about 64 MB, depth about 400 MB)**,
-  verifying each download, so you never need the whole package again. The backend is stopped first and restarted afterwards; if the new
+  verifying each download, so you never need to reinstall the backend. The backend is stopped first and restarted afterwards; if the new
   version doesn't start, the old one is restored. If GitHub is unreachable or slow, fill in a download mirror prefix; if a download breaks,
   just click again — finished components aren't downloaded twice.
-- **Downloads fail in the plugin**: download the files from GitHub in a browser or get the archives from a friend and unpack them into the package yourself; see [Updating the backend by hand](../manual-update.md).
+- **Downloads fail in the plugin**: download the files from GitHub in a browser or get the archives from a friend and unpack them into the backend folder yourself; see [Updating the backend by hand](../manual-update.md).
 - **Python / PyTorch needs replacing (the plugin tells you), you changed GPUs, or the backend is broken**: run `Install-Posegraph.bat` again and pick the same folder; it only adds what's missing and replaces what's wrong.
 
 ![Changelog](images/en/tut-changelog.png)
