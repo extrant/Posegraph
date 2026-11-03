@@ -51,15 +51,17 @@ Posegraph 插件（游戏内 ImGui）  ── HTTP（127.0.0.1）──►  Pose
 
 - 装好 Dalamud（API 15）并启用 **Brio** 的 FF14
 - Windows 10/11 64 位
-- 用显卡识别：NVIDIA 显卡（一键包内置 CUDA），或支持 ROCm 的 AMD 显卡（需按下方「后端（开发安装）」配置 ROCm 环境），可用显存约 **3GB**（识别时约占 2GB）。没有的话用 CPU：每张约 10~20 秒，内存约 4GB。
-- 后端一键包约 7GB 磁盘空间
+- 用显卡识别：NVIDIA 显卡，或支持 ROCm 的 AMD 显卡（RX 9000 系、RX 7900 / 7800 / 7700 等，安装脚本会识别显卡自动选），可用显存约 **3GB**（识别时约占 2GB）。没有的话用 CPU：每张约 10~20 秒，内存约 4GB。
+- 后端约 10GB 磁盘空间（安装时约 16GB）
 
 ## 安装
 
-### 1. 后端一键包
+### 1. 后端（一键安装脚本）
 
-1. 下载 **[Posegraph-Backend-win64.zip](https://drive.google.com/file/d/1PnbqdyH0hOTMSPhBaSXQ-Dpjp3fil6k2/view?usp=sharing)**（谷歌硬盘，约 4GB），解压到空间充足的位置，路径建议只用英文。
-2. 解压后有 `python`、`backend`、`LICENSES`、`Start-Backend.bat`、`README.txt`，不需要安装任何东西。
+1. 下载 **[Posegraph-Installer.zip](https://github.com/extrant/Posegraph/releases/download/backend-components-1/Posegraph-Installer.zip)**（不到 100KB），解压后双击 `Install-Posegraph.bat`。
+2. 按提示选安装位置（路径只用英文）、计算方式（自动识别显卡并推荐：NVIDIA CUDA 12.8 / 12.6、AMD ROCm、CPU）
+   和网络方式（国内选「中国网络」走镜像），等它下完、装完（约 3~6GB）。中途断了再运行一次会接着装。
+3. 装好时游戏没开的话，会自动把后端位置填进插件设置。详见 [安装脚本说明](installer/README.md)。
 
 ### 2. 插件
 
@@ -74,7 +76,7 @@ Posegraph 不在 Dalamud 官方仓库里，从自定义仓库安装：
 ### 3. 首次使用
 
 1. `/posegraph` 打开主界面。
-2. 设置 → **选择一键包目录…** → 选解压出来的文件夹。
+2. 设置 → **选择一键包目录…** → 选安装的文件夹（安装脚本已经自动填好的话跳过这步）。
 3. 点状态栏的**插头**按钮启动后端。可以勾选「插件加载时自动启动后端」。
 
 ### 更新
@@ -87,7 +89,8 @@ Posegraph 不在 Dalamud 官方仓库里，从自定义仓库安装：
   老一键包点一次更新就补齐面捕（约 64MB）和深度图（约 400MB），不用重新下载整个一键包。
   旧版保留为 `backend\src.bak`，新版启动失败会自动回滚。连不上 GitHub 时可以填加速前缀，例如 `https://gh-proxy.org/`。
   插件里下载不了时可以手动下载、解压，见 [手动更新后端](docs/manual-update.zh-CN.md)（组件压缩包也可以朋友之间传，附校验方法）。
-- 只有 Python / PyTorch 本身要换时才需要重新下载完整一键包，插件会提示（一键包的 `runtime.json` 低于新版后端的要求）。
+- Python / PyTorch 本身要换时（插件会提示，一键包的 `runtime.json` 低于新版后端的要求）、换了显卡、或者后端坏了：
+  **再运行一次 `Install-Posegraph.bat`，选同一个文件夹**，它会核对每个文件，只补缺的、换不对的。
 - 源码安装：用 `git pull` 或切换到同版本标签更新。
 
 ## 使用
@@ -185,6 +188,7 @@ powershell -ExecutionPolicy Bypass -File packaging\build_backend_package.ps1 `
 ```
 
 脚本把一份普通的 CPython 3.11 安装复制成便携解释器，再加上虚拟环境的 site-packages、后端源码、SAM 3D Body 源码与权重、许可证文件。
+一键包不再单独发布：它是安装脚本的基准，`packaging/make_installer_lock.py` 从实测过的一键包生成 `installer/lock.json`（见 [安装脚本说明](installer/README.md)）。
 
 ### 开发工具（`backend/scripts`，输出为中文）
 

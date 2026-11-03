@@ -2,8 +2,8 @@
 
 **简体中文** | [English](#english)
 
-不用下载 4GB 的一键包：这个脚本从官方源（或国内镜像）现下现装，装出来的东西和一键包一样
-（同样的依赖版本、同样的模型权重，每个文件都按 SHA-256 核对）。已经装过的后端也能用它**更新 / 修复**。
+Posegraph 的后端统一用这个脚本安装：从官方源（或国内镜像）现下现装，按你的显卡选合适的版本，
+每个文件都按 SHA-256 核对。已经装过的后端（包括以前下载的一键包）也能用它**更新 / 修复**。
 
 ## 怎么用
 
@@ -87,8 +87,9 @@ ROCm 的几个大文件要下下来算 SHA-256（约 2GB），ROCm 版本没变�
 
 ## English
 
-Instead of downloading the 4 GB package, this script installs the same thing from official sources (or mainland China
-mirrors), every file checked against SHA-256. It also **updates / repairs** an existing backend.
+The Posegraph backend is installed with this script: it downloads from official sources (or mainland China mirrors),
+picks the right build for your GPU and checks every file against SHA-256. It also **updates / repairs** an existing
+backend, including a previously downloaded one-click package.
 
 **How to use**
 

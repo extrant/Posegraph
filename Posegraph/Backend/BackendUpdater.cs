@@ -159,7 +159,7 @@ public sealed class BackendUpdater : IDisposable
                 incoming = Parse(await reader.ReadToEndAsync());
             if ("v" + incoming.Version != tag) return Loc.F("版本不符：压缩包是 {0}，需要 {1}", incoming.Version, tag);
             if (incoming.Runtime > runtime)
-                return Loc.F("新版后端需要运行环境 {0}，一键包是 {1}：请重新下载完整一键包", incoming.Runtime, runtime);
+                return Loc.F("新版后端需要运行环境 {0}，一键包是 {1}：请再运行一键安装脚本 Install-Posegraph.bat，选这个文件夹", incoming.Runtime, runtime);
 
             // 新源码要的组件：缺的先全部下载、校验好（这时后端还在跑），停后端后再解压
             var packageRoot = PackageRoot(backendDir);

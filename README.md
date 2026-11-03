@@ -56,17 +56,20 @@ Posegraph plugin (in game, ImGui)  ── HTTP (127.0.0.1) ──►  Posegraph 
 
 - FINAL FANTASY XIV with Dalamud (API 15) and **Brio** installed and enabled
 - Windows 10/11 64-bit
-- For GPU inference: an NVIDIA GPU (CUDA is bundled in the backend package) or a ROCm-capable AMD GPU (via source setup below), with about **3 GB free VRAM** (about 2 GB used while recognizing).
+- For GPU inference: an NVIDIA GPU or a ROCm-capable AMD GPU (RX 9000, RX 7900 / 7800 / 7700 and others; the installer detects
+  your GPU and picks the right build), with about **3 GB free VRAM** (about 2 GB used while recognizing).
   Without it, Posegraph runs on the CPU: about 10–20 s per image and about 4 GB RAM.
-- About 7 GB of disk space for the backend package
+- About 10 GB of disk space for the backend (about 16 GB while installing)
 
 ## Installation
 
-### 1. Backend package
+### 1. Backend (installer)
 
-1. Download **[Posegraph-Backend-win64.zip](https://drive.google.com/file/d/1PnbqdyH0hOTMSPhBaSXQ-Dpjp3fil6k2/view?usp=sharing)** (Google Drive, about 4 GB) and extract it somewhere with
-   enough space. An ASCII-only path is recommended.
-2. The folder contains `python`, `backend`, `LICENSES`, `Start-Backend.bat` and `README.txt`. Nothing needs to be installed.
+1. Download **[Posegraph-Installer.zip](https://github.com/extrant/Posegraph/releases/download/backend-components-1/Posegraph-Installer.zip)** (under 100 KB), unpack it and double-click `Install-Posegraph.bat`.
+2. Choose the install location (English-only path), the compute mode (detected and recommended: NVIDIA CUDA 12.8 / 12.6,
+   AMD ROCm or CPU) and the network, then wait for it to finish (about 3–6 GB). If it's interrupted, run it again to resume.
+3. If the game isn't running when it finishes, the backend location is filled into the plugin settings.
+   See the [installer notes](installer/README.md).
 
 ### 2. Plugin
 
@@ -82,7 +85,7 @@ and add `Posegraph.dll` under *Dev Plugin Locations*.
 ### 3. First start
 
 1. `/posegraph` opens the main window.
-2. *Settings* → **Choose backend package folder…** → select the extracted folder.
+2. *Settings* → **Choose backend package folder…** → select the install folder (skip this if the installer already filled it in).
 3. Click the **plug** icon in the status bar to start the backend. Optionally enable *Start the backend when the plugin loads*.
 
 ### Updating
@@ -99,8 +102,9 @@ and add `Posegraph.dll` under *Dev Plugin Locations*.
   If GitHub is unreachable, set a mirror prefix such as `https://gh-proxy.org/`.
   If downloads fail in the plugin, download and unpack the files by hand: see [Updating the backend by hand](docs/manual-update.md)
   (component archives can be shared between users; checksums included).
-- A full package download is only needed when Python / PyTorch itself changes; the plugin tells you
-  (the package's `runtime.json` is older than what the new backend requires).
+- When Python / PyTorch itself changes (the plugin tells you: the package's `runtime.json` is older than what the new
+  backend requires), after changing GPUs, or if the backend is broken: **run `Install-Posegraph.bat` again and pick the same
+  folder**. It checks every file and only adds what's missing or replaces what's wrong.
 - Source installs: update with `git pull` / checkout of the same tag.
 
 ## Usage
@@ -210,7 +214,9 @@ powershell -ExecutionPolicy Bypass -File packaging\build_backend_package.ps1 `
 ```
 
 It copies a regular CPython 3.11 install as a portable interpreter, the venv's site-packages, the backend source,
-the SAM 3D Body source and weights, and the license files.
+the SAM 3D Body source and weights, and the license files. The package is no longer published on its own: it is the
+reference for the installer, and `packaging/make_installer_lock.py` generates `installer/lock.json` from a tested package
+(see the [installer notes](installer/README.md)).
 
 ### Developer tools (`backend/scripts`, Chinese output)
 

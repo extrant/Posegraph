@@ -267,7 +267,7 @@ public static partial class Loc
         ["校验…"] = "Verifying…",
         ["压缩包里没有后端源码（backend/src/posegraph/version.json）"] = "The archive has no backend source (backend/src/posegraph/version.json)",
         ["版本不符：压缩包是 {0}，需要 {1}"] = "Version mismatch: the archive is {0}, expected {1}",
-        ["新版后端需要运行环境 {0}，一键包是 {1}：请重新下载完整一键包"] = "The new backend needs runtime {0}, your package has {1}: please download the full backend package again",
+        ["新版后端需要运行环境 {0}，一键包是 {1}：请再运行一键安装脚本 Install-Posegraph.bat，选这个文件夹"] = "The new backend needs runtime {0}, your package has {1}: please run the installer Install-Posegraph.bat again and choose this folder",
         ["压缩包里有不安全的路径，已取消"] = "The archive contains unsafe paths; cancelled",
         ["停止后端…"] = "Stopping the backend…",
         ["启动新版后端…"] = "Starting the new backend…",

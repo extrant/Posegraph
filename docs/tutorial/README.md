@@ -55,9 +55,10 @@ The UI screenshots are made with the [offline screenshot tool](../../tools/UiPre
 You need:
 
 - FFXIV with Dalamud and **[Brio](https://github.com/Etheirys/Brio)** enabled
-- The **Posegraph backend package**: [Posegraph-Backend-win64.zip](https://drive.google.com/file/d/1PnbqdyH0hOTMSPhBaSXQ-Dpjp3fil6k2/view?usp=sharing) (about 4 GB).
-  Unzip it somewhere with enough space, using an **English-only path** such as `D:\Posegraph-Backend`
-- For GPU recognition, an NVIDIA card with about 3 GB of free VRAM; without one it runs on the CPU (about 10–20 s per image)
+- The **Posegraph backend**: download [Posegraph-Installer.zip](https://github.com/extrant/Posegraph/releases/download/backend-components-1/Posegraph-Installer.zip), unpack it and double-click `Install-Posegraph.bat`.
+  Choose the install location (an **English-only path** such as `D:\Posegraph-Backend`), compute mode and network, and wait
+  for it to finish (about 3–6 GB). Your GPU is detected and a compute mode recommended. See the [installer notes](../../installer/README.md)
+- For GPU recognition, an NVIDIA card or a ROCm-capable AMD card (RX 9000, RX 7900 / 7800 / 7700 and others) with about 3 GB of free VRAM; without one it runs on the CPU (about 10–20 s per image)
 
 Install the plugin:
 
@@ -72,7 +73,7 @@ Go to the main window's **Settings** tab:
 
 ![Settings tab](images/en/tut-settings.png)
 
-1. Click **Choose backend package folder…** and pick the folder you unzipped (it contains `python` and `backend`).
+1. Click **Choose backend package folder…** and pick the folder the installer set up (it contains `python` and `backend`). If the game was closed while installing, the installer already filled it in.
 2. "Paths OK" and "Up to date" mean you're set.
 3. Click the **power** button at the top right to start the backend. Tick "Start the backend when the plugin loads" so you don't have to every time.
 4. Leave the device on **Auto**: it uses the GPU when there is enough VRAM and falls back to the CPU otherwise.
@@ -342,6 +343,7 @@ when the person is small in the frame (wide shots), motion and expressions get w
   version doesn't start, the old one is restored. If GitHub is unreachable or slow, fill in a download mirror prefix; if a download breaks,
   just click again — finished components aren't downloaded twice.
 - **Downloads fail in the plugin**: download the files from GitHub in a browser or get the archives from a friend and unpack them into the package yourself; see [Updating the backend by hand](../manual-update.md).
+- **Python / PyTorch needs replacing (the plugin tells you), you changed GPUs, or the backend is broken**: run `Install-Posegraph.bat` again and pick the same folder; it only adds what's missing and replaces what's wrong.
 
 ![Changelog](images/en/tut-changelog.png)
 

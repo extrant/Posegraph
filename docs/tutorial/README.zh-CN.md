@@ -54,9 +54,10 @@
 你需要：
 
 - 装好 Dalamud 并启用 **[Brio](https://github.com/Etheirys/Brio)** 的 FF14
-- **Posegraph 后端一键包**：[Posegraph-Backend-win64.zip](https://drive.google.com/file/d/1PnbqdyH0hOTMSPhBaSXQ-Dpjp3fil6k2/view?usp=sharing)（约 4GB），
-  解压到空间充足的位置，**路径只用英文**，比如 `D:\Posegraph-Backend`
-- 用显卡识别要 NVIDIA 显卡、可用显存约 3GB；没有也能用 CPU（每张约 10~20 秒）
+- **Posegraph 后端**：下载 [Posegraph-Installer.zip](https://github.com/extrant/Posegraph/releases/download/backend-components-1/Posegraph-Installer.zip)，解压后双击 `Install-Posegraph.bat`，
+  按提示选安装位置（**路径只用英文**，比如 `D:\Posegraph-Backend`）、计算方式和网络方式，等它装完（约 3~6GB）。
+  国内网络选「中国网络」；显卡会自动识别并推荐计算方式。详见 [安装脚本说明](../../installer/README.md)
+- 用显卡识别要 NVIDIA 显卡或支持 ROCm 的 AMD 显卡（RX 9000 系、RX 7900 / 7800 / 7700 等）、可用显存约 3GB；没有也能用 CPU（每张约 10~20 秒）
 
 安装插件：
 
@@ -71,7 +72,7 @@
 
 ![设置页](images/zh/tut-settings.png)
 
-1. 点 **选择一键包目录…**，选你解压出来的文件夹（里面有 `python` 和 `backend`）。
+1. 点 **选择一键包目录…**，选安装脚本装好的文件夹（里面有 `python` 和 `backend`）。装的时候游戏没开的话，脚本已经自动填好了。
 2. 下方显示「路径有效」「已是最新」就对了。
 3. 点右上角的 **电源** 按钮启动后端；勾上「插件加载时自动启动后端」以后就不用每次点。
 4. 识别设备保持 **自动** 即可：显存够就用显卡，不够自动改用 CPU。
@@ -321,6 +322,7 @@
   更新时会先停后端，装好后自动启动；新版起不来会自动换回旧版。连不上 GitHub 或者下载很慢时可以填「下载加速前缀」，
   中途断了再点一次就行，已经下好的组件不用重下。
 - **插件里下载不了**：可以用浏览器从 GitHub 下载，或者找朋友要压缩包，自己解压进一键包，见 [手动更新后端](../manual-update.zh-CN.md)。
+- **要换 Python / PyTorch（插件会提示）、换了显卡、后端坏了**：再运行一次 `Install-Posegraph.bat`，选同一个文件夹，只补缺的、换不对的。
 
 ![更新日志](images/zh/tut-changelog.png)
 
