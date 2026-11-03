@@ -584,7 +584,7 @@ class Installer:
         if (key, *stamp) in self._hashed:
             return self._hashed[(key, *stamp)]
         if size >= SPLIT_MIN:
-            print("  " + L(f"核对 {path.name}（{size / 2**30:.1f} GB）…", f"Checking {path.name} ({size / 2**30:.1f} GB)…"), flush=True)
+            print("  " + L(f"核对 {path.name}（{size / 2**30:.1f} GB）…", f"Checking {path.name} ({size / 2**30:.1f} GB)…"), file=sys.stderr, flush=True)
         ok = self._hashed[(key, *stamp)] = file_sha256(path) == digest
         if ok and save:
             cache[key] = stamp
