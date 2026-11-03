@@ -53,6 +53,9 @@ SAM_WEIGHTS = "facebook/sam-3d-body-vith"
 SKIP = {"mediapipe", "absl-py", "flatbuffers", "moge", "pipeline", "utils3d-moge", "onnxruntime", "av", "torch", "torchvision", "pip"}
 # 有 3 个包只有源码包（antlr4-python3-runtime、fvcore、iopath），离线构建要 setuptools + wheel
 BUILD_EXTRA = {"wheel": "0.45.1"}
+# 按环境换掉一键包里的版本：一键包的 setuptools 65.5 在 Python 3.12 上用不了（pkg_resources 要 pkgutil.ImpImporter，3.12 删了），
+# 构建上面 3 个源码包和 ROCm 的 rocm 元包会失败。80.9.0 在 3.12 上实测能构建这 4 个
+ENV_PINS = {"cp312": {"setuptools": "80.9.0"}}
 # 官方权重（Hugging Face 2025-11-19 版）的 SHA-256，魔搭镜像同一份文件
 WEIGHT_SHA = {"model.ckpt": "3b1cb897f4bbd977bf81cbb0b30780a9582681ac642ee112865790ceb4d66056",
               "assets/mhr_model.pt": "352e271a6c42729c68554ceaea0c955e866970160c31e35506d782dc0f7377bc"}
@@ -195,7 +198,8 @@ def main() -> None:
 
     envs = {}
     for env, pyver in PYTHONS.items():
-        packages = pick_all(names, env)
+        pins = ENV_PINS.get(env, {})
+        packages = pick_all([(n, pins.get(n, v)) for n, v in names], env)
         print(f"{env}: {len(packages)} packages")
         entry = {"python": python_embed(pyver), "pip": pick("pip", md.version("pip"), tag_ranks(env)), "packages": packages}
         if env != "cp311":
@@ -231,8 +235,11 @@ def main() -> None:
     posegraph = archive_files(f"https://github.com/{REPO}/archive/refs/tags/{tag}.zip")
     components = json.loads(posegraph_component_manifest(tag))
 
+    # 同一后端版本重新生成清单（修了包版本之类）时加一，安装脚本按「版本 + 修订」判断远端清单是不是更新
+    revision = old.get("revision", 0) + 1 if old.get("posegraph", {}).get("version") == version["version"] else 1
     lock = {
         "format": 2,
+        "revision": revision,
         "posegraph": {"version": version["version"], "runtime": version["runtime"], "tag": tag,
                       "url": f"https://github.com/{REPO}/archive/refs/tags/{tag}.zip", **posegraph},
         "envs": envs,

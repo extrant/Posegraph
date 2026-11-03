@@ -1,5 +1,6 @@
 {
  "format": 2,
+ "revision": 1,
  "posegraph": {
   "version": "0.7.3",
   "runtime": 1,
@@ -941,6 +942,15 @@
      "sdist": false
     },
     {
+     "name": "wheel",
+     "version": "0.45.1",
+     "file": "wheel-0.45.1-py3-none-any.whl",
+     "path": "packages/0b/2c/87f3254fd8ffd29e4c02732eee68a83a1d3c346ae39bc6822dcbcb697f2b/wheel-0.45.1-py3-none-any.whl",
+     "sha256": "708e7481cc80179af0e556bbf0cc00b8444c7321e2700b8d8580231d13017248",
+     "size": 72494,
+     "sdist": false
+    },
+    {
      "name": "yacs",
      "version": "0.1.8",
      "file": "yacs-0.1.8-py3-none-any.whl",
@@ -956,15 +966,6 @@
      "path": "packages/aa/9d/8cdceec66a9b940700cb45931741403f045b162afd79bcb93c41cadd0972/yarl-1.25.1-cp311-cp311-win_amd64.whl",
      "sha256": "d7306dee25b8a0e737363f347362b875094b4dc4e367311470656ae420fdbf8e",
      "size": 102894,
-     "sdist": false
-    },
-    {
-     "name": "wheel",
-     "version": "0.45.1",
-     "file": "wheel-0.45.1-py3-none-any.whl",
-     "path": "packages/0b/2c/87f3254fd8ffd29e4c02732eee68a83a1d3c346ae39bc6822dcbcb697f2b/wheel-0.45.1-py3-none-any.whl",
-     "sha256": "708e7481cc80179af0e556bbf0cc00b8444c7321e2700b8d8580231d13017248",
-     "size": 72494,
      "sdist": false
     }
    ]
@@ -1519,11 +1520,11 @@
     },
     {
      "name": "setuptools",
-     "version": "65.5.0",
-     "file": "setuptools-65.5.0-py3-none-any.whl",
-     "path": "packages/41/82/7f54bbfe5c247a8c9f78d8d1d7c051847bcb78843c397b866dba335c1e88/setuptools-65.5.0-py3-none-any.whl",
-     "sha256": "f62ea9da9ed6289bfe868cd6845968a2c854d1427f8548d52cae02a42b4f0356",
-     "size": 1232695,
+     "version": "80.9.0",
+     "file": "setuptools-80.9.0-py3-none-any.whl",
+     "path": "packages/a3/dc/17031897dae0efacfea57dfd3a82fdd2a2aeb58e0ff71b77b87e44edc772/setuptools-80.9.0-py3-none-any.whl",
+     "sha256": "062d34222ad13e0cc312a4c02d73f059e86a4acbfbdea8f8f76b28c99f306922",
+     "size": 1201486,
      "sdist": false
     },
     {
@@ -1653,6 +1654,15 @@
      "sdist": false
     },
     {
+     "name": "wheel",
+     "version": "0.45.1",
+     "file": "wheel-0.45.1-py3-none-any.whl",
+     "path": "packages/0b/2c/87f3254fd8ffd29e4c02732eee68a83a1d3c346ae39bc6822dcbcb697f2b/wheel-0.45.1-py3-none-any.whl",
+     "sha256": "708e7481cc80179af0e556bbf0cc00b8444c7321e2700b8d8580231d13017248",
+     "size": 72494,
+     "sdist": false
+    },
+    {
      "name": "yacs",
      "version": "0.1.8",
      "file": "yacs-0.1.8-py3-none-any.whl",
@@ -1668,15 +1678,6 @@
      "path": "packages/bb/cc/51a7b4abf4ac593b8e7eb3794b28e5a35ae26eed8bc04787628d215af82f/yarl-1.25.1-cp312-cp312-win_amd64.whl",
      "sha256": "7d575b54cb3863ef9bc290ea4b009999d55dc237326131e4853cf33e888fee03",
      "size": 102593,
-     "sdist": false
-    },
-    {
-     "name": "wheel",
-     "version": "0.45.1",
-     "file": "wheel-0.45.1-py3-none-any.whl",
-     "path": "packages/0b/2c/87f3254fd8ffd29e4c02732eee68a83a1d3c346ae39bc6822dcbcb697f2b/wheel-0.45.1-py3-none-any.whl",
-     "sha256": "708e7481cc80179af0e556bbf0cc00b8444c7321e2700b8d8580231d13017248",
-     "size": 72494,
      "sdist": false
     }
    ],

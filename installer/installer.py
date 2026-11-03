@@ -724,8 +724,9 @@ class Installer:
                            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
         self.log(p.stdout + p.stderr)
         if p.returncode != 0:
-            tail = [l for l in (p.stderr or p.stdout).strip().splitlines() if l.strip()][-3:]
-            raise RuntimeError(" / ".join(tail) or f"exit {p.returncode}")
+            lines = [l.strip() for l in (p.stderr or p.stdout).strip().splitlines() if l.strip()]
+            cause = [l for l in lines if re.match(r"^\w+(Error|Exception): ", l)][-1:]   # 真正的原因（pip 的结尾几行只说「上面有错」）
+            raise RuntimeError(" / ".join(cause + lines[-2:]) or f"exit {p.returncode}")
         return p.stdout
 
     def install_loop(self) -> None:

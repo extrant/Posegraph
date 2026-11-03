@@ -318,7 +318,8 @@ foreach ($url in @("https://raw.githubusercontent.com/extrant/Posegraph/main/ins
 $quick.Dispose()
 if ($remote -and $remote.format -gt 2) {
     Say ("        " + (L "有新版的安装脚本（清单格式变了），这次先用自带的清单；想要最新的请重新下载安装脚本。" "A newer installer exists (new list format); using the bundled list this time. Download the installer again for the latest.")) "DarkYellow"
-} elseif ($remote -and $remote.format -eq 2 -and (Compare-Version $remote.posegraph.version $version) -gt 0) {
+} elseif ($remote -and $remote.format -eq 2 -and ((Compare-Version $remote.posegraph.version $version) -gt 0 -or
+        ((Compare-Version $remote.posegraph.version $version) -eq 0 -and [int]$remote.revision -gt [int]$lock.revision))) {
     [IO.File]::WriteAllText($lockPath, $text, (New-Object Text.UTF8Encoding($false)))
     $lock = $remote; $version = $lock.posegraph.version
     Say ("        √ " + (L "用最新的清单：后端 $version" "Using the latest list: backend $version")) "Green"
