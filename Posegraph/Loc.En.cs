@@ -12,6 +12,8 @@ public static partial class Loc
         ["[Posegraph] 已启动后端 PID {0}"] = "[Posegraph] Backend started, PID {0}",
         ["nvidia-smi 输出无法解析"] = "Could not parse nvidia-smi output",
         ["无法读取显存（需要 NVIDIA 显卡与驱动）：{0}"] = "Cannot read VRAM (requires an NVIDIA GPU and driver): {0}",
+        ["无法读取显存：{0}"] = "Cannot read VRAM: {0}",
+        ["未检测到可用独立显卡"] = "No discrete GPU detected",
         ["Posegraph HTTP 已启动：http://127.0.0.1:{0}/"] = "Posegraph HTTP started: http://127.0.0.1:{0}/",
         ["Posegraph 处理请求失败"] = "Posegraph failed to handle a request",
         ["不在 GPose 中"] = "Not in GPose",

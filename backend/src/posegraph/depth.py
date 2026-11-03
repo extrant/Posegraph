@@ -9,6 +9,7 @@
 
 from __future__ import annotations
 
+import sys
 import threading
 from dataclasses import dataclass
 
@@ -52,6 +53,9 @@ def available() -> bool:
 def estimate(rgb: np.ndarray, device: str) -> PhotoDepth:
     """跑 MoGe-2。模型第一次用时加载，换设备时重载；和 SAM 3D Body 一起在 Estimator.unload 时释放（unload）。"""
     import torch
+
+    if device == "cuda" and sys.platform == "win32" and getattr(torch.version, "hip", None) and hasattr(torch, "backends"):
+        torch.backends.cudnn.enabled = False
 
     global _model, _model_device
     with _lock:

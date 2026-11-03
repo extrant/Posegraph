@@ -22,11 +22,12 @@ sys.path.insert(0, str(ROOT / "src"))
 
 
 def gpu_free_mb() -> tuple[int, int]:
-    out = subprocess.check_output(
-        ["nvidia-smi", "--query-gpu=memory.used,memory.total", "--format=csv,noheader,nounits"], text=True
-    )
-    used, total = (int(x) for x in out.strip().splitlines()[0].split(","))
-    return used, total
+    from posegraph.gpu import query_gpu
+
+    info = query_gpu(max_age=0)
+    if info is None:
+        return 0, 0
+    return info["usedMB"], info["totalMB"]
 
 
 def run_one(precision: str, image: Path, runs: int, share_mhr: bool = True) -> dict:
