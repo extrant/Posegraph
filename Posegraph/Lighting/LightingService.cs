@@ -143,6 +143,9 @@ public sealed partial class LightingService : IDisposable
 
     public int DroppedGroups { get; private set; }
 
+    /// <summary>现在打着的每盏灯（世界坐标）：名字、第几套、状态、离那套中心多远（米）。导出到 Blender 用。</summary>
+    public IReadOnlyList<(string Name, int Group, LightState State, float Distance)> WorldLights { get; private set; } = [];
+
     /// <summary>勾选要一起照的其他角色（主窗口角色列表的序号，Plugin 接上：列表里没被去掉勾的）。</summary>
     public Func<IReadOnlyList<int>>? Others { get; set; }
 
@@ -183,8 +186,9 @@ public sealed partial class LightingService : IDisposable
     }).OfType<LightRig>();
 
     /// <summary>读角色的脸，套用方案。actor 同主窗口（null 为 GPose 目标）。返回失败原因，成功为 null。
-    /// follow：跟随角色的自动重摆——主光那一侧沿用之前的，人的位置平滑过渡过去。</summary>
-    public async Task<string?> ApplyAsync(LightRig rig, int? actor, bool follow = false)
+    /// follow：跟随角色的自动重摆——主光那一侧沿用之前的，人的位置平滑过渡过去。
+    /// fresh：新套一套方案（记下每盏灯原来的样子，「恢复原样」回到这里）；重新摆、跟随角色时为 false。</summary>
+    public async Task<string?> ApplyAsync(LightRig rig, int? actor, bool follow = false, bool fresh = true)
     {
         var read = await ReadPeopleAsync(actor);
         if (read.Count == 0) return Error = Loc.T("读不到角色的脸（不在 GPose、没选角色或 Brio 不可用）");
@@ -215,14 +219,15 @@ public sealed partial class LightingService : IDisposable
             SelectedGroup = null;
         }
         Active = rig;
-        _shared = [.. rig.Lights];
+        _shared = WithIds(rig.Lights);
+        if (fresh) RememberOriginal();
         await _framework.RunOnFrameworkThread(Rebuild);
         return Error = null;
     }
 
     /// <summary>角色动过后重新读脸，再摆一次。</summary>
     public async Task<string?> ReplaceAsync(int? actor, bool follow = false)
-        => Active is { } rig ? await ApplyAsync(rig with { Lights = [.. _shared] }, actor, follow) : null;
+        => Active is { } rig ? await ApplyAsync(rig with { Lights = [.. _shared] }, actor, follow, fresh: false) : null;
 
     /// <summary>界面改了某盏灯或全局微调：按已读到的脸重摆（不重新读角色）。</summary>
     public void Refresh() => _framework.RunOnFrameworkThread(Rebuild);
@@ -231,7 +236,7 @@ public sealed partial class LightingService : IDisposable
     public (int Changed, int Added) ApplyPhotoColors(Backend.PhotoLighting photo)
     {
         var before = Lights;
-        Lights = LightRigs.WithPhotoColors(before, photo);
+        Lights = WithIds(LightRigs.WithPhotoColors(before, photo));
         var changed = before.Where((l, i) => !LightRigs.SameColor(l, Lights[i])).Count();
         if (Lights.Count != before.Count) Solo = null;
         Refresh();
@@ -243,6 +248,7 @@ public sealed partial class LightingService : IDisposable
         _lights.DestroyAll();
         _spawned.Clear();
         Active = null;
+        WorldLights = [];
         _shared = [];
         _overrides.Clear();
         SelectedGroup = null;
@@ -250,11 +256,14 @@ public sealed partial class LightingService : IDisposable
         Muted.Clear();
     });
 
-    /// <summary>把当前的灯（含逐盏改过的）存成自己的方案。</summary>
+    /// <summary>把当前的灯（含逐盏改过的）存成自己的方案，并把它当成现在套着的方案：之后「恢复原样」回到存的这一份。</summary>
     public void SaveCustom(string name)
     {
         var rig = new LightRig($"custom-{DateTime.Now:yyyyMMddHHmmss}", name, Loc.T("自己存的方案"), [.. Lights], Custom: true);
         _config.LightRigs.Add(JsonSerializer.Serialize(rig));
+        Active = rig;
+        _original = [.. rig.Lights];
+        _base = rig.Lights.Where(l => l.Id is not null).ToDictionary(l => l.Id!, l => l);
     }
 
     public void DeleteCustom(LightRig rig)
@@ -329,17 +338,21 @@ public sealed partial class LightingService : IDisposable
                                    .OrderBy(g => g == 0 ? -1f : camera is { } c ? Vector3.Distance(c, groups[g].Center) : g).ToList();
         DroppedGroups = Math.Max(0, groups.Count - keep);
         var states = new List<LightState>();
+        var world = new List<(string, int, LightState, float)>();
         foreach (var g in byDistance.Take(keep).Order())
         {
             var shadows = byDistance.IndexOf(g) < MaxShadowGroups;
-            var solved = LightRigs.Solve(LightsFor(g), groups[g], camera, Tweaks, Time, tight: groups.Count > 1);
+            var specs = LightsFor(g);
+            var solved = LightRigs.Solve(specs, groups[g], camera, Tweaks, Time, tight: groups.Count > 1);
             for (var i = 0; i < solved.Count; i++)
             {
                 if (!IsLit(i)) solved[i] = solved[i] with { Color = Vector3.Zero };
                 if (!shadows) solved[i] = solved[i] with { Shadows = false };
+                if (IsLit(i)) world.Add((specs[i].Name, g, solved[i], Vector3.Distance(solved[i].Position, groups[g].Center)));
             }
             states.AddRange(solved);
         }
+        WorldLights = world;
         // 种类或数量变了就重建，否则原地改（避免闪）
         if (states.Count != _spawned.Count || states.Where((s, i) => s.Kind != _spawned[i].Kind).Any())
         {
@@ -370,8 +383,10 @@ public sealed partial class LightingService : IDisposable
             _lights.DestroyAll();
             _spawned.Clear();
             Active = null;
+            WorldLights = [];
             SelectedLight = Solo = null;
             Muted.Clear();
+            ClearHistory();
             return;
         }
         _tick++;

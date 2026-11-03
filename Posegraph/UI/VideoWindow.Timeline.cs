@@ -47,6 +47,15 @@ public sealed partial class VideoWindow
     private int _poseGroup = 2;
     private volatile bool _editBusy;
     private readonly Stack<List<ClipKey>> _undo = new();
+    private readonly Stack<List<ClipKey>> _redo = new();
+
+    /// <summary>这次换上的修正从哪来：普通改动（记撤销、清掉重做）、撤销（旧的进重做）、重做（旧的进撤销）。</summary>
+    private enum EditHistory
+    {
+        Normal,
+        Undo,
+        Redo,
+    }
     private double? _dragTime;              // 正在拖的关键帧的新时间
 
     // Brio 里的改动：读回的姿势、当时播放器写的那一帧、那一帧的时间
@@ -60,6 +69,7 @@ public sealed partial class VideoWindow
     {
         _editContext = rawPath is null ? null : new EditContext(clipPath, rawPath, request) { RawId = rawId };
         _undo.Clear();
+        _redo.Clear();
         _selectedKey = null;
     }
 
@@ -222,9 +232,14 @@ public sealed partial class VideoWindow
             ImGui.EndCombo();
         }
         ImGui.SameLine();
-        using (ImRaii.Disabled(_undo.Count == 0))
+        using (ImRaii.Disabled(_undo.Count == 0 || _editBusy))
             if (ImGuiComponents.IconButton("##editUndo", FontAwesomeIcon.Undo)) Undo();
-        Tip(Loc.T("撤销上一次修正"));
+        Tip(Loc.T("撤销上一次修正（Ctrl+Z）"));
+        ImGui.SameLine();
+        using (ImRaii.Disabled(_redo.Count == 0 || _editBusy))
+            if (ImGuiComponents.IconButton("##editRedo", FontAwesomeIcon.Redo)) Redo();
+        Tip(Loc.T("重做（Ctrl+Y）"));
+        HandleEditShortcuts();
 
         using (ImRaii.Disabled(_clipboard is null))
         {
@@ -360,9 +375,29 @@ public sealed partial class VideoWindow
 
     private void Undo()
     {
-        if (_undo.Count == 0) return;
+        if (_undo.Count == 0 || _editBusy) return;
         var edits = _undo.Pop();
-        _ = Task.Run(() => CommitAsync(edits, Loc.T("已撤销"), null, undoable: false));
+        _ = Task.Run(() => CommitAsync(edits, Loc.T("已撤销"), null, EditHistory.Undo));
+    }
+
+    private void Redo()
+    {
+        if (_redo.Count == 0 || _editBusy) return;
+        var edits = _redo.Pop();
+        _ = Task.Run(() => CommitAsync(edits, Loc.T("已重做"), null, EditHistory.Redo));
+    }
+
+    /// <summary>视频窗口有焦点（不在输入框里打字）时 Ctrl+Z 撤销修正、Ctrl+Y / Ctrl+Shift+Z 重做。</summary>
+    private void HandleEditShortcuts()
+    {
+        var io = ImGui.GetIO();
+        if (!io.KeyCtrl || io.WantTextInput || !ImGui.IsWindowFocused(ImGuiFocusedFlags.RootAndChildWindows)) return;
+        if (ImGui.IsKeyPressed(ImGuiKey.Z, false))
+        {
+            if (io.KeyShift) Redo();
+            else Undo();
+        }
+        if (ImGui.IsKeyPressed(ImGuiKey.Y, false)) Redo();
     }
 
     /// <summary>
@@ -547,7 +582,7 @@ public sealed partial class VideoWindow
     /// 换上新的一份修正：找出变了的关键帧（新旧两份里对不上的），按它们的影响范围只重算那几帧，拼回片段文件和播放器里的片段，
     /// 重新套上当前帧。select：重算完选中这个时间的关键帧。骨骼列表变了（比如表情开关改过）时改走整段重算。
     /// </summary>
-    private async Task CommitAsync(List<ClipKey> edits, string done, double? select, bool undoable = true)
+    private async Task CommitAsync(List<ClipKey> edits, string done, double? select, EditHistory history = EditHistory.Normal)
     {
         _editBusy = true;
         try
@@ -573,7 +608,19 @@ public sealed partial class VideoWindow
                     if (!part.Bones.SequenceEqual(clip.People[p].Bones))
                         throw new InvalidOperationException(Loc.T("骨骼列表和片段里的不一样，请整段重算（换一次角色或改一下表情权重）"));
                 }
-                if (undoable) _undo.Push(CloneEdits(clip.Edits));
+                switch (history)
+                {
+                    case EditHistory.Normal:
+                        _undo.Push(CloneEdits(clip.Edits));
+                        _redo.Clear();
+                        break;
+                    case EditHistory.Undo:
+                        _redo.Push(CloneEdits(clip.Edits));
+                        break;
+                    case EditHistory.Redo:
+                        _undo.Push(CloneEdits(clip.Edits));
+                        break;
+                }
                 foreach (var p in people)
                 {
                     var part = result.People[p];

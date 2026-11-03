@@ -18,7 +18,9 @@ namespace Posegraph.UI;
 /// 方案最前面是「照片同款」：按主窗口照片里人物脸上的明暗估出主光，照着摆（后端 lighting.py）；「照片配色」只按照片换颜色。
 /// 方案下面是跟随角色、自动调亮度这些开关，和把灯光存进主窗口当前图片（图库）。
 /// 「照谁」：单人 / 一组（一套灯罩住勾选的人）/ 每人一套 / 自动（近的合一套、远的各一套），人散开的大场景也都照得到。
-/// 下面「逐盏调整」给熟悉打光的人：每盏灯的方位、仰角、距离、颜色、光斑、灯头偏角都能改，可独显 / 关掉，改好可存成自己的方案。
+/// 下面「逐盏调整」给熟悉打光的人：每盏灯的方位、仰角、距离、颜色、光斑、灯头偏角都能改，可独显 / 关掉，改好可存成自己的方案；
+/// 还能加灯（主光、轮廓光、头发光这些预设，加进正在调的那一套）、删灯，单盏 / 整套恢复成方案原样。
+/// 灯光窗口和 3D 布光共用一份撤销记录：改参数、拖灯、加删灯、换方案都能撤销 / 重做（Ctrl+Z / Ctrl+Y）。
 /// </summary>
 public sealed class LightingWindow : Window
 {
@@ -102,10 +104,50 @@ public sealed class LightingWindow : Window
             ImGui.TextColored(Yellow, Loc.T("进入 GPose 后才能打光"));
             return;
         }
+        HandleShortcuts();
         DrawRigs();
         ImGui.Separator();
         DrawTweaks();
         DrawLights();
+    }
+
+    /// <summary>窗口有焦点（不在输入框里打字）时 Ctrl+Z 撤销、Ctrl+Y / Ctrl+Shift+Z 重做。3D 布光窗口也调。</summary>
+    public void HandleShortcuts()
+    {
+        var io = ImGui.GetIO();
+        if (!io.KeyCtrl || io.WantTextInput || !ImGui.IsWindowFocused(ImGuiFocusedFlags.RootAndChildWindows)) return;
+        if (ImGui.IsKeyPressed(ImGuiKey.Z, false))
+        {
+            if (io.KeyShift) Redo();
+            else Undo();
+        }
+        if (ImGui.IsKeyPressed(ImGuiKey.Y, false)) Redo();
+    }
+
+    /// <summary>撤销、重做两个按钮（灯光窗口和 3D 布光窗口都有）。</summary>
+    public void DrawUndoRedo()
+    {
+        using (ImRaii.Disabled(!_service.CanUndo || _busy))
+            if (ImGuiComponents.IconButton("##lightUndo", FontAwesomeIcon.Undo)) Undo();
+        Tip(Loc.T("撤销（Ctrl+Z）"));
+        ImGui.SameLine();
+        using (ImRaii.Disabled(!_service.CanRedo || _busy))
+            if (ImGuiComponents.IconButton("##lightRedo", FontAwesomeIcon.Redo)) Redo();
+        Tip(Loc.T("重做（Ctrl+Y）"));
+    }
+
+    private void Undo()
+    {
+        if (_busy || !_service.CanUndo) return;
+        _service.Undo();
+        SetStatus(Loc.T("已撤销"), Grey);
+    }
+
+    private void Redo()
+    {
+        if (_busy || !_service.CanRedo) return;
+        _service.Redo();
+        SetStatus(Loc.T("已重做"), Grey);
     }
 
     private void DrawRigs()
@@ -132,15 +174,18 @@ public sealed class LightingWindow : Window
                 _pi.SavePluginConfig(_config);
             }
         }
+        DrawUndoRedo();
+        ImGui.SameLine();
         using (ImRaii.Disabled(_busy || _service.Active is null))
         {
-            if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Redo, Loc.T("重新摆")))
+            if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.SyncAlt, Loc.T("重新摆")))
                 Run(() => _service.ReplaceAsync(_actor()), Loc.T("已按角色现在的位置重新摆"));
             if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
                 ImGui.SetTooltip(Loc.T("角色挪动、换了姿势后点这里：重新读脸的位置和朝向"));
             UiText.SameLineIfFits(UiText.IconButtonWidth(Loc.T("关掉所有灯")));
             if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Trash, Loc.T("关掉所有灯")))
             {
+                _service.Checkpoint();
                 _service.Clear();
                 SetStatus(Loc.T("已关掉 Posegraph 打的灯"), Grey);
             }
@@ -211,6 +256,7 @@ public sealed class LightingWindow : Window
             ImGui.SameLine();
             if (ImGui.SmallButton(Loc.T("恢复成和其他套一样")))
             {
+                _service.Checkpoint();
                 _service.ResetGroup(selected);
                 SetStatus(Loc.F("第 {0} 套已恢复成和其他套一样", selected + 1), Grey);
             }
@@ -347,16 +393,28 @@ public sealed class LightingWindow : Window
     private void DrawTweaks()
     {
         var t = _service.Tweaks;
-        var changed = false;
+        var d = RigTweaks.Default;
+        ImGui.AlignTextToFramePadding();
+        ImGui.TextDisabled(Loc.T("整体调整（右键滑杆单独恢复默认）"));
+        ImGui.SameLine();
+        using (ImRaii.Disabled(t == d))
+            if (ImGui.SmallButton(Loc.T("恢复默认") + "##tweaksReset"))
+            {
+                _service.Checkpoint();
+                _service.Tweaks = d;
+                _service.Refresh();
+            }
+        Tip(Loc.T("整体亮度、冷暖、灯距、补光全部回到默认（不动每盏灯自己的参数）"));
         var brightness = t.Brightness;
         var warmth = t.Warmth;
         var distance = t.Distance;
         var fill = t.Fill;
-        changed |= Slider(Loc.T("整体亮度"), ref brightness, 0.1f, 3f, "%.2f");
-        changed |= Slider(Loc.T("冷暖"), ref warmth, -2500f, 2500f, warmth >= 0 ? "+%.0f K" : "%.0f K", Loc.T("负值更暖、正值更冷（加在每盏灯的色温上）"));
-        changed |= Slider(Loc.T("灯距"), ref distance, 0.5f, 2.5f, "×%.2f", Loc.T("所有灯离脸的距离倍数：近了光更硬更集中"));
+        var changed = false;
+        changed |= Slider(Loc.T("整体亮度"), ref brightness, 0.1f, 3f, "%.2f", reset: d.Brightness);
+        changed |= Slider(Loc.T("冷暖"), ref warmth, -2500f, 2500f, warmth >= 0 ? "+%.0f K" : "%.0f K", Loc.T("负值更暖、正值更冷（加在每盏灯的色温上）"), d.Warmth);
+        changed |= Slider(Loc.T("灯距"), ref distance, 0.5f, 2.5f, "×%.2f", Loc.T("所有灯离脸的距离倍数：近了光更硬更集中"), d.Distance);
         changed |= Slider(Loc.T("补光##fillScale"), ref fill, 0f, 1.5f, "×%.2f",
-                          Loc.T("补光（主光以外、在脸前面的灯）的亮度倍数：小了光比更大、更有立体感；场景本身已经很亮时调小"));
+                          Loc.T("补光（主光以外、在脸前面的灯）的亮度倍数：小了光比更大、更有立体感；场景本身已经很亮时调小"), d.Fill);
         if (!changed) return;
         _service.Tweaks = t with { Brightness = brightness, Warmth = warmth, Distance = distance, Fill = fill };
         _service.Refresh();
@@ -366,12 +424,25 @@ public sealed class LightingWindow : Window
     {
         if (_openSelected) ImGui.SetNextItemOpen(true);   // 3D 布光窗口点了灯：把「逐盏调整」也展开
         if (!ImGui.CollapsingHeader(Loc.T("逐盏调整"))) return;
-        if (_service.Lights.Count == 0)
+        if (_service.Active is null)
         {
-            ImGui.TextDisabled(Loc.T("先在上面选一个方案"));
+            ImGui.TextDisabled(Loc.T("先在上面选一个方案，或者从空白开始加灯："));
+            DrawAddLight();
             return;
         }
         DrawGroupPicker();
+        DrawAddLight();
+        ImGui.SameLine();
+        using (ImRaii.Disabled(!_service.IsRigModified))
+            if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.UndoAlt, Loc.T("整套恢复原样")))
+            {
+                _service.Checkpoint();
+                _service.ResetRig();
+                SetStatus(Loc.T("已恢复成刚套方案时的样子"), Grey);
+            }
+        Tip(_service.IsManual
+                ? Loc.T("这些灯是从空白开始加的，没有原样可回；先在下面存成我的方案，之后就能恢复成存的样子")
+                : Loc.T("所有灯恢复成刚套方案时的样子：逐盏改的参数、加删的灯、单独调过的套、关掉的灯都去掉（整体亮度这些不动）"));
         var changed = false;
         for (var i = 0; i < _service.Lights.Count; i++)
         {
@@ -380,10 +451,17 @@ public sealed class LightingWindow : Window
             var selected = _service.SelectedLight == i;
             if (selected && _openSelected) ImGui.SetNextItemOpen(true);
             var flags = ImGuiTreeNodeFlags.AllowItemOverlap | (selected ? ImGuiTreeNodeFlags.Selected : 0);
-            var open = ImGui.TreeNodeEx(Loc.T(l.Name) + "###light", flags);
+            var open = ImGui.TreeNodeEx(LightRigs.DisplayName(l.Name) + (_service.IsModified(i) ? " *" : "") + "###light", flags);
             if (ImGui.IsItemClicked()) _service.SelectedLight = i;
-            changed |= DrawSoloMute(i);
+            var action = DrawLightButtons(i);
+            if (action == LightAction.Removed)
+            {
+                if (open) ImGui.TreePop();
+                break;   // 下标变了，下一帧再画
+            }
+            changed |= action == LightAction.Changed;
             if (!open) continue;
+            l = _service.Lights[i];   // 可能刚恢复过原样
             var az = l.Azimuth;
             var el = l.Elevation;
             var dist = l.Distance;
@@ -400,9 +478,9 @@ public sealed class LightingWindow : Window
             var amount = l.EffectAmount;
             var c = false;
             ImGui.SetNextItemWidth(120 * ImGuiHelpers.GlobalScale);
-            c |= ImGui.Combo(Loc.T("种类"), ref kind, [Loc.T("点光"), Loc.T("聚光"), Loc.T("面光")], 3);
+            c |= Discrete(ImGui.Combo(Loc.T("种类"), ref kind, [Loc.T("点光"), Loc.T("聚光"), Loc.T("面光")], 3));
             ImGui.SameLine();
-            c |= ImGui.Checkbox(Loc.T("投影"), ref shadows);
+            c |= Discrete(ImGui.Checkbox(Loc.T("投影"), ref shadows));
             c |= Slider(Loc.T("方位"), ref az, -180f, 180f, "%.0f°", Loc.T("0 = 从镜头这边照，正值偏向脸转过去的一侧，±90 = 正侧面，±180 = 正后方"));
             c |= Slider(Loc.T("仰角"), ref el, -60f, 85f, "%.0f°", Loc.T("正值从上往下照，负值从下往上"));
             c |= Slider(Loc.T("距离"), ref dist, 0.2f, 8f, "%.2f m");
@@ -413,13 +491,11 @@ public sealed class LightingWindow : Window
             {
                 c |= Slider(Loc.T("光斑角度"), ref angle, 5f, 120f, "%.0f°");
                 c |= Slider(Loc.T("边缘柔和"), ref soft, 0f, 60f, "%.0f°");
-                c |= Slider(Loc.T("灯头左右"), ref aimYaw, -90f, 90f, "%.0f°", Loc.T("灯头偏离「对准脸」的角度（3D 视图里拖菱形点也是改这个）。右键归零"));
-                if (ImGui.IsItemClicked(ImGuiMouseButton.Right)) { aimYaw = 0; c = true; }
-                c |= Slider(Loc.T("灯头上下"), ref aimPitch, -90f, 90f, "%.0f°", Loc.T("正值往上偏。右键归零"));
-                if (ImGui.IsItemClicked(ImGuiMouseButton.Right)) { aimPitch = 0; c = true; }
+                c |= Slider(Loc.T("灯头左右"), ref aimYaw, -90f, 90f, "%.0f°", Loc.T("灯头偏离「对准脸」的角度（3D 视图里拖菱形点也是改这个）。右键归零"), 0f);
+                c |= Slider(Loc.T("灯头上下"), ref aimPitch, -90f, 90f, "%.0f°", Loc.T("正值往上偏。右键归零"), 0f);
             }
             ImGui.SetNextItemWidth(120 * ImGuiHelpers.GlobalScale);
-            c |= ImGui.Combo(Loc.T("动态"), ref effect, [Loc.T("无"), Loc.T("闪烁"), Loc.T("呼吸"), Loc.T("环绕"), Loc.T("变色")], 5);
+            c |= Discrete(ImGui.Combo(Loc.T("动态"), ref effect, [Loc.T("无"), Loc.T("闪烁"), Loc.T("呼吸"), Loc.T("环绕"), Loc.T("变色")], 5));
             if (ImGui.IsItemHovered())
                 ImGui.SetTooltip(Loc.T("闪烁：烛火、坏灯管那样不规则地跳；呼吸：亮暗缓慢起伏；环绕：绕着脸转圈；变色：色相循环（霓虹）"));
             if (effect != 0)
@@ -452,36 +528,94 @@ public sealed class LightingWindow : Window
             {
                 _service.SaveCustom(_saveName.Trim());
                 _pi.SavePluginConfig(_config);
-                SetStatus(Loc.F("已存成「{0}」：换地图、换站位都能直接用", _saveName.Trim()), Green);
+                SetStatus(Loc.F("已存成「{0}」：换地图、换站位都能直接用；「整套恢复原样」之后回到存的这一份", _saveName.Trim()), Green);
                 _saveName = "";
             }
     }
 
-    /// <summary>3D 布光：视角按钮、专业选项，下面是 3D 视图（LightingScene）和每盏灯的快捷条。</summary>
-    /// <summary>灯名右边：独显（只亮这盏）、关掉 / 打开。返回是否有改动。</summary>
-    private bool DrawSoloMute(int i)
+    /// <summary>点一下就改完的控件（下拉框、勾选框）：改了先记一步撤销。</summary>
+    private bool Discrete(bool changed)
+    {
+        if (changed) _service.Checkpoint();
+        return changed;
+    }
+
+    /// <summary>
+    /// 「添加灯」按钮和它的菜单（主光、轮廓光、头发光……），灯加进正在调的那一套；还没打光时从空白开始。
+    /// 3D 布光窗口灯按钮那一排也有一个。
+    /// </summary>
+    public void DrawAddLight()
+    {
+        using (ImRaii.Disabled(_busy))
+            if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Plus, Loc.T("添加灯")))
+                ImGui.OpenPopup("##addLight");
+        Tip(_service.Groups.Count > 1
+                ? _service.SelectedGroup is { } g ? Loc.F("加一盏灯到第 {0} 套（只这一套有）", g + 1) : Loc.T("加一盏灯到所有套（单独调过的那几套除外）")
+                : Loc.T("加一盏灯：主光、补光、轮廓光、头发光这些常用的灯，加好再逐盏调"));
+        if (!ImGui.BeginPopup("##addLight")) return;
+        foreach (var preset in LightRigs.Presets)
+        {
+            if (ImGui.MenuItem(Loc.T(preset.Name)))
+            {
+                _service.Checkpoint();
+                var name = Loc.T(preset.Name);
+                Run(() => _service.AddLightAsync(preset, _actor()), Loc.F("已加上「{0}」，在下面逐盏调整里改参数", name));
+                _openSelected = true;
+            }
+            if (ImGui.IsItemHovered()) ImGui.SetTooltip(Loc.T(preset.Description));
+        }
+        ImGui.EndPopup();
+    }
+
+    private enum LightAction
+    {
+        None,
+        Changed,
+        Removed,
+    }
+
+    /// <summary>灯名右边：恢复原样、删掉、独显（只亮这盏）、关掉 / 打开。</summary>
+    private LightAction DrawLightButtons(int i)
     {
         var spacing = ImGui.GetStyle().ItemSpacing.X;
         var button = ImGui.GetFrameHeight() + 8 * ImGuiHelpers.GlobalScale;   // 图标按钮比行高略宽
-        ImGui.SameLine(ImGui.GetWindowContentRegionMax().X - button * 2 - spacing);
-        var changed = false;
+        ImGui.SameLine(ImGui.GetWindowContentRegionMax().X - button * 4 - spacing * 3);
+        var action = LightAction.None;
+        using (ImRaii.Disabled(!_service.IsModified(i)))
+            if (ImGuiComponents.IconButton("##reset", FontAwesomeIcon.UndoAlt))
+            {
+                _service.Checkpoint();
+                _service.ResetLight(i);
+                action = LightAction.Changed;
+            }
+        Tip(Loc.T("这盏灯恢复原样（方案里的样子，或刚加进来时的样子）"));
+        ImGui.SameLine();
+        if (ImGuiComponents.IconButton("##remove", FontAwesomeIcon.Trash))
+        {
+            _service.Checkpoint();
+            _service.RemoveLight(i);
+            return LightAction.Removed;
+        }
+        Tip(Loc.T("删掉这盏灯（可以撤销）"));
+        ImGui.SameLine();
         var solo = _service.Solo == i;
         using (ImRaii.PushColor(ImGuiCol.Button, PosegraphTheme.Accent with { W = 0.7f }, solo))
             if (ImGuiComponents.IconButton("##solo", FontAwesomeIcon.Crosshairs))
             {
                 _service.Solo = solo ? null : i;
-                changed = true;
+                action = LightAction.Changed;
             }
         Tip(solo ? Loc.T("取消独显") : Loc.T("独显：只亮这一盏，看它单独的效果"));
         ImGui.SameLine();
         var muted = _service.Muted.Contains(i);
         if (ImGuiComponents.IconButton("##mute", muted ? FontAwesomeIcon.EyeSlash : FontAwesomeIcon.Eye))
         {
+            _service.Checkpoint();
             if (!_service.Muted.Remove(i)) _service.Muted.Add(i);
-            changed = true;
+            action = LightAction.Changed;
         }
         Tip(muted ? Loc.T("打开这盏灯") : Loc.T("关掉这盏灯（方案里保留，存方案时照常保存）"));
-        return changed;
+        return action;
     }
 
     private static bool Check(string label, bool value, Action<bool> set, string? tip = null)
@@ -506,7 +640,10 @@ public sealed class LightingWindow : Window
         using (ImRaii.PushColor(ImGuiCol.Button, PosegraphTheme.Accent with { W = 0.55f }, active))
         using (ImRaii.Disabled(_busy || !hasPhoto))
             if (ImGui.Button(Loc.T("照片同款") + "##rigPhoto", new Vector2(width - colorsW - ImGui.GetStyle().ItemSpacing.X, 0)))
+            {
+                _service.Checkpoint();
                 Run(ApplyPhotoAsync, Loc.F("已打上「{0}」", Loc.T("照片同款")));
+            }
         if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
         {
             var tip = Loc.T("按主窗口照片里人物脸上的明暗，估出主光从哪来、软硬、冷暖和光比，照着摆灯。\n"
@@ -516,7 +653,10 @@ public sealed class LightingWindow : Window
         ImGui.SameLine();
         using (ImRaii.Disabled(_busy || !hasPhoto || _service.Active is null))
             if (ImGui.Button(Loc.T("照片配色") + "##rigColors", new Vector2(colorsW, 0)))
+            {
+                _service.Checkpoint();
                 Run(ApplyPhotoColorsAsync, Loc.T("已按照片换了灯的颜色"));
+            }
         if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
             ImGui.SetTooltip(!hasPhoto ? Loc.T("主窗口先识别一张照片")
                              : Loc.T("灯的位置不动，只按照片换颜色：主光用照片主光的颜色，补光用照片里环境光的颜色，\n"
@@ -579,7 +719,11 @@ public sealed class LightingWindow : Window
         return await _service.ApplyAsync(LightRigs.FromPhoto(photo), _actor());
     }
 
-    private void Apply(LightRig rig) => Run(() => _service.ApplyAsync(rig, _actor()), Loc.F("已打上「{0}」", Loc.T(rig.Name)));
+    private void Apply(LightRig rig)
+    {
+        _service.Checkpoint();
+        Run(() => _service.ApplyAsync(rig, _actor()), Loc.F("已打上「{0}」", Loc.T(rig.Name)));
+    }
 
     private void Run(Func<Task<string?>> action, string ok)
     {
@@ -602,10 +746,18 @@ public sealed class LightingWindow : Window
 
     private void SetStatus(string text, Vector4 color) => (_status, _statusColor) = (text, color);
 
-    private static bool Slider(string label, ref float value, float min, float max, string format, string? tip = null)
+    /// <summary>滑杆：开始拖的那一下记一步撤销；给了 reset 时右键恢复成它。</summary>
+    private bool Slider(string label, ref float value, float min, float max, string format, string? tip = null, float? reset = null)
     {
         ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X - ImGui.CalcTextSize(label).X - ImGui.GetStyle().ItemInnerSpacing.X * 2);
         var changed = ImGui.SliderFloat(label, ref value, min, max, format);
+        if (ImGui.IsItemActivated()) _service.Checkpoint();
+        if (reset is { } r && ImGui.IsItemClicked(ImGuiMouseButton.Right) && value != r)
+        {
+            _service.Checkpoint();
+            value = r;
+            changed = true;
+        }
         if (tip is not null && ImGui.IsItemHovered()) ImGui.SetTooltip(tip);
         return changed;
     }

@@ -10,7 +10,8 @@ namespace Posegraph.UI;
 
 /// <summary>
 /// 3D 布光窗口：竖着贴在灯光窗口右边，高度跟灯光窗口一样，宽度可以拖；在灯光窗口里点「3D 布光」展开 / 收起，
-/// 灯光窗口关着时不显示。里面是视角按钮、专业选项、3D 视图（拖灯、拖对准点，见 LightingScene）和每盏灯一个按钮。
+/// 灯光窗口关着时不显示。里面是视角按钮、专业选项、3D 视图（拖灯、拖对准点，见 LightingScene）和每盏灯一个按钮（后面是添加灯）。
+/// 撤销 / 重做和灯光窗口共用一份记录（Ctrl+Z / Ctrl+Y）。
 /// </summary>
 public sealed class LightingSceneWindow : Window
 {
@@ -93,7 +94,10 @@ public sealed class LightingSceneWindow : Window
 
     public override void Draw()
     {
+        _lighting.HandleShortcuts();
         var subject = _service.Subject;
+        _lighting.DrawUndoRedo();
+        ImGui.SameLine();
         using (ImRaii.Disabled(subject is null))
         {
             if (ImGui.SmallButton(Loc.T("镜头视角")) && _service.CameraPose is { } pose) _scene.LookFrom(-pose.Forward);
@@ -111,6 +115,7 @@ public sealed class LightingSceneWindow : Window
             ImGui.SameLine();
             if (ImGui.SmallButton(Loc.T("全部对准脸")))
             {
+                _service.Checkpoint();
                 for (var i = 0; i < _service.Lights.Count; i++) _service.Lights[i] = _service.Lights[i] with { AimYaw = 0, AimPitch = 0 };
                 _service.Refresh();
             }
@@ -158,7 +163,7 @@ public sealed class LightingSceneWindow : Window
             var selected = _service.SelectedLight == i;
             using (ImRaii.PushColor(ImGuiCol.Button, PosegraphTheme.Accent with { W = 0.6f }, selected))
             using (ImRaii.PushColor(ImGuiCol.Text, Grey, !_service.IsLit(i)))
-                if (ImGui.SmallButton(Loc.T(_service.Lights[i].Name)))
+                if (ImGui.SmallButton(LightRigs.DisplayName(_service.Lights[i].Name)))
                     _lighting.OpenLight(selected ? null : i);
             if (ImGui.IsItemClicked(ImGuiMouseButton.Right))
             {
@@ -172,12 +177,15 @@ public sealed class LightingSceneWindow : Window
             ImGui.SameLine();
             if (ImGui.SmallButton(Loc.T("全部点亮")))
             {
+                if (_service.Muted.Count > 0) _service.Checkpoint();
                 _service.Solo = null;
                 _service.Muted.Clear();
                 changed = true;
             }
         }
         if (changed) _service.Refresh();
+        if (_service.Lights.Count > 0) ImGui.SameLine();
+        _lighting.DrawAddLight();
     }
 
     private static bool Check(string label, bool value, Action<bool> set, string? tip = null)

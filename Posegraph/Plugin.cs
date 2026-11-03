@@ -109,6 +109,11 @@ public sealed class Plugin : IDalamudPlugin
                                                             body.GetProperty("fps").GetDouble(), body.GetProperty("reshade").GetBoolean());
         _windows.AddWindow(_video);
         _main.ToggleVideo = _video.Toggle;
+#if DEBUG
+        // 导出到 Blender 还在试，只有 Debug 版有（Release 版不编 Export 目录，主窗口也不显示按钮）
+        var blender = new Export.BlenderExport(framework, clientState, applier, _lighting, () => _main.Actors);
+        _main.ExportBlender = blender.ExportAsync;
+#endif
         _main.DumpFaceData = DumpFaceAnimations;
         _main.LibraryDragged = () => _library.DraggedImages;
         _main.Closed = () => _library.IsOpen = _split.IsOpen = _masks.IsOpen = _lightingWindow.IsOpen = _composition.IsOpen = false;

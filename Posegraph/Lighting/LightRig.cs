@@ -11,11 +11,16 @@ namespace Posegraph.Lighting;
 /// Kelvin：色温；Rgb 给了就不用色温（霓虹这类不在色温线上的颜色）；Power：相对亮度（1 = 一盏正常的主光）。
 /// AimYaw / AimPitch：灯头偏离「对准脸」的角度（度，左右 / 上下；0 = 正对着脸），在游戏里用旋转手柄调。
 /// Effect：动态灯效（见 LightEffect），EffectSpeed 快慢倍数，EffectAmount 幅度 0～1。
+/// Id：这盏灯在当前这套里的编号（套用方案、加灯时给，见 LightingService），「恢复原样」按它找回这盏灯原来的样子。
 /// </summary>
 public sealed record LightSpec(
     string Name, LightKind Kind, float Azimuth, float Elevation, float Distance, float Kelvin = 5500f, float Power = 1f,
     float SpotAngle = 45f, float Softness = 10f, bool Shadows = false, float Falloff = 1f, float[]? Rgb = null,
-    float AimYaw = 0f, float AimPitch = 0f, LightEffect Effect = LightEffect.None, float EffectSpeed = 1f, float EffectAmount = 0.5f);
+    float AimYaw = 0f, float AimPitch = 0f, LightEffect Effect = LightEffect.None, float EffectSpeed = 1f, float EffectAmount = 0.5f,
+    string? Id = null);
+
+/// <summary>「添加灯」里的一种灯：名字、说明、摆法（方位、仰角这些同 LightSpec，相对脸和镜头）。</summary>
+public sealed record LightPreset(string Name, string Description, LightSpec Spec);
 
 /// <summary>动态灯效：闪烁（烛火、坏灯管）、呼吸（亮暗缓慢起伏）、环绕（绕着脸转圈）、变色（色相循环，霓虹）。</summary>
 public enum LightEffect
@@ -147,7 +152,48 @@ public static class LightRigs
         ]),
     ];
 
+    /// <summary>
+    /// 「添加灯」的预设：常见的单盏灯，加进正在调的那一套（多人时跟着「调哪一套」走）。
+    /// 方位正值偏向主光那一侧（脸转过去的一侧），负值是另一侧。
+    /// </summary>
+    public static readonly LightPreset[] Presets =
+    [
+        new("主光", "主要的照明：斜前上方一盏带投影的聚光，决定脸的明暗",
+            new("主光", LightKind.Spot, 35, 25, 1.8f, 5200, 1.0f, 50, 15, Shadows: true)),
+        new("补光", "主光对侧的弱光，把暗部提亮一点（光比变小）",
+            new("补光", LightKind.Point, -45, 5, 2.2f, 5600, 0.3f)),
+        new("轮廓光（主光侧）", "从背后斜上方勾出头发、肩膀的亮边，和背景分开",
+            new("轮廓光", LightKind.Spot, 150, 35, 1.8f, 6000, 0.8f, 35, 10)),
+        new("轮廓光（暗侧）", "从另一侧背后勾亮边，暗的那半边脸也有轮廓",
+            new("轮廓光", LightKind.Spot, -150, 35, 1.8f, 6000, 0.8f, 35, 10)),
+        new("头发光", "正后方高处往下照，头顶和头发发亮",
+            new("头发光", LightKind.Spot, 180, 65, 1.6f, 5800, 0.6f, 35, 12)),
+        new("侧光", "侧后方一道窄光，刷亮脸颊和下颌的边（kicker）",
+            new("侧光", LightKind.Spot, 110, 15, 1.8f, 5600, 0.6f, 30, 8)),
+        new("顶光", "正上方往下照，眼窝、颧骨下有阴影，压抑或聚光灯感",
+            new("顶光", LightKind.Spot, 0, 80, 1.8f, 5500, 0.8f, 45, 20, Shadows: true)),
+        new("底光", "从下往上的柔光：补下巴阴影；调亮了就是恐怖片效果",
+            new("底光", LightKind.Flat, 0, -30, 1.4f, 5600, 0.3f, 60, 25)),
+        new("眼神光", "镜头旁边很近、很弱的一点光，眼睛里多一个亮点",
+            new("眼神光", LightKind.Point, 5, 8, 0.9f, 6500, 0.1f)),
+        new("背景光", "在人身后、灯头朝外，照亮身后的墙或地面",
+            new("背景光", LightKind.Spot, 180, 15, 0.6f, 5500, 0.6f, 80, 30, AimYaw: 180)),
+        new("环境光", "远处一盏很弱的点光，整体提一点亮度",
+            new("环境光", LightKind.Point, 0, 0, 3.0f, 6500, 0.15f)),
+        new("彩色点缀", "侧面一盏彩色点光（默认洋红，颜色可改成霓虹、魔法光）",
+            new("彩色点缀", LightKind.Point, 90, 10, 1.2f, Power: 0.7f, Rgb: [1f, 0.15f, 0.75f])),
+    ];
+
     public const string PhotoRigId = "photo";
+
+    public const string ManualRigId = "manual";
+
+    /// <summary>灯名在界面上的样子：翻译；同名加的第二盏起带编号（「轮廓光 2」），编号前面照样翻译。</summary>
+    public static string DisplayName(string name)
+    {
+        var space = name.LastIndexOf(' ');
+        return space > 0 && int.TryParse(name.AsSpan(space + 1), out _) ? Loc.T(name[..space]) + name[space..] : Loc.T(name);
+    }
 
     /// <summary>
     /// 照片同款：按照片估出的灯（backend lighting.py）搭一套方案。主光用带投影的聚光，软硬按估出的柔和度；
@@ -359,7 +405,8 @@ public static class LightRigs
     }
 
     /// <summary>补光：第一盏（主光）以外、在脸前半圈、不是背景光的灯。整体微调里的「补光」和自动调亮度扣场景光只动这些。</summary>
-    public static bool IsFill(LightSpec l, int index) => index > 0 && MathF.Abs(l.Azimuth) < 110 && l.Name != "背景光";
+    public static bool IsFill(LightSpec l, int index)
+        => index > 0 && MathF.Abs(l.Azimuth) < 110 && l.Name != "背景光" && !l.Name.StartsWith("主光", StringComparison.Ordinal);
 
     /// <summary>
     /// 动态灯效在 time 秒时的样子：返回改过方位 / 颜色的灯和亮度倍数。index 错开各盏灯的相位，几盏一起闪时不会同步。

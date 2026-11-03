@@ -74,7 +74,7 @@ public sealed class LightingScene(LightingService service, Configuration config)
         _view.End();
         if (_view.Hovered && _drag == DragTarget.None)
             ImGui.SetTooltip(HoverLight(states) is { } h
-                ? Loc.F("{0}：拖动移动（按住 Shift 只改距离），滚轮改距离；拖菱形点转灯头", Loc.T(service.Lights[h].Name))
+                ? Loc.F("{0}：拖动移动（按住 Shift 只改距离），滚轮改距离；拖菱形点转灯头", LightRigs.DisplayName(service.Lights[h].Name))
                 : Loc.T("左键拖动转视角，右键 / 中键平移，滚轮缩放，双击复位；点灯选中"));
     }
 
@@ -87,11 +87,15 @@ public sealed class LightingScene(LightingService service, Configuration config)
         if (_view.Activated)
         {
             if (AimHandleHit(states) is { } a)
+            {
                 (_drag, _dragLight) = (DragTarget.Aim, a);
+                service.Checkpoint();
+            }
             else if (HoverLight(states) is { } l)
             {
                 (_drag, _dragLight, _dragAnchor) = (DragTarget.Light, l, states[l].Position);
                 service.SelectedLight = l;
+                service.Checkpoint();
             }
         }
         if (_drag != DragTarget.None && _view.Active && _dragLight < states.Count)
@@ -107,6 +111,7 @@ public sealed class LightingScene(LightingService service, Configuration config)
         if (_view.Hovered && io.MouseWheel != 0 && _drag == DragTarget.None && HoverLight(states) is { } w)
         {
             var l = service.Lights[w];
+            service.Checkpoint($"wheel{w}");   // 连着滚算一步
             service.Lights[w] = l with { Distance = Math.Clamp(l.Distance * (1 - io.MouseWheel * 0.06f), 0.2f, 8f) };
             service.Refresh();
             _view.WheelUsed = true;
@@ -323,7 +328,7 @@ public sealed class LightingScene(LightingService service, Configuration config)
             var dl = _view.DrawList;
             dl.AddCircleFilled(p, selected ? 8 : 6.5f, ImGui.GetColorU32(color with { W = 1 }));
             dl.AddCircle(p, selected ? 11 : 8, ImGui.GetColorU32(selected ? Highlight : White with { W = 0.5f }), 0, selected ? 2 : 1);
-            dl.AddText(p + new Vector2(10, -8), ImGui.GetColorU32(lit ? White : Faint), Loc.T(spec.Name));
+            dl.AddText(p + new Vector2(10, -8), ImGui.GetColorU32(lit ? White : Faint), LightRigs.DisplayName(spec.Name));
         }
         if (selected && AimPoint(i, s, subject) is { } aim && _view.Project(aim) is { } ap)
         {

@@ -79,6 +79,11 @@ public sealed partial class MainWindow : Window, IDisposable
     /// <summary>打开 / 关闭视频窗口（由 Plugin 接上）。</summary>
     public Action? ToggleVideo { get; set; }
 
+    /// <summary>导出到 Blender（由 Plugin 接上，只有 Debug 版有；没接上时不显示按钮）：返回导出的文件夹，失败时抛异常（消息给用户看）。</summary>
+    public Func<Task<string>>? ExportBlender { get; set; }
+
+    private bool _exporting;
+
     /// <summary>识别后端客户端（视频窗口用）。</summary>
     public BackendClient Client => _client;
 
@@ -237,6 +242,25 @@ public sealed partial class MainWindow : Window, IDisposable
         _updater.Dispose();
         _texture?.Dispose();
         _newTexture?.Dispose();
+    }
+
+    private void ExportToBlender()
+    {
+        _exporting = true;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var folder = await ExportBlender!();
+                SetStatus(Loc.F("已导出到 Blender 场景：{0}", folder), Green);
+                Dalamud.Utility.Util.OpenLink(folder);
+            }
+            catch (Exception ex)
+            {
+                SetStatus(Loc.F("导出失败：{0}", ex.Message), Yellow);
+            }
+            finally { _exporting = false; }
+        });
     }
 
     private void SetStatus(string text, Vector4? color = null)
@@ -1138,6 +1162,8 @@ public sealed partial class MainWindow : Window, IDisposable
             ImGui.EndTabBar();
         }
         DrawFooter();
+        HandleParamsShortcuts();
+        TrackParamsHistory();
         _fileDialog.Draw();
     }
 
@@ -1188,6 +1214,14 @@ public sealed partial class MainWindow : Window, IDisposable
         ImGui.SameLine();
         if (IconButton("##video", FontAwesomeIcon.Film, Loc.T("视频：逐帧识别视频里的动作和镜头，在游戏里播放"), ToggleVideo is not null))
             ToggleVideo!();
+        if (ExportBlender is not null)
+        {
+            ImGui.SameLine();
+            if (IconButton("##blender", FontAwesomeIcon.FileExport,
+                           Loc.T("导出到 Blender：镜头、Posegraph 打的灯、每个角色的位置和姿势。\n人物模型用 Meddle 导出，导出的文件夹里有 Blender 插件和使用说明"),
+                           _clientState.IsGPosing && !_exporting))
+                ExportToBlender();
+        }
         if (_recognizing || _rtBusy)
         {
             ImGui.SameLine();
@@ -1612,6 +1646,8 @@ public sealed partial class MainWindow : Window, IDisposable
             _savedFix = null;
             SetStatus(Loc.T("已删除这张图保存的修正"), Yellow);
         }
+        ImGui.SameLine();
+        DrawParamsUndoRedo();
         ImGui.SameLine();
         var offsets = _params.Offsets.Count(kv => kv.Value.Any(v => v != 0));
         var detail = Loc.F("（偏移 {0} 处，调整 {1} 项）", offsets, ChangedTuning());

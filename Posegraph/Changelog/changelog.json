@@ -5,6 +5,28 @@
   },
   "entries": [
     {
+      "version": "0.7.3",
+      "date": "2026-11-03",
+      "title": {
+        "zh": "自己加灯（轮廓光、头发光等预设）、恢复默认、撤销 / 重做；支持 AMD 显卡",
+        "en": "Add your own lights (rim, hair light and other presets), reset to default, undo / redo; AMD GPU support"
+      },
+      "items": {
+        "zh": [
+          "自己加灯：「逐盏调整」和 3D 布光窗口里点「添加灯」，选主光、补光、轮廓光（两侧）、头发光、侧光、顶光、底光、眼神光、背景光、环境光、彩色点缀；还没打光时也能从空白开始一盏盏加。灯可以删掉。多人时加到「调哪一套」选中的那一套（选「所有套一起调」就每套都加）",
+          "恢复默认：整体亮度、冷暖、灯距、补光有「恢复默认」按钮，右键滑杆单独恢复；每盏灯可以恢复成方案里的样子（改过的灯名字后面带 *）；「整套恢复原样」去掉逐盏的改动、加删的灯、单独调过的套。从空白开始加的灯存成自己的方案后，原样就是存的那一份",
+          "撤销 / 重做（Ctrl+Z / Ctrl+Y）：灯光窗口和 3D 布光（改参数、拖灯、加删灯、换方案都算）、主窗口调整页和 3D 页（调整值、关节偏移）、视频时间轴（补上了重做）",
+          "支持 AMD 显卡（ROCm）识别（感谢 Richard_Zhou）：没有 nvidia-smi 时改用 Windows 的显卡接口读显存，AMD、Intel 显卡也能显示可用显存；按源码方式装 ROCm 版 PyTorch 后，AMD 显卡能用显卡识别。一键包仍是 NVIDIA（CUDA），AMD 显卡用一键包时照旧走 CPU"
+        ],
+        "en": [
+          "Add your own lights: click \"Add light\" in \"Adjust each light\" or the 3D lighting window and pick key, fill, rim (either side), hair light, kicker, top, under light, catchlight, background, ambient or color accent; with no lights yet you can start from scratch one light at a time. Lights can be removed. With several people the light goes to the set chosen under \"Adjust\" (every set when adjusting all sets together)",
+          "Reset to default: overall brightness, warmth, distance and fill have a \"Reset to default\" button, and right-clicking a slider resets just that one; each light can go back to how it was in the setup (changed lights get a * after their name); \"Reset whole setup\" discards per-light changes, added and removed lights and separately adjusted sets. Lights built from scratch get an original once you save them as your own setup",
+          "Undo / redo (Ctrl+Z / Ctrl+Y): the lighting and 3D lighting windows (settings, dragging lights, adding and removing lights, switching setups), the main window's Tuning and 3D tabs (tuning values, joint offsets), and the video timeline (redo added)",
+          "AMD GPU (ROCm) support for recognition (thanks to Richard_Zhou): without nvidia-smi, VRAM is read through the Windows graphics interfaces, so AMD and Intel GPUs show free VRAM too; with a source install of the ROCm build of PyTorch, AMD GPUs can recognize on the GPU. The one-click package is still NVIDIA (CUDA), so AMD GPUs run on the CPU there as before"
+        ]
+      }
+    },
+    {
       "version": "0.7.2",
       "date": "2026-11-01",
       "title": {

@@ -1,7 +1,7 @@
 <Project Sdk="Dalamud.NET.SDK/15.0.0">
 
 	<PropertyGroup>
-		<Version>0.7.2.0</Version>
+		<Version>0.7.3.0</Version>
 		<Nullable>enable</Nullable>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 		<ImplicitUsings>enable</ImplicitUsings>
@@ -27,6 +27,14 @@
 	<ItemGroup>
 		<EmbeddedResource Include="Changelog\changelog.json" LogicalName="Posegraph.Changelog.changelog.json" />
 		<EmbeddedResource Include="Changelog\banner.png" LogicalName="Posegraph.Changelog.banner.png" />
+	</ItemGroup>
+
+	<!-- 导出到 Blender 还在试，只编进 Debug 版；发布的 Release 版不带 -->
+	<ItemGroup Condition="'$(Configuration)' == 'Debug'">
+		<EmbeddedResource Include="Export\posegraph_blender.py" LogicalName="Posegraph.Export.posegraph_blender.py" />
+	</ItemGroup>
+	<ItemGroup Condition="'$(Configuration)' != 'Debug'">
+		<Compile Remove="Export\**" />
 	</ItemGroup>
 
 </Project>

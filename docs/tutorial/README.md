@@ -266,6 +266,13 @@ with "Follow character" on they are placed again when Posegraph changes the char
   front, side and top. The ball at the top right previews the lighting ratio.
 - The buttons below the 3D view select a light; "Adjust each light" lets you solo or mute a light, change its color, intensity and angle,
   and add an effect (flicker, pulse, orbit, color cycle).
+- **Add light**: in "Adjust each light" and the 3D lighting window. Pick key, fill, rim, hair light, kicker, top, under light, catchlight,
+  background, ambient or color accent, then adjust it; with no lights yet you can start from scratch one light at a time, and the bin next to
+  a light's name removes it. With several people the light goes to the set chosen under "Adjust" (every set when adjusting all sets together).
+- **Reset to default**: above the overall sliders, and right-clicking a slider resets just that one; the button next to each light restores
+  how it was in the setup (changed lights get a * after their name); "Reset whole setup" goes back to how the setup was when applied.
+  Lights built from scratch have no original until you "Save as my setup"; after that, resetting goes back to the saved version.
+- **Undo / redo**: the lighting and 3D lighting windows share one history; Ctrl+Z / Ctrl+Y, or the two arrows left of "Re-place".
 - Status messages appear in the lighting window's title bar. Lights are removed automatically when you leave GPose.
 
 ## 15. Framing and screenshots
@@ -314,7 +321,7 @@ Fix what recognition got wrong (fingers especially) by hand; corrections are sav
 4. **Copy correction** copies the selected keyframe's change, which follows the original motion wherever you paste it; **Copy pose** copies how a bone group looks on the current frame
    (left hand, right hand, both hands, arms, head and neck, whole body) and pastes it as is - use this when you need the same hand gesture many times.
 5. **Paste to current frame**, or mark a range with "In" and "Out" and **Paste to range**: held across the range, fading out after the out point.
-6. On the track, click empty space to jump to that frame, drag a diamond to move it, right-click a diamond to copy or delete it; undo if you change your mind.
+6. On the track, click empty space to jump to that frame, drag a diamond to move it, right-click a diamond to copy or delete it; undo (Ctrl+Z) if you change your mind, redo (Ctrl+Y) if you undid too much.
 
 Each change only rebuilds the affected frames (a few dozen frames take a second or two). The first correction after opening an older clip rebuilds the whole clip once to read the character's current bone lengths.
 Face bones and helper bones such as shoulders and elbows can't be kept (helper bones follow the main bones automatically).
