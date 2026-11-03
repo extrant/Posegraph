@@ -252,7 +252,12 @@ class Sam3dBodyEstimator(PoseEstimator):
             cfg.freeze()
             model = SAM3DBody(cfg)
             # 内存映射读取：不把 2.5GB 权重整个读进内存再复制一份（与游戏同跑时内存峰值会翻倍）
-            state = torch.load(str(ckpt), map_location="cpu", weights_only=False, mmap=True)
+            try:
+                state = torch.load(str(ckpt), map_location="cpu", weights_only=False, mmap=True)
+            except (RuntimeError, EOFError, OSError) as ex:
+                # 权重文件不完整（下载中途断了、老版本安装脚本留下大小对内容却是空的文件）时 torch 报 mmap / 不是 zip 格式
+                raise RuntimeError(tr("权重文件不完整或损坏：{path}。再运行一次安装脚本 Install-Posegraph.bat、选这个后端文件夹，会核对并重新下载（{error}）",
+                                      path=ckpt, error=ex)) from ex
             load_state_dict(model, state.get("state_dict", state), strict=False)
             del state
 

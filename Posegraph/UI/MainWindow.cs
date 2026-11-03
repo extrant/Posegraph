@@ -2242,6 +2242,8 @@ public sealed partial class MainWindow : Window, IDisposable
 
         if (ImGui.CollapsingHeader(Loc.T("后端日志")))
         {
+            if (ImGui.SmallButton(Loc.T("复制日志")))
+                ImGui.SetClipboardText(string.Join(Environment.NewLine, _process.Log));
             using var child = ImRaii.Child("##log", new Vector2(0, 160), true);
             foreach (var line in _process.Log)
                 ImGui.TextUnformatted(line);

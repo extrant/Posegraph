@@ -248,6 +248,7 @@ public static partial class Loc
         ["启动"] = "Start",
         ["端口 {0} 启动失败：{1}"] = "Failed to start on port {0}: {1}",
         ["后端日志"] = "Backend log",
+        ["复制日志"] = "Copy log",
         ["可用显存足够（约 3GB）时用 GPU，否则用 CPU"] = "GPU when enough VRAM is free (~3 GB), otherwise CPU",
         ["总是用显卡（约 1.5 秒/张）。显存紧张时可能拖慢甚至挤崩游戏"] = "Always use the GPU (~1.5 s per image). With little VRAM this can slow down or even crash the game",
         ["不占显存（约 10 秒/张，取决于 CPU），内存约需 4GB"] = "No VRAM (~10 s per image, depends on the CPU), needs about 4 GB RAM",

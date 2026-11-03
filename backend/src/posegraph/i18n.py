@@ -120,6 +120,9 @@ EN = {
     "识别缓存无法读取：{error}": "Cannot read the recognition cache: {error}",
     "请求体为空": "Empty request body",
     "模型加载失败：{error}": "Model failed to load: {error}",
+    "深度图出错，这次不用深度：{error}": "Depth failed, recognizing without depth this time: {error}",
+    "权重文件不完整或损坏：{path}。再运行一次安装脚本 Install-Posegraph.bat、选这个后端文件夹，会核对并重新下载（{error}）":
+        "The weights file is incomplete or damaged: {path}. Run the installer Install-Posegraph.bat again and choose this backend folder; it checks and re-downloads it ({error})",
     "未检测到人物": "No person detected",
     "找不到人物检测模型：{path}": "Person detection model not found: {path}",
     "后端缺少人物检测组件（onnxruntime），请更新一键包": "The backend is missing the person detection component (onnxruntime); update the backend package",

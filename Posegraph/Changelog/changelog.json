@@ -5,6 +5,28 @@
   },
   "entries": [
     {
+      "version": "0.7.4",
+      "date": "2026-11-03",
+      "title": {
+        "zh": "后端一键安装 / 更新脚本（按显卡自动选 NVIDIA / AMD / CPU 版）；修复 AMD 显卡识别报错",
+        "en": "Backend installer / updater (picks the NVIDIA / AMD / CPU build for your GPU); fixed recognition errors on AMD GPUs"
+      },
+      "items": {
+        "zh": [
+          "后端改用一键安装脚本：下载 Posegraph-Installer.zip 解压后双击 Install-Posegraph.bat。自动识别显卡，选 NVIDIA CUDA 12.8 / 12.6（GTX 900 / 10 系等老显卡）、AMD ROCm（RX 9000、RX 7900 / 7800 / 7700 等）或 CPU；记住上次的位置；装完游戏没开时自动填好插件设置。不再提供 4GB 的一键包下载",
+          "更新 / 修复已有的后端（包括以前下载的一键包）：再运行安装脚本选这个文件夹，逐个核对文件，只补缺的、换不对的；换了显卡也这样换计算方式",
+          "修复 AMD 显卡（ROCm）识别时报 500：深度图模型在 ROCm 版 PyTorch 上加载失败；以后深度图出错时这张图改为不用深度照常识别",
+          "识别出错时显示真正的原因（原来只显示「Internal Server Error」）；设置页「后端日志」加了「复制日志」按钮；权重文件不完整时提示再运行安装脚本修复；后端要换运行环境时改为提示运行安装脚本"
+        ],
+        "en": [
+          "The backend is now installed with the installer: download Posegraph-Installer.zip, unpack it and double-click Install-Posegraph.bat. It detects your GPU and picks NVIDIA CUDA 12.8 / 12.6 (older cards such as GTX 900 / 10 series), AMD ROCm (RX 9000, RX 7900 / 7800 / 7700 and others) or CPU, remembers your last location, and fills in the plugin settings when the game isn't running. The 4 GB backend package is no longer offered",
+          "Update / repair an existing backend (including a previously downloaded package): run the installer again and choose that folder; every file is checked and only missing or wrong pieces are replaced. Changing GPUs works the same way",
+          "Fixed recognition failing with 500 on AMD GPUs (ROCm): the depth model failed to load with the ROCm build of PyTorch. If depth fails from now on, that image is recognized without depth instead",
+          "Recognition errors now show the actual cause (previously just \"Internal Server Error\"); \"Backend log\" in Settings has a \"Copy log\" button; an incomplete weights file tells you to run the installer again to repair it; a backend that needs a new runtime now points you to the installer"
+        ]
+      }
+    },
+    {
       "version": "0.7.3",
       "date": "2026-11-03",
       "title": {

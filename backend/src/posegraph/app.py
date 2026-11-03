@@ -29,6 +29,7 @@
 from __future__ import annotations
 
 import io
+import sys
 import threading
 import time
 import uuid
@@ -36,7 +37,7 @@ from pathlib import Path
 
 import numpy as np
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import Response
+from fastapi.responses import JSONResponse, Response
 from starlette.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
 
@@ -55,6 +56,16 @@ from .parallel_batch import ParallelBatch
 from .shared_inference import ModelLifecycle
 
 app = FastAPI(title="posegraph", version=__version__)
+
+
+@app.exception_handler(Exception)
+async def _unhandled(request: Request, ex: Exception) -> JSONResponse:
+    """没接住的异常：把类型和信息带回插件（默认只回「Internal Server Error」，用户看不出原因）；完整堆栈照旧打在后端日志里。"""
+    import traceback
+
+    traceback.print_exception(ex)
+    return JSONResponse({"detail": f"{type(ex).__name__}: {ex}"}, status_code=500)
+
 _estimator = create_estimator()
 # 串行识别：加载、推理、释放互斥（释放不能打断正在进行的识别）
 _model_lock = threading.RLock()
@@ -328,7 +339,11 @@ def _estimate_with_depth(rgb: np.ndarray, bboxes: np.ndarray, person_masks: np.n
     sc = min(1.0, DEPTH_WORK_SIDE / max(W, H))
     size = (max(1, round(W * sc)), max(1, round(H * sc)))
     small = cv2.resize(rgb, size, interpolation=cv2.INTER_AREA) if sc < 1 else rgb
-    photo = depth.estimate(small, _estimator.active_device or "cpu")
+    try:
+        photo = depth.estimate(small, _estimator.active_device or "cpu")
+    except Exception as ex:   # noqa: BLE001 —— 深度只是辅助：深度模型出问题时照常识别，不让整张图失败
+        print(tr("深度图出错，这次不用深度：{error}", error=f"{type(ex).__name__}: {ex}"), file=sys.stderr, flush=True)
+        return _estimator.estimate(rgb, bboxes, person_masks)
     focal = photo.focal / sc
     faces = _estimator.faces()
     shrink = lambda m: np.stack([cv2.resize(x.astype(np.uint8), size, interpolation=cv2.INTER_NEAREST) for x in m]).astype(bool)

@@ -212,6 +212,11 @@ class Job:
     def state_path(self) -> Path:
         return self.dest.with_name(self.dest.name + ".parts")
 
+    def part_path(self) -> Path:
+        """分块下载先写这里（一开始就占满整个大小），校验通过才改名成 dest：
+        中途关掉时不会留下一个大小对、内容却大半是空的正式文件。"""
+        return self.dest.with_name(self.dest.name + ".partial")
+
 
 class Downloader:
     """多文件同时下、大文件分块多线程（服务器支持 Range 时）。同一个站点同时最多 per_host 个连接。"""
@@ -303,14 +308,17 @@ class Downloader:
                     ranged = r.status == 206 and (r.headers.get("Content-Range") or "").endswith(f"/{job.size}")
             if ranged:
                 job.chunks = (job.size + CHUNK - 1) // CHUNK
-                state = job.state_path()
-                if state.exists() and job.dest.exists() and job.dest.stat().st_size == job.size:
+                state, part = job.state_path(), job.part_path()
+                if state.exists() and not part.exists() and job.dest.exists() and job.dest.stat().st_size == job.size:
+                    os.replace(job.dest, part)    # 老版本安装脚本直接往 dest 里下，接着下之前先挪开
+                if state.exists() and part.exists() and part.stat().st_size == job.size:
                     try:
                         job.chunk_done = set(json.loads(state.read_text()))
                     except Exception:
                         job.chunk_done = set()
                 else:
-                    with open(job.dest, "wb") as f:
+                    job.dest.unlink(missing_ok=True)
+                    with open(part, "wb") as f:
                         f.truncate(job.size)
                     state.write_text("[]")
                 job.done = sum(min(CHUNK, job.size - i * CHUNK) for i in job.chunk_done)
@@ -351,7 +359,7 @@ class Downloader:
             finally:
                 job.threads -= 1
         with job.lock:
-            with open(job.dest, "r+b") as f:
+            with open(job.part_path(), "r+b") as f:
                 f.seek(start)
                 f.write(buf)
             job.chunk_done.add(i)
@@ -392,14 +400,15 @@ class Downloader:
 
     def _verify(self, job: Job, arg) -> None:
         job.status = "verify"
+        path = job.part_path() if job.part_path().exists() else job.dest
         if job.sha256:
             h = hashlib.sha256()
-            with open(job.dest, "rb") as f:
+            with open(path, "rb") as f:
                 for b in iter(lambda: f.read(4 << 20), b""):
                     h.update(b)
             if h.hexdigest() != job.sha256:
-                # 内容不对（镜像坏了 / 被改过）：删掉，换下一个地址重下
-                job.dest.unlink(missing_ok=True)
+                # 内容不对（镜像坏了 / 被改过 / 以前没下完）：删掉，换下一个地址重下
+                path.unlink(missing_ok=True)
                 job.state_path().unlink(missing_ok=True)
                 with job.lock:
                     job.done = 0
@@ -415,6 +424,8 @@ class Downloader:
                     job.status = "wait"
                 self._push(job.priority, ("start", job, None))
                 return
+        if path != job.dest:
+            os.replace(path, job.dest)
         job.state_path().unlink(missing_ok=True)
         job.done = job.size
         job.status = "ok"
@@ -490,6 +501,7 @@ class Installer:
         self.failed = False
         self.started = time.time()
         self.sources: dict[str, str] = {}
+        self._hashed: dict[tuple, bool] = {}     # 这次运行里算过的哈希（核对和规划各问一次，不重复算 2.5GB）
 
     # ---- 记录
     def log(self, text: str) -> None:
@@ -531,7 +543,7 @@ class Installer:
             st["sam3d"] = True
         w = self.lock["weights"]
         wdir = self.root / "backend" / "checkpoints" / w["dir"]
-        if all((wdir / f["path"]).is_file() and (wdir / f["path"]).stat().st_size == f["size"] for f in w["files"]):
+        if all(self._verified(wdir / f["path"], f["size"], f["sha256"], save) for f in w["files"]):
             st["weights"] = True
         pg = self.lock["posegraph"]
         backend = {rel[len("backend/"):]: h for rel, h in pg["files"].items()
@@ -555,6 +567,29 @@ class Installer:
 
     def _keys(self) -> list[str]:
         return ["pip", "build", "packages", "torch", "sam3d", "weights", "posegraph"] + ["component-" + c["id"] for c in self.lock["components"]]
+
+    def _verified(self, path: Path, size: int, digest: str, save: bool) -> bool:
+        """大文件真的完整：大小对、没有没下完的分块记录、SHA-256 对。只看大小不够：老版本安装脚本中途关掉会留下
+        大小对、内容大半是空的文件（加载模型时报 mmap / 不是 zip 格式）。算过的按大小 + 修改时间记在 .verified.json。"""
+        if not path.is_file() or path.stat().st_size != size or path.with_name(path.name + ".parts").exists():
+            return False
+        cache_path = self.root / ".verified.json"
+        try:
+            cache = json.loads(cache_path.read_text(encoding="utf-8"))
+        except Exception:
+            cache = {}
+        key, stamp = str(path.relative_to(self.root)), [size, path.stat().st_mtime_ns, digest]
+        if cache.get(key) == stamp:
+            return True
+        if (key, *stamp) in self._hashed:
+            return self._hashed[(key, *stamp)]
+        if size >= SPLIT_MIN:
+            print("  " + L(f"核对 {path.name}（{size / 2**30:.1f} GB）…", f"Checking {path.name} ({size / 2**30:.1f} GB)…"), flush=True)
+        ok = self._hashed[(key, *stamp)] = file_sha256(path) == digest
+        if ok and save:
+            cache[key] = stamp
+            cache_path.write_text(json.dumps(cache, indent=1), encoding="utf-8")
+        return ok
 
     def _backend_version(self) -> str:
         try:
@@ -685,7 +720,7 @@ class Installer:
             w = lock["weights"]
             for f in w["files"]:
                 dest = self.root / "backend" / "checkpoints" / w["dir"] / f["path"]
-                if dest.is_file() and dest.stat().st_size == f["size"] and not dest.with_name(dest.name + ".parts").exists():
+                if self._verified(dest, f["size"], f["sha256"], False):
                     continue
                 d.add(Job("weight:" + f["path"], Path(f["path"]).name, [MODELSCOPE.format(repo=w["repo"], path=f["path"])], dest,
                           f["size"], f["sha256"], 2))
@@ -952,6 +987,7 @@ class Installer:
         env = dict(os.environ, PYTHONPATH=str(root / "backend" / "src"), PYTHONNOUSERSITE="1", PYTHONUTF8="1")
         code = ("import torch, torchvision, cv2, scipy, fastapi, uvicorn, timm, mediapipe, moge, av, onnxruntime; "
                 "import posegraph.app, posegraph.face, posegraph.depth\n"
+                "if hasattr(posegraph.depth, 'model_class'): posegraph.depth.model_class()\n"   # 深度模型的类真能导入（ROCm 版曾经不行）
                 "ok = torch.cuda.is_available()\n"
                 "name = torch.cuda.get_device_name(0) if ok else ''\n"
                 "if ok:\n"

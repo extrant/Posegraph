@@ -50,6 +50,18 @@ def available() -> bool:
     return settings.moge_model.is_file()
 
 
+def model_class():
+    """MoGe 的模型类。Windows 上的 ROCm 版 PyTorch 没编分布式训练（torch.distributed 里没有 GradBucket），
+    moge.model.utils 定义训练用的钩子时在类型标注里用到它，导入就报错；推理用不到，补一个占位。"""
+    import torch.distributed
+
+    if not hasattr(torch.distributed, "GradBucket"):
+        torch.distributed.GradBucket = type("GradBucket", (), {})
+    from moge.model.v2 import MoGeModel
+
+    return MoGeModel
+
+
 def estimate(rgb: np.ndarray, device: str) -> PhotoDepth:
     """跑 MoGe-2。模型第一次用时加载，换设备时重载；和 SAM 3D Body 一起在 Estimator.unload 时释放（unload）。"""
     import torch
@@ -60,9 +72,7 @@ def estimate(rgb: np.ndarray, device: str) -> PhotoDepth:
     global _model, _model_device
     with _lock:
         if _model is None or _model_device != device:
-            from moge.model.v2 import MoGeModel
-
-            _model = MoGeModel.from_pretrained(str(settings.moge_model)).to(device).eval()
+            _model = model_class().from_pretrained(str(settings.moge_model)).to(device).eval()
             _model_device = device
         H, W = rgb.shape[:2]
         with torch.no_grad():
