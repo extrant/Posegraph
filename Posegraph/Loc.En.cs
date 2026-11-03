@@ -816,6 +816,7 @@ public static partial class Loc
         ["撤销调整（Ctrl+Z）：调整页的数值、3D 页的关节偏移"] = "Undo adjustment (Ctrl+Z): Tuning tab values and 3D tab joint offsets",
         ["这些灯是从空白开始加的，没有原样可回；先在下面存成我的方案，之后就能恢复成存的样子"] = "These lights were added from scratch, so there is no original to go back to; save them as your setup below, then you can restore to the saved version",
         ["已存成「{0}」：换地图、换站位都能直接用；「整套恢复原样」之后回到存的这一份"] = "Saved as \"{0}\": works directly on other maps and positions; \"Reset whole setup\" now goes back to this saved version",
+        ["这个后端是安装脚本装的 Python {0} 环境（AMD 显卡），新组件要用安装脚本补：再运行 Install-Posegraph.bat，选这个文件夹"] = "This backend is a Python {0} environment set up by the installer (AMD GPU); add the new components with the installer: run Install-Posegraph.bat again and choose this folder",
         ["打光范围"] = "Light area",
         ["脸"] = "Face",
         ["半身"] = "Half body",

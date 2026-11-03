@@ -1,0 +1,2046 @@
+{
+ "format": 2,
+ "posegraph": {
+  "version": "0.7.3",
+  "runtime": 1,
+  "tag": "v0.7.3",
+  "url": "https://github.com/extrant/Posegraph/archive/refs/tags/v0.7.3.zip",
+  "root": "Posegraph-0.7.3",
+  "files": {
+   ".gitignore": "b0fb220195a501d3548af687fd28376026be8e6614115a12b54c8edefea8db51",
+   "LICENSE": "6a73a836038c9b5544fcfc861f5c277b503ca34381618c5963f39fc862354f44",
+   "Posegraph.slnx": "832eec248a815ad3c6ede45724c9d7133be31be9ab869be277e564a522c077cb",
+   "Posegraph/Backend/BackendClient.Parallel.cs": "ffaed04dd80f1f328603306c1b10de7dce6315b17c33f97d5f157552b359e42f",
+   "Posegraph/Backend/BackendClient.Video.cs": "72d69ce1117bc32a1345c49d192623abfd37032f068bcf201262a2db32d64c1f",
+   "Posegraph/Backend/BackendClient.cs": "46182a29cc3829b931b298888addcd6eb40a69cad66bfdd5455baa4af22426d3",
+   "Posegraph/Backend/BackendProcess.cs": "63c7d2f098a312c5bed86dbf885d368cd029d7656c0217315097f721e1c7e105",
+   "Posegraph/Backend/BackendUpdater.cs": "7aa2746a7905453f7f2363c9fafcc4518820bff17e050be0af4800dfbc3916b8",
+   "Posegraph/Backend/Dto.cs": "2a3cc6dd46231721cebf197a01895367e527fde11062551d091154c15535cfb1",
+   "Posegraph/Backend/SystemProbe.cs": "a5d92ee5642b9364018626e5075bcc7ab5781812519cd1db694010d88f65785c",
+   "Posegraph/BridgeServer.cs": "6735394782ba7de5673442dc72c80c4342805bba414ef7c5a09e86e4bfa19f4f",
+   "Posegraph/BrioBridge.cs": "76b9028a0242a17ad2dbce6a8f3b9ae6239ec1e7cdcd225175f9395568ed15e1",
+   "Posegraph/BrioDirectPose.cs": "5046afdfbbd0c0f3b01d3899d762c0bdf4abd18f1443912be4d3d62c802f4421",
+   "Posegraph/Changelog/banner.png": "0494089b28e36bea6c966d2752116fea758b9aee6f3fbe675267b4bf51e4225c",
+   "Posegraph/Changelog/changelog.json": "2068756b47c9c95060a01cf6e778f83a2e5df3b3ac4ac131d82a8500ea4011c0",
+   "Posegraph/Configuration.cs": "9cdd677311ea8d5ad3934794426de19cf62b7d91275599a8da5c5eb133590a17",
+   "Posegraph/Export/BlenderExport.cs": "1bff4beee6df29a3a9aa110cd100079c0bbf71fb1e7263ed608d201659f6ead0",
+   "Posegraph/Export/posegraph_blender.py": "813528071c26f94cff1368bf47f8fbcf68b607487bf933f25c0dc47085712279",
+   "Posegraph/FaceAnimationDump.cs": "368c06e014dc8ac3e599bf9a56aa182ca392fa4749b387a4deffced4ed4fa97d",
+   "Posegraph/GposeCamera.cs": "10f60469a09811e7194dfa59c0686c03f313e21241a7f54bed06cb1c5c5b75f4",
+   "Posegraph/Library/BrioPoseLibrary.cs": "3cfffc4f6d42ce35fa753a0b8323439195c27f407a5b38e1451a1a3825924f73",
+   "Posegraph/Library/ClipboardImage.cs": "04be45b709e019dbe7c99279d4aff77c6ed6f7a2687dd6f33bdda17e2c3d2582",
+   "Posegraph/Library/ImageFormat.cs": "7f7b591cf8ae7a96fdcf95e1d5cb11526245315e444baabfcd1e2872f256cb45",
+   "Posegraph/Library/ImageLibrary.cs": "2695a8bf93fff27de37c96c964e18cfb4e62f47487328c8d646367655b8cd9ac",
+   "Posegraph/Library/RecognitionService.Parallel.cs": "2024ebbd058e603086defabfc3bfeb13ade8a9f943cf70231e85e636fb25b168",
+   "Posegraph/Library/RecognitionService.cs": "043ff5fcf90c63826023a3cdaa6327cc5a5ef4e2e8c0379334bb33801809a1fe",
+   "Posegraph/Library/TextureImages.cs": "00ebe424ea95d810863cc78199813ecbcffd01cbc0938b379c69ef42c08d8742",
+   "Posegraph/Library/ThumbnailCache.cs": "42d46d8bb2c9b29ba51b3166f4b6c66b7b90328b8224c6d9452cac5b5b0f16a2",
+   "Posegraph/Library/WicThumbnail.cs": "11099a08eccd9f4e2d09912008a32d4c2257fe0f22a1564908036b49032b7c99",
+   "Posegraph/Lighting/GameLights.cs": "799f005ce60850e1ac5a32c5982ca953906fb64752db93fee2608722b5c37e5a",
+   "Posegraph/Lighting/LightRig.cs": "950a4e675ce72016dd6d8e5b333c22ab94f01bf501f6e67329c163b133f7a9f7",
+   "Posegraph/Lighting/LightingService.Edit.cs": "71773d824dac35726f7284f8a3870738d27a04b72d2791e524365f52a9959a79",
+   "Posegraph/Lighting/LightingService.cs": "a22b3657dc707415084818f654a562d1af2c08550147ad835f46c2cfc1e65e82",
+   "Posegraph/Loc.En.cs": "ae4f0d2a194a73b3a224e4ecaae84cde3b98a3af3fc900e7639c677d6a9ef1b9",
+   "Posegraph/Loc.cs": "5d1e4e0d2c4e8a58c3065254fc18f4bcb912b9ba98dc8063ef1b4b131e2335fd",
+   "Posegraph/Plugin.cs": "494d453950055727073b58ae5d9802b4eae68fa784b8f2313a50bd232242bb9f",
+   "Posegraph/PoseApplier.cs": "b4537e4829d11f35c49529b388b8ecf416636abf0b99e7f85eee040c94fd03d9",
+   "Posegraph/Posegraph.csproj": "3461cf7396c1e3f096a6ea78d2262dfe376e7995a00819243fde281d0a2827f4",
+   "Posegraph/Posegraph.json": "406085609c764fe2e0f876c17b7292fa8f1d8330f846711b0addf23817d2a2e8",
+   "Posegraph/Races.cs": "d5245c67b194874db573ad719f2d0d0f0ab91c02904653c30cfca22d53341ad4",
+   "Posegraph/UI/AuxViewsMenu.cs": "ffea037a432c2cff0019d62ec0e98f8bf41ee4bfa276f40cb93b4de9b1510765",
+   "Posegraph/UI/CompositionWindow.cs": "137fd63c2b4d5cc1dd67f70278b33b924f059645e2c197032c0a9154582e4828",
+   "Posegraph/UI/LibraryWindow.cs": "5a9b50a031cee8852693618d3c11caeae6d593bb81bd2c51cf7476999211d856",
+   "Posegraph/UI/LightingScene.cs": "0a649bed54b5864ab220de8f802d4996c34e6857f089cf8dfa3b2e8ae787e5c6",
+   "Posegraph/UI/LightingSceneWindow.cs": "b3be3707fb5d555e9a8b2570819ac44430b0f8b8e504ad2aab603d5ec463cfae",
+   "Posegraph/UI/LightingWindow.cs": "3c6212ed8cba5c86efd3de84c000c115556f47060c102c2e78ade0320f6f95e7",
+   "Posegraph/UI/MainWindow.BrioEdits.cs": "b86328766254ba4eba96053ed7ecc18b3ef248d4dc78437154320edeb73d3094",
+   "Posegraph/UI/MainWindow.Merge.cs": "4c840776e30996703e8ddcb48480912ecab86eb8cdf02367c65d07eaa8a4121a",
+   "Posegraph/UI/MainWindow.RecognitionSettings.cs": "f20d0652b3d9f9d88565b1ad6ff9937619d4f77cb5be8771a12d8933a171f2d6",
+   "Posegraph/UI/MainWindow.Undo.cs": "5157beb756a7f8cfb13ecd988654169710beacdfe61c176f802c333286a38afc",
+   "Posegraph/UI/MainWindow.cs": "69e8e2709c21144c597009dda75edcacd0527c3fc44249cc806adc04d09d879b",
+   "Posegraph/UI/MaskDocument.cs": "cc58c22adc5d365e79c637a9bf824c7fba222ec3b83a00d242d2387ab480cc02",
+   "Posegraph/UI/MaskEditorWindow.cs": "8003a0e7740defc1708bdbc0952e3a152ec58eff7b892a687c95c11a56c1c1e5",
+   "Posegraph/UI/PosegraphTheme.cs": "8262ad4667fe557c25f58cb0aba3ecbeec78ca673d416594e1426cbffbac3bfc",
+   "Posegraph/UI/Scene3D.cs": "d3f4568ffa75c63f50ed5e51bfb4576f2e934913a793d9c33d02f616cbfbd851",
+   "Posegraph/UI/ScreenCapture.cs": "93dddb43ed80250c46b6eb4c1e2f3fa1df7e261b758e0841b7eec53ae5036827",
+   "Posegraph/UI/SplitWindow.cs": "cb4c28c5adb31fa87001bae47d1f8e59be3717f7df0a31fb6cdebb56e17ada50",
+   "Posegraph/UI/UiText.cs": "1bc2542ee892bb8f43b65ce8efe6608f9fa2603adfe6958a586dddafde0ed54f",
+   "Posegraph/UI/UpdateWindow.cs": "e8ba1630223d4cc75df896d9efeccc916bb0d7ece6da7e1eeffb710a345502d5",
+   "Posegraph/UI/VideoWindow.Timeline.cs": "d59a73e74a0aaa8c7a764f197491f1f14b6324337aab5efc55bfe06f36cbb30a",
+   "Posegraph/UI/VideoWindow.cs": "5c43cf7993702e6ab9b5ec7bf457b4bece46baf3f4cb4c866f46884216f0408d",
+   "Posegraph/Video/Clip.cs": "8b34beb2cbb89529fb78be529fef939d31e5c8991225cd69f0299d8058a821d1",
+   "Posegraph/Video/ClipAudio.cs": "fac15804af08b02cb4ddd5fd41d65683e8408dc0be8cc6d8f8432a8667f5dcbf",
+   "Posegraph/Video/ClipEdits.cs": "853c980e862be6b9b5b23dd1fef7273b9b19874f78a92c3d1cc19105a37d3e70",
+   "Posegraph/Video/ClipPlayer.cs": "1a8f7c39d42abceb5e3218d681b9f53558e0518dcda622d818997113bc55de26",
+   "Posegraph/Video/ClipRecorder.cs": "bef019bad2412675176f54757b10655e7a8a440950b3c123c3136891e3770ffe",
+   "Posegraph/Video/ClipView.cs": "a3bc9552943b6f9cfd6f5fd3c09f367a493ff614f280439f9653b37579e691fd",
+   "Posegraph/VideoSpike.cs": "f976ace0e92d3ad44c329ce5398e203ecc47b74ee18513a90a48512b030b9d2e",
+   "Posegraph/images/icon.png": "6745f923f4a435e21d7e2c9571f49324c7a0e186314a332559d94de1f63a6759",
+   "Posegraph/packages.lock.json": "aab3fed1b503149b08ce26bed16605db18910b3582c947a1fd92b6793bf5bd36",
+   "README.md": "a81e989b5406f2f86e3dbab90ad13aa5696e5786b2d07bb2bd340bbd5b5d452c",
+   "README.zh-CN.md": "3755cd59cf398fb47c59cfb0cf64365d7a6aba4a96a359a48421a6e7084a419e",
+   "THIRD_PARTY_NOTICES.md": "61062c0e1059cbc235ee259b765f471edd0972dfb7d66d8f3aea26959374078f",
+   "backend/pyproject.toml": "5a63878ed3d1ccfadb50e128a9df689ea2ba250f0671ddc430710a3cf0d824b9",
+   "backend/scripts/bench_sam3d.py": "5d047c7992b85d3c71c8ee0513d79f2a3787c82b6cb81574b04aa484eb896d0b",
+   "backend/scripts/blender_compare_scene.py": "15a1d7033f9e575db65215db042576bdbcc00dbd6fe90b2ac017ee51463b2d02",
+   "backend/scripts/blender_race_compare.py": "da237e13ed20630033612e24f23351d8e9152c4f013db99c15f1e8efd74bb04b",
+   "backend/scripts/build_body_extents.py": "1508ea1352f26d3f961b7189353b7e301cd6109d5b526199797a6bffbd3ee7d7",
+   "backend/scripts/build_retarget_data.py": "c5f64551ad4902b0e7644efcddf97791f7c65ab0325d6002a93b564a1e452350",
+   "backend/scripts/camera_calibrate.py": "aecc409e55b2f12815b038bd42af4137b405b35d21977d67494a4dfd9f01e611",
+   "backend/scripts/export_blender_compare.py": "6d967fb39c42298eafeb0ad04f1b5ab3a72e0668d48cc28219320dbe6a80fb6e",
+   "backend/scripts/export_race_compare.py": "e7d7397941aa40a751656940cc8386f99d05b1d68f2d6e07aaa199a884bcdd06",
+   "backend/scripts/image_to_pose.py": "629bd1ca0a1d2cc53b06f043f74e74e6452fa4f90afb7101021206f6ab1348dd",
+   "backend/scripts/photo_to_game.py": "b66a819847e54b26007e4ea43ae63104e7cc7bd69797259e4eef933c375a0dc7",
+   "backend/scripts/preview_overlay.py": "e1165de45f465cdc68245c2fde8ddc62e3545b7a37ef1d23c3bbf039a9e59ddb",
+   "backend/scripts/push_pose.py": "092467dfbc693b9b99ea7ba7ec1f3b37037de31578d170717794b2de674f7f7b",
+   "backend/scripts/sample_frames.py": "fb9e8d5a0ab548127b5e0006dd5c3d0e360ce9d6e4ca3b38b985316040002d62",
+   "backend/scripts/setup_sam3d.ps1": "4f1ff4a43c50fc0a8d385d545bb41b3a62db5e3dd26e7e920c65f34e867e97f9",
+   "backend/scripts/verify_devices.py": "b45a1064a16efff0dd1434041291a0f97fcbdbbf8f31dfefc3731ccc80c94510",
+   "backend/src/posegraph/__init__.py": "33036535cf7e9732da8f5b0a75be9e003b730406b1d366479ce5e4080bd96a5e",
+   "backend/src/posegraph/app.py": "789cba5d4d138072406395cdfccc2e1eb5c7b73b99bc39d93cfcfb87c5318cea",
+   "backend/src/posegraph/audio.py": "0cfdabe161e4fa0e3e2e143a76da23afa78a1b2318dff8259d5f854836104b4d",
+   "backend/src/posegraph/bridge.py": "6a1af9c384a14faecc19e57d23d3c833cecfc7df5c422eaf5a5f9885dabc1b0a",
+   "backend/src/posegraph/camera.py": "7339c2d6372db04e3e9bc39ffaec42238663df54671914fa961554e3e54c0681",
+   "backend/src/posegraph/components.json": "a8b44674fa121edd13324028f3c83504777283e59be288d1c1b8573cb39c2b16",
+   "backend/src/posegraph/config.py": "5d4ec1223ecc2143ea6b8d7150683769a239dbb883bc9ab03f05436e77a5e469",
+   "backend/src/posegraph/data/face_neutral.npy": "fcf98e3eea48c0d02432d7d41112e0df700b716441b07d66a778c0531cf6cf33",
+   "backend/src/posegraph/depth.py": "07f432784067808b97a3deefd9da016bd65519c4dd996403ec475ba80acfc646",
+   "backend/src/posegraph/detect.py": "63ee689e933e1161687339816e0fffc28a375ea58620b9ef97d32539242884ab",
+   "backend/src/posegraph/edits.py": "e6ec8e989eabca44fd50ee47ac5fbc975cace1462e518d5568d64a0a64725a32",
+   "backend/src/posegraph/estimators/__init__.py": "8a8fd1a7e1c1a5d84695380ee1e615d73d1cb914208017e1e1da91fca5da9a88",
+   "backend/src/posegraph/estimators/base.py": "0a93b9f5dda2b53e47939392595f4ad483d41bb21dadc607d81aa6ed7f6b5708",
+   "backend/src/posegraph/estimators/sam3d_body.py": "f90b921455b29f5692f4573a3d2e5ab93606ea8ee85d8411d8305a0c70877631",
+   "backend/src/posegraph/estimators/sam3d_fast.py": "d508fa843896ce10993b80166038a26c32a0b2b78d6a1864c2c658676cc3b97b",
+   "backend/src/posegraph/estimators/shared_sam3d.py": "a26ad6a6730931115673e13e1e2b9815e3766f276a42024bca36856e78b74cca",
+   "backend/src/posegraph/face.py": "fed0d8164649ddb6aa876b404ea11130aee8e2f340faabcf327036621f6bfac6",
+   "backend/src/posegraph/face_geom.py": "e12de13b58fcfa181e4dee66f3a39fe77f3196ec77a19450ca2cf62b5250d098",
+   "backend/src/posegraph/face_rig.py": "c7fc007945096ff501ce000174a9b22afae738db7fe564bfe6502704e9b823f7",
+   "backend/src/posegraph/floor.py": "1dc968ce92cad45ce112b296d5c65d964d56532d2bd76593e27b6e6d0d39023a",
+   "backend/src/posegraph/gpu.py": "27fb64c88eaab280ce6e0aaccfb2bc6351ff179b0c5def0b05a20e236bce7de7",
+   "backend/src/posegraph/hands.py": "cd0b715df2a83f2b49e7257f4ad39c2af67821be9e2fb8dffe105531af53ccd7",
+   "backend/src/posegraph/i18n.py": "cadfbac04f5281b0dbc44ff05a60c5228c0ee20a2c3531b963bdb24ae4b19272",
+   "backend/src/posegraph/lighting.py": "b18d2392428054bad35ebd4e7d46b4b1f35095cfab7b380da87642a1828ed774",
+   "backend/src/posegraph/masks.py": "9ddced1dfff68e7398a0a289709f483eee14d5784d5595fd7ba623728f4fb784",
+   "backend/src/posegraph/motion.py": "a17aad52d26059ae7cd58853d86df21000a57e00ba6d4b76e14e29b7073e1aee",
+   "backend/src/posegraph/multiview.py": "dd4b72d501fc46f897691bb20365ad9cd8580be363b3a9548c2725a12831106f",
+   "backend/src/posegraph/parallel_batch.py": "06548af1de4e5e4942e477b6d67509724dfbdbbb0f9f4fc2487ebc06b59cc716",
+   "backend/src/posegraph/placement.py": "02eb8b77e3bd5674bdd04cca456c36a861456d5bf84c6de830cfa9a2d9ec5dfb",
+   "backend/src/posegraph/retarget/__init__.py": "9b9231b434e5cc9b3373e8127e741604f1e7afa7b3678a6c0428fdf91ebc5663",
+   "backend/src/posegraph/retarget/body.py": "03f68b19f0b6e432b687a04ce2329554ad70fcd9a2db3b8436fff2083c5108b7",
+   "backend/src/posegraph/retarget/brio_pose.py": "6e02bcb59b011ffcb1900bd1b1527ad167f9a2566e6fb45c30d09817b047145e",
+   "backend/src/posegraph/retarget/data/body_extents.json": "68634aa73c4839b83a292047baacccfd2199e9ec075cabd2b5b7998ed06939d4",
+   "backend/src/posegraph/retarget/data/ffxiv_c0101.json": "4bc00e6cbd18dcadd174f9910b7de12bd5ace1ce03bfccc586adfe6638972304",
+   "backend/src/posegraph/retarget/data/ffxiv_c0201.json": "6a54148e8c1ee251546b7f54d09bd9dbe61609c081272c65e06969176670244e",
+   "backend/src/posegraph/retarget/data/ffxiv_c0301.json": "c41cd7d1042a77a173f014f76321d3778083b42a95347b12610c86ffc5c11a73",
+   "backend/src/posegraph/retarget/data/ffxiv_c0401.json": "cd8a465fcc4dae8650f4dc158c7be1d8542fa8ce43ee916524472a055eb93de1",
+   "backend/src/posegraph/retarget/data/ffxiv_c0501.json": "0e806aa8b5210a3952c32fa29e06ad965148f7680f37a996e70ed03fdf04daf0",
+   "backend/src/posegraph/retarget/data/ffxiv_c0601.json": "8c86cebe1196b11595c0698ff3294d17b2fd2b954d96972248e2c8fc20de50e1",
+   "backend/src/posegraph/retarget/data/ffxiv_c0701.json": "1a9791e8eba997ce5f44ca33915141edbcf6c1425df852e56873963f433288e1",
+   "backend/src/posegraph/retarget/data/ffxiv_c0801.json": "e6fd1d3f28791018963ffff163124c7f9ed90178ac5cb6946bccb86976a8c073",
+   "backend/src/posegraph/retarget/data/ffxiv_c0901.json": "10099a62f76a035ddcb7101784cc639b1fcdb9055a611ab2c229c8585ac16572",
+   "backend/src/posegraph/retarget/data/ffxiv_c1001.json": "b177e7e0b2f9eeacf4ef71d4e6947a3bf8556d833b31b77ef9bfed16144180f2",
+   "backend/src/posegraph/retarget/data/ffxiv_c1101.json": "09db9c626d7b3d3e68da7b85a907bb3dbe703542483cae42940514d326d38e6c",
+   "backend/src/posegraph/retarget/data/ffxiv_c1201.json": "232c55e0d1e9b43ec9647354676bb2a5af45c30df981de89888fd215fb07d6aa",
+   "backend/src/posegraph/retarget/data/ffxiv_c1301.json": "fb803cda91141bc86567f58c27dc22c38ff80f0acc812e7fc9c2d30f4355f177",
+   "backend/src/posegraph/retarget/data/ffxiv_c1401.json": "bd305a70bc176a09224a6b5f4eff28c07a9fdd62c05f35f31dd18236e29e3478",
+   "backend/src/posegraph/retarget/data/ffxiv_c1501.json": "abed3764f9af93bc527d9fed578615206daceb4bd9ce72287b31689ff725de48",
+   "backend/src/posegraph/retarget/data/ffxiv_c1601.json": "6b435b3f29e828f96d170a34b00b6eb75af2575ae69549b5baf542381dd798a8",
+   "backend/src/posegraph/retarget/data/ffxiv_c1701.json": "e8adc3a81e677437041f94df390380e900ff08b4b6832c404fe678b5c9a93b62",
+   "backend/src/posegraph/retarget/data/ffxiv_c1801.json": "1886212bf5252d89011cf01ebb2c12169256c645d74f583006c55d09c3cf7588",
+   "backend/src/posegraph/retarget/data/mhr_rest.json": "aecf15706256f5b9abed7bf68d2c5194493df824f1d94f20e65f4c12269a85c0",
+   "backend/src/posegraph/retarget/ffxiv.py": "7c53beb544797e406209814d5a3605cb83d17dd3b655df89d419fbf8b823f0cc",
+   "backend/src/posegraph/retarget/mhr.py": "a1edbf92046fc8cb371c28266d46edfa4074f634341913daf0b4d458048ab9bb",
+   "backend/src/posegraph/retarget/pbd.py": "226498e9c790541f9ce641785e620e0816a67aaa7c7bc0160169b8b00bfd249c",
+   "backend/src/posegraph/retarget/races.py": "bb2478b4bbf988abbdc752ba798f876a793a24569ddba3640885270f9c21f1d5",
+   "backend/src/posegraph/retarget/sklb.py": "f86d0961a0ad8087c6113068a3fffe5ad87004d872596552c51866e524da274e",
+   "backend/src/posegraph/session_archive.py": "ffb25a24d6abc7c35735234c4641596c41f942c21106c152ea019eb46365d22e",
+   "backend/src/posegraph/session_cache.py": "3459d37a835479ff32f41118964ee6deed9957d9c6b2ff651e64ef2e2bd0f30d",
+   "backend/src/posegraph/shared_inference.py": "d2df6a6ce77eea07d18e6a81fe855dc98b0a0cb823c7b8a164018d5874b78171",
+   "backend/src/posegraph/tuning.py": "bc87fb44af90b0f19ec32019e1c391ff2ad4850296cefba1e45885ff4feb3596",
+   "backend/src/posegraph/version.json": "89c388d485a3f9a91e611fc5b928faeefb182c5850f58fb72b55c5d90013decc",
+   "backend/src/posegraph/video.py": "0ba4166857857e3e7c9d56cc96c093ceaabc0dd60a19a039a66b8d1e69d8fe78",
+   "backend/tests/inference_fakes.py": "fec6cf61fc87b13ff5bdf2c0a87784415c0dd2a6d012a9384d2d8563f0517866",
+   "backend/tests/test_camera_solver.py": "5e4a28e0048e0adc7ee2b64f4bfa297ebec78f7b825338a86eac5f1415c90a5c",
+   "backend/tests/test_depth_floor.py": "23d23dc22ab18295e2a9579926a0315611e39481a19766508d2d77bf403f32d3",
+   "backend/tests/test_depth_masks.py": "51cfe671ad89edc3366c76c7f8bc3646b2764b599355b23cfd3826ca8748f39e",
+   "backend/tests/test_detect.py": "fac569f229e2ee077e95e5ca2b2c49fec59f0e4bfd29a23d0d0ac3c33667c2c7",
+   "backend/tests/test_edits.py": "f6211afd080c085691ca218f1c97e36781419f78560d467d1c5f60360499aee4",
+   "backend/tests/test_face.py": "d66e10aa7b45ec04ad526595c7eaa52aa7afe0ebde8745608591fbda7bd5d8b7",
+   "backend/tests/test_face_rig.py": "082609c53d08e22c5dd56bbc63ae5018445379b44d04a9bc69e3dc755540eb08",
+   "backend/tests/test_floor.py": "b307692dff73024ba29c2208f2e3c6e962ddceedb58860429cec59e3badbef56",
+   "backend/tests/test_hands.py": "3f4cc1cdf72aaef399bec393c9a2cb5e5531048d6436818c7c2738c0e54fdefc",
+   "backend/tests/test_lighting.py": "0b28766ebc5958674bc236e4d99b66151120d357153337cea685deb63d9edde6",
+   "backend/tests/test_masks.py": "ca9c054f0b0c9be640508e324d85b35d0c193f7f1065523aef4c01317bfe8e5b",
+   "backend/tests/test_motion.py": "d7e1765bf93b321e96104e3e3c2b3bcac5c83ba2f91b50d84293ca4514c84cbf",
+   "backend/tests/test_parallel_batch.py": "7b612be801f12bad0d06a15a5719b7c2372ef496b5385bb3b2364ae7521a3ee6",
+   "backend/tests/test_placement.py": "a25687a9f81549b6af3dc99a5276ce913a2fe6c5015beb4f838c6dc3a36b8690",
+   "backend/tests/test_rocm_gpu.py": "fc2bade062f024632cc29d7747d84cdaab803989baffe416b3ab798bbcc9d0d7",
+   "backend/tests/test_session_cache.py": "37103c275a0bd2e622dc33c630218c4ebd5e9b009a6b55f03498ad4ba7ac66c2",
+   "backend/tests/test_shared_inference.py": "d9196afde1a4d74074be674738ed848189c1611d3f749a654b3fb8f23a5fb3f3",
+   "backend/tests/test_shared_sam3d.py": "5a80fa5b8160d924e003ad0ab9cd693370df1bfb531c2c5f7669094a3f5ac5b7",
+   "backend/tests/test_shared_strategy_api.py": "f8177322fb81911a47c62db33f3bdd8b6631e62b2be6b2dbc2d8aac6583fbb72",
+   "backend/tests/test_video.py": "9328c5aa00ff01ccd2c1f761e123c45d07015201af83201e179dcef1def3a929",
+   "docs/benchmark.md": "ab4e213f87cd5e601570d539ffb1299dbe73402e70696d78392a6ce4c3d3dfee",
+   "docs/manual-update.md": "271ec6fcbd96e015a67c9dd3841dccc7cf79d2983846791b93dd1ff77a0ffa52",
+   "docs/manual-update.zh-CN.md": "60b5b84943ff73d55879996e065bf7e6d9fc0a75fbe64f2dddcd7218f39ff4e6",
+   "docs/parallel-recognition.md": "e1512fd3b6d388b2dc2161c2994d68cceac661d49a2831282e4b41bf698cef0b",
+   "docs/tutorial/README.md": "07b81c704c50c59d3ddafd9cd75686638e85441a5f00e4ee68f01fc635ac0396",
+   "docs/tutorial/README.zh-CN.md": "6596c715d4b173dda05fd2eb68b329440609b2295c44039563ad28e89ffd788f",
+   "docs/tutorial/images/credits.json": "dc5ffb746f7eb0b961b1829854b2acd90622f23f5687c8872236431dd62fbc5c",
+   "docs/tutorial/images/en/tut-3d.png": "03543cfec0beb3af46e73f2924c78e577fa02a1960f8ec32b3af8793846e5971",
+   "docs/tutorial/images/en/tut-aux.png": "c753ca6cddc5375d4ad2c3daae4b4c3edc594be990eb9d9d8c57b802bbd9e58d",
+   "docs/tutorial/images/en/tut-changelog.png": "24d8b63a57c87a31235eeabc9bc8ce56ee84970e5b02c63fb2d1852b388667af",
+   "docs/tutorial/images/en/tut-composition.png": "6949a0b320adf3a97eed20cfa8e9bb4f8efcfcef50e1b706f68811bdd2bf7330",
+   "docs/tutorial/images/en/tut-empty.png": "02df4d1aac734ef308d9116b3eee74731c9fb34017645028672ee3afd597a3af",
+   "docs/tutorial/images/en/tut-hints.png": "583fa1cb465b2d4047e6df8e8a63fecfe4cefc57d2d876e5d003eb506e4f3778",
+   "docs/tutorial/images/en/tut-image.png": "a045712ec8691c469ae1a8e8e465b1dc453f1529a3d25968e561eaf7714e3930",
+   "docs/tutorial/images/en/tut-library.png": "a561a0e90e3f2501af796220701b51fab7d92ccda320d02a3285a0aebb8b6bf2",
+   "docs/tutorial/images/en/tut-lighting.png": "d6980fa6a7d7bfb968e0c6aece3669b1e5d3ba65dadd257b65a509f5feb42661",
+   "docs/tutorial/images/en/tut-rings.png": "c68994ee9b6774211b23a87944fb8100ed318b0c1a24057247428bdbfb272cb0",
+   "docs/tutorial/images/en/tut-settings.png": "d373824ddca06eb49f38e50e58f633433f6eb8b7c7b02e4f3de67490cce44c90",
+   "docs/tutorial/images/en/tut-split.png": "f0463daf3ae6c1670cbf2306faa2a85072f3c52f9ee2f50e3ab51c156b33e67e",
+   "docs/tutorial/images/en/tut-tuning.png": "3fa713e5f6dcd78fac83ed7527051f2e7273aeab5de5bf6614d67dc4fe236886",
+   "docs/tutorial/images/ingame-arms-open.jpg": "6a47923045ea287e544b2fde62e855befaf2f527e10c92443321f0c170685e9f",
+   "docs/tutorial/images/ingame-kalaripayattu.jpg": "c3de9436a62ae52061cde54ba4c4b680bdfe0e9ec9b28bf60bbbacda7cf0865d",
+   "docs/tutorial/images/ingame-sit-wall.jpg": "0b297c6e2605fa02150874d341e3d305e6588c44ca9186f899459ba6457f103e",
+   "docs/tutorial/images/ingame-split.jpg": "b991ebe4e32c9a36b6cd01b41c9f5f03c2243dad4312586b2383eac20c4d5764",
+   "docs/tutorial/images/ingame-wall.jpg": "19a16f953c9f0d3b1e907dac38b0d29488c045eae124ec15979c70d0a55143be",
+   "docs/tutorial/images/sample-arms-open.jpg": "1bb4d427ad20d667050e2fbebd5c0cb31466647be2409d101e290a4187e290ba",
+   "docs/tutorial/images/sample-kalaripayattu.jpg": "603cb8f775699cd4eebcaea07eb4723d56550a3b1cf4475b6c1286c8fbd91922",
+   "docs/tutorial/images/sample-lean-wall.jpg": "9d04e7d34567ef2fc0609e4c2ba06abdb62296cec5490e9068c3f47b38937bfa",
+   "docs/tutorial/images/sample-sit-wall.jpg": "d37177da1377aae1935d1200f00ba351a1c597ea3886916b3f54ef0aed01a67c",
+   "docs/tutorial/images/zh/tut-3d.png": "725655a750c0f947ec3013cddfaa99ba031c27d055d696f9ed3fabad8922a1a0",
+   "docs/tutorial/images/zh/tut-aux.png": "84fa5224ca9eac8b113899e0b10e5e065a31cf75b0f33a027d194b0f77274eee",
+   "docs/tutorial/images/zh/tut-changelog.png": "f22c60209a5b3037dada6b8a9942cc87b029a1e64d769a19ba165d383623de27",
+   "docs/tutorial/images/zh/tut-composition.png": "e4b19a1a1cdc187bbe326011923e2d4d8dce3f3bb11951f61fe4ab074b98c24d",
+   "docs/tutorial/images/zh/tut-empty.png": "e1a98d4e472c4f99549aebea1d191a8651fe32ea611021d504ae33013d4682be",
+   "docs/tutorial/images/zh/tut-hints.png": "608abce9cc997e7e6f94175d317ad26e2ed2080d4dce768d609d501c540e5e56",
+   "docs/tutorial/images/zh/tut-image.png": "091d70158eedc043f52ed90417ad5b2919f6eb2bc416bdd7e143544ffe44379c",
+   "docs/tutorial/images/zh/tut-library.png": "18d41b344554cbad21ada61ee6edc2707a55feeb5748b7024292f245a8914a22",
+   "docs/tutorial/images/zh/tut-lighting.png": "f3cd613a69082d5c353a7612ab946f0320424c2e7b7e7949bb25a04570a89008",
+   "docs/tutorial/images/zh/tut-rings.png": "834d509c973b9f7ceba66e32abc7af6e1cf9203082a5c532f21abdcdec6efeff",
+   "docs/tutorial/images/zh/tut-settings.png": "888f19ee0046dc7e46554c352420c7fedcb6e73efbee5da9caa366ef6bf05141",
+   "docs/tutorial/images/zh/tut-split.png": "88542103ff8e5ed7b566b222c2ced5ffc2ea192404df0c3d5bcaca780e065ff0",
+   "docs/tutorial/images/zh/tut-tuning.png": "99303d1e27dca4f080370f07017c172b0f58b7742b63fa9b9925ed375e2437ee",
+   "packaging/build_backend_components.py": "218ec7f3d0e97a8d216eb6ef35d123ac38577d044bae34bc80506b06e96c8c4e",
+   "packaging/build_backend_package.ps1": "ef0feca9b1b0c19f7e1b81997ddb7e6f084edec9e94e6d817024bfa2bef165f5",
+   "packaging/package/README.txt": "421a5de0bf255154ace833022e0303ac34b88fa855f87f2e1d6d7c08659c2773",
+   "packaging/package/Start-Backend.bat": "588ae02e6a231f3fa7417c6b938c070f446d036479c52a53f3ceacb3d967d690",
+   "tests/BackendClient.Checks/BackendClient.Checks.csproj": "4ff4ca17a184cc4dbd8b5a149740d2a2116961dd61b81471a9963871aa5ac206",
+   "tests/BackendClient.Checks/LocalBackend.cs": "975e474388226cf4ba60420cf566e2c0582a503154ba694a5cc162759fad4923",
+   "tests/BackendClient.Checks/Program.cs": "1e42661ac6dda174affa6c8514c91bb537a1ecced3d0492fb10a745bfde24a56",
+   "tests/BackendUpdater.Checks/BackendUpdater.Checks.csproj": "1c29c04e4104126db064f4c5b571d734dab0e19f21238d6af3a40c4275bd3c8b",
+   "tests/BackendUpdater.Checks/Program.cs": "e70b9802762cb3709c8e99de2578c9c31718bc91e20538f552dda4aed747780c",
+   "tests/Common/LoopbackServer.cs": "d2376fd3932fc25505572d9b521fdc5d991dcc5f76c359505c1ff787e15c5d53",
+   "tests/Common/Stubs.cs": "12de2269a958fde1742f87eb83745b2e3d1a554698bcc61b307aa72098b45f69",
+   "tests/MaskDocument.Checks/MaskDocument.Checks.csproj": "59fbf34786a6129a189f4e91a20769b89634bd77abd3323066037b55013e1469",
+   "tests/MaskDocument.Checks/Program.cs": "fad94b73d65d26d72ff776abfce6a70b7f88473f333adcb49d2f098a3f6b59c0",
+   "tests/RecognitionService.Checks/Program.cs": "a6f819624ff3f51d10e82f82a76d88ca128f97392bc634103c1846598747b6dc",
+   "tests/RecognitionService.Checks/RecognitionService.Checks.csproj": "3f59f0b3b044962245bf9233fe91876be3a348908572141573ab139d9c82854e",
+   "tools/UiPreview/Cli.cs": "36fac2d2e20a231a9f72c6ea12e47ec95f88d47702d5cc810a6746bc59d7a526",
+   "tools/UiPreview/Demo.cs": "7b6843b11bbfb4e9e228e38c37427f94cc47484020c89076f156947acc09769f",
+   "tools/UiPreview/Host.cs": "c380eea7cb6e11b4b1956add732844ee318bda29e0a05641cb5bbc87a8706363",
+   "tools/UiPreview/MergeScenes.cs": "de413323bb79adef284c908027a1a561e5e1db9d2346e1b8d1abc165ecea0dbb",
+   "tools/UiPreview/PluginPatches.cs": "cd2de0a5237c1b472dc1c54811422eef58aada3195c1841e734fec6c9da447a3",
+   "tools/UiPreview/Program.cs": "44747e0c75ba82977ca2b4bce62d1e502f432b1c8f79226ca8755427857284f1",
+   "tools/UiPreview/README.md": "2e321b3a645b12e8a482bc7284e5b6aa549c1f1779970ce5366dae7476e449cb",
+   "tools/UiPreview/Scenes.cs": "2bea98b19ace7686be8c56e8b493536810ea9e7294d74aabb198fe23c11b598b",
+   "tools/UiPreview/Services.cs": "81c080d21fd2a21f870738626720938571d97f458102478f0ac65a3c84b3dc51",
+   "tools/UiPreview/SkiaRenderer.cs": "1d0fb99ca7610fe747bcadbaed42ab9b3e26b51f5389b7885428156d079557cd",
+   "tools/UiPreview/Stress.cs": "8f9c029423ebaa54f0fcbb2c2a6e2fbe095cf634cc6e82b31dcc435872703dd2",
+   "tools/UiPreview/Stub.cs": "01a997e3af049ea0c256021767cd1db64138a33a4f65f55a6193e81e54bb4226",
+   "tools/UiPreview/Tutorial.cs": "39c5a4a58a5af692091ccd80182fde1725fe70391ba0af0a1179d254809758a7",
+   "tools/UiPreview/UiPreview.csproj": "7a95cf504320228474783a0c238af1535569d6018a662408b108553ac84039a6",
+   "tools/UiPreview/annotate.py": "c5a5cae2c095ba04d8d0f85cc7e085d7c115fe51029a2fdca964b59cad107589",
+   "tools/UiPreview/make_banner.py": "19fb1639aed3d8073f388cf405e31404c0bad0ff4ad52c12edc4230e96bf25e2",
+   "tools/UiPreview/tutorial_annotations.json": "761b764431b0fa72ab9f6cb6514c1523665dd032a4337cc6b0f1e9a279dd9e98"
+  }
+ },
+ "envs": {
+  "cp311": {
+   "python": {
+    "version": "3.11.9",
+    "file": "python-3.11.9-embed-amd64.zip",
+    "sha256": "009d6bf7e3b2ddca3d784fa09f90fe54336d5b60f0e0f305c37f400bf83cfd3b",
+    "size": 11249023
+   },
+   "pip": {
+    "name": "pip",
+    "version": "26.2.2",
+    "file": "pip-26.2.2-py3-none-any.whl",
+    "path": "packages/3f/06/3e4420302363fbb71be3c7f35ce042f54bfca330e3e66b3a2e3c4cca579f/pip-26.2.2-py3-none-any.whl",
+    "sha256": "fd7f4dfa8190e014013b9f08f3e973f4e4c26ffd179a204895533a7254813a70",
+    "size": 1819850,
+    "sdist": false
+   },
+   "packages": [
+    {
+     "name": "aiohappyeyeballs",
+     "version": "2.7.1",
+     "file": "aiohappyeyeballs-2.7.1-py3-none-any.whl",
+     "path": "packages/71/43/1947f06babed6b3f1d7f38b0c767f52df66bfb2bc10b468c4a7de9eceff2/aiohappyeyeballs-2.7.1-py3-none-any.whl",
+     "sha256": "9243213661e29250eb41368e5daa826fc017156c3b8a11440826b2e3ed376472",
+     "size": 15038,
+     "sdist": false
+    },
+    {
+     "name": "aiohttp",
+     "version": "3.14.5",
+     "file": "aiohttp-3.14.5-cp311-cp311-win_amd64.whl",
+     "path": "packages/0f/15/52b5e65f02b33686ae49f1518548ae4f5a7adaf31d9d3c54fa12a143137b/aiohttp-3.14.5-cp311-cp311-win_amd64.whl",
+     "sha256": "6f275c11d1aa6d4c458e05a68be084efe3c55a113d99e3f46a318098e52948fc",
+     "size": 512575,
+     "sdist": false
+    },
+    {
+     "name": "aiosignal",
+     "version": "1.4.0",
+     "file": "aiosignal-1.4.0-py3-none-any.whl",
+     "path": "packages/fb/76/641ae371508676492379f16e2fa48f4e2c11741bd63c48be4b12a6b09cba/aiosignal-1.4.0-py3-none-any.whl",
+     "sha256": "053243f8b92b990551949e63930a839ff0cf0b0ebbe0597b0f3fb19e1a0fe82e",
+     "size": 7490,
+     "sdist": false
+    },
+    {
+     "name": "annotated-doc",
+     "version": "0.0.5",
+     "file": "annotated_doc-0.0.5-py3-none-any.whl",
+     "path": "packages/3e/30/e900b21425a860e195f32e37657aa1f7c7f2b1bfb26f03ca209b90933c06/annotated_doc-0.0.5-py3-none-any.whl",
+     "sha256": "117bac03a25ede5df5440e855b32d556049ca169ead221505badf432fed4b101",
+     "size": 5302,
+     "sdist": false
+    },
+    {
+     "name": "annotated-types",
+     "version": "0.8.0",
+     "file": "annotated_types-0.8.0-py3-none-any.whl",
+     "path": "packages/99/91/8acff4f5e50511b911bbccb72b8628a49c68ce14148cd9f6431094859a90/annotated_types-0.8.0-py3-none-any.whl",
+     "sha256": "f072f4d804ea359e4eaf198b1af7a8b0943881a87f31bb764f8bf219bb9419e0",
+     "size": 13427,
+     "sdist": false
+    },
+    {
+     "name": "antlr4-python3-runtime",
+     "version": "4.9.3",
+     "file": "antlr4-python3-runtime-4.9.3.tar.gz",
+     "path": "packages/3e/38/7859ff46355f76f8d19459005ca000b6e7012f2f1ca597746cbcd1fbfe5e/antlr4-python3-runtime-4.9.3.tar.gz",
+     "sha256": "f224469b4168294902bb1efa80a8bf7855f24c99aef99cbefc1bcd3cce77881b",
+     "size": 117034,
+     "sdist": true
+    },
+    {
+     "name": "anyio",
+     "version": "4.15.1",
+     "file": "anyio-4.15.1-py3-none-any.whl",
+     "path": "packages/12/b8/4bd346e22b28902df4d651910f5242c28d84e4a5c2435ca5c3f797ed7e2e/anyio-4.15.1-py3-none-any.whl",
+     "sha256": "6152fdbbf9a77fdec97731721bebf7c4c44f7c29b424b0065826173efc7ed101",
+     "size": 132079,
+     "sdist": false
+    },
+    {
+     "name": "attrs",
+     "version": "26.1.0",
+     "file": "attrs-26.1.0-py3-none-any.whl",
+     "path": "packages/64/b4/17d4b0b2a2dc85a6df63d1157e028ed19f90d4cd97c36717afef2bc2f395/attrs-26.1.0-py3-none-any.whl",
+     "sha256": "c647aa4a12dfbad9333ca4e71fe62ddc36f4e63b2d260a37a8b83d2f043ac309",
+     "size": 67548,
+     "sdist": false
+    },
+    {
+     "name": "braceexpand",
+     "version": "0.1.7",
+     "file": "braceexpand-0.1.7-py2.py3-none-any.whl",
+     "path": "packages/fa/93/e8c04e80e82391a6e51f218ca49720f64236bc824e92152a2633b74cf7ab/braceexpand-0.1.7-py2.py3-none-any.whl",
+     "sha256": "91332d53de7828103dcae5773fb43bc34950b0c8160e35e0f44c4427a3b85014",
+     "size": 5923,
+     "sdist": false
+    },
+    {
+     "name": "certifi",
+     "version": "2026.10.23",
+     "file": "certifi-2026.10.23-py3-none-any.whl",
+     "path": "packages/32/d1/a3652fe2c19134d0d15922177821d863cbd7e842d53a21bbe7e8e3a1b5ac/certifi-2026.10.23-py3-none-any.whl",
+     "sha256": "e9b54de76e530bb6cf0ccd036787103acb58fd42ba930ea8bf948ddbaa2f61d1",
+     "size": 135082,
+     "sdist": false
+    },
+    {
+     "name": "click",
+     "version": "8.5.0",
+     "file": "click-8.5.0-py3-none-any.whl",
+     "path": "packages/58/50/6c0d534c5f134586a8e1ba4e330569e32f057e33372ae556463212fb4cd3/click-8.5.0-py3-none-any.whl",
+     "sha256": "255bc9599cf7748b4b1a446ccc735421bd08a2ae529a8b88597d3de5664ee360",
+     "size": 125251,
+     "sdist": false
+    },
+    {
+     "name": "colorama",
+     "version": "0.4.6",
+     "file": "colorama-0.4.6-py2.py3-none-any.whl",
+     "path": "packages/d1/d6/3965ed04c63042e047cb6a3e6ed1a63a35087b6a609aa3a15ed8ac56c221/colorama-0.4.6-py2.py3-none-any.whl",
+     "sha256": "4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6",
+     "size": 25335,
+     "sdist": false
+    },
+    {
+     "name": "contourpy",
+     "version": "1.3.3",
+     "file": "contourpy-1.3.3-cp311-cp311-win_amd64.whl",
+     "path": "packages/98/4b/9bd370b004b5c9d8045c6c33cf65bae018b27aca550a3f657cdc99acdbd8/contourpy-1.3.3-cp311-cp311-win_amd64.whl",
+     "sha256": "3519428f6be58431c56581f1694ba8e50626f2dd550af225f82fb5f5814d2a42",
+     "size": 225234,
+     "sdist": false
+    },
+    {
+     "name": "cycler",
+     "version": "0.12.1",
+     "file": "cycler-0.12.1-py3-none-any.whl",
+     "path": "packages/e7/05/c19819d5e3d95294a6f5947fb9b9629efb316b96de511b418c53d245aae6/cycler-0.12.1-py3-none-any.whl",
+     "sha256": "85cef7cff222d8644161529808465972e51340599459b8ac3ccbac5a854e0d30",
+     "size": 8321,
+     "sdist": false
+    },
+    {
+     "name": "einops",
+     "version": "0.8.2",
+     "file": "einops-0.8.2-py3-none-any.whl",
+     "path": "packages/2a/09/f8d8f8f31e4483c10a906437b4ce31bdf3d6d417b73fe33f1a8b59e34228/einops-0.8.2-py3-none-any.whl",
+     "sha256": "54058201ac7087911181bfec4af6091bb59380360f069276601256a76af08193",
+     "size": 65638,
+     "sdist": false
+    },
+    {
+     "name": "fastapi",
+     "version": "0.162.0",
+     "file": "fastapi-0.162.0-py3-none-any.whl",
+     "path": "packages/b4/4f/3f2c25c9b43970b5e9a08beb5e04776247edea684ddc0930f4f02f0bb6cb/fastapi-0.162.0-py3-none-any.whl",
+     "sha256": "3785963de305dd09912426cb81f2d230fce98ab3521cdfe97265c8d14983128c",
+     "size": 148912,
+     "sdist": false
+    },
+    {
+     "name": "filelock",
+     "version": "3.32.3",
+     "file": "filelock-3.32.3-py3-none-any.whl",
+     "path": "packages/a7/8e/50f46a9c0ce8d2861a394c1347caae037ea0431d2f67d7feb151cbc4649a/filelock-3.32.3-py3-none-any.whl",
+     "sha256": "7f0ca4bcc0e181c60dbbd8aa9ab5b120ebb99e4e064e83636340056f833a1f09",
+     "size": 98901,
+     "sdist": false
+    },
+    {
+     "name": "fonttools",
+     "version": "4.67.0",
+     "file": "fonttools-4.67.0-cp311-cp311-win_amd64.whl",
+     "path": "packages/24/73/5c281531cf7899ae37a0937c62feed1f7d0e8a35538eea4d1595b52447e1/fonttools-4.67.0-cp311-cp311-win_amd64.whl",
+     "sha256": "33ae23a531795864fcdbbab91a40c824976e22642c05efca3bd8a0b00630d0e7",
+     "size": 1646300,
+     "sdist": false
+    },
+    {
+     "name": "frozenlist",
+     "version": "1.8.0",
+     "file": "frozenlist-1.8.0-cp311-cp311-win_amd64.whl",
+     "path": "packages/0a/f5/603d0d6a02cfd4c8f2a095a54672b3cf967ad688a60fb9faf04fc4887f65/frozenlist-1.8.0-cp311-cp311-win_amd64.whl",
+     "sha256": "ac913f8403b36a2c8610bbfd25b8013488533e71e62b4b4adce9c86c8cea905b",
+     "size": 44064,
+     "sdist": false
+    },
+    {
+     "name": "fsspec",
+     "version": "2026.7.0",
+     "file": "fsspec-2026.7.0-py3-none-any.whl",
+     "path": "packages/fd/3c/6a2bf344106328fd04963664a60b9bb6496fc25df8e962fcdc1367285fb9/fsspec-2026.7.0-py3-none-any.whl",
+     "sha256": "b57ddbafedfaef7018c1ecab32aa200a9d7ca26b77965f64e48b70061249d279",
+     "size": 206583,
+     "sdist": false
+    },
+    {
+     "name": "fvcore",
+     "version": "0.1.5.post20221221",
+     "file": "fvcore-0.1.5.post20221221.tar.gz",
+     "path": "packages/a5/93/d056a9c4efc6c79ba7b5159cc66bb436db93d2cc46dca18ed65c59cc8e4e/fvcore-0.1.5.post20221221.tar.gz",
+     "sha256": "f2fb0bb90572ae651c11c78e20493ed19b2240550a7e4bbb2d6de87bdd037860",
+     "size": 50217,
+     "sdist": true
+    },
+    {
+     "name": "h11",
+     "version": "0.16.0",
+     "file": "h11-0.16.0-py3-none-any.whl",
+     "path": "packages/04/4b/29cac41a4d98d144bf5f6d33995617b185d14b22401f75ca86f384e87ff1/h11-0.16.0-py3-none-any.whl",
+     "sha256": "63cf8bbe7522de3bf65932fda1d9c2772064ffb3dae62d55932da54b31cb6c86",
+     "size": 37515,
+     "sdist": false
+    },
+    {
+     "name": "hf-xet",
+     "version": "1.7.0",
+     "file": "hf_xet-1.7.0-cp38-abi3-win_amd64.whl",
+     "path": "packages/4d/59/b35106dfa71b6eef605dc88bd038fe99c7f86fb132a15b60d0bf2f235b2c/hf_xet-1.7.0-cp38-abi3-win_amd64.whl",
+     "sha256": "2b7bb5727889b0f2436dbaaad8fc4c3e66b8240d992716989e0c086b4278b1bc",
+     "size": 3822644,
+     "sdist": false
+    },
+    {
+     "name": "httpcore",
+     "version": "1.0.9",
+     "file": "httpcore-1.0.9-py3-none-any.whl",
+     "path": "packages/7e/f5/f66802a942d491edb555dd61e3a9961140fd64c90bce1eafd741609d334d/httpcore-1.0.9-py3-none-any.whl",
+     "sha256": "2d400746a40668fc9dec9810239072b40b4484b640a8c38fd654a024c7a1bf55",
+     "size": 78784,
+     "sdist": false
+    },
+    {
+     "name": "httpcore2",
+     "version": "2.16.0",
+     "file": "httpcore2-2.16.0-py3-none-any.whl",
+     "path": "packages/af/c2/ce417c397afa5181f0e3c6ff01a4d01639414e1adef08730d97571297151/httpcore2-2.16.0-py3-none-any.whl",
+     "sha256": "5c4358319f2602d984ad93182c9fee5160f22e9da7babdda870a5e7c4e2dc34f",
+     "size": 85070,
+     "sdist": false
+    },
+    {
+     "name": "httpx",
+     "version": "0.28.1",
+     "file": "httpx-0.28.1-py3-none-any.whl",
+     "path": "packages/2a/39/e50c7c3a983047577ee07d2a9e53faf5a69493943ec3f6a384bdc792deb2/httpx-0.28.1-py3-none-any.whl",
+     "sha256": "d909fcccc110f8c7faf814ca82a9a4d816bc5a6dbfea25d6591d6985b8ba59ad",
+     "size": 73517,
+     "sdist": false
+    },
+    {
+     "name": "httpx2",
+     "version": "2.16.0",
+     "file": "httpx2-2.16.0-py3-none-any.whl",
+     "path": "packages/7b/3d/2e4bc4fd1ef9770871669adb348d612a6e4786b303a23f9935b81c48dd60/httpx2-2.16.0-py3-none-any.whl",
+     "sha256": "fd2c5d7909e8d86fe92d53020c310ca0e4e431b838c207c5754b9bbf0308d49a",
+     "size": 97880,
+     "sdist": false
+    },
+    {
+     "name": "huggingface-hub",
+     "version": "2.3.0",
+     "file": "huggingface_hub-2.3.0-py3-none-any.whl",
+     "path": "packages/c7/89/5f6ef1162d0323f167b6baab04d1b4bd6a946161a8af6d86f622d9d79aa1/huggingface_hub-2.3.0-py3-none-any.whl",
+     "sha256": "5da369600233568a126eb5578754935b2add9446b42d9e2fc0927d56840ac1a5",
+     "size": 855161,
+     "sdist": false
+    },
+    {
+     "name": "hydra-core",
+     "version": "1.3.7",
+     "file": "hydra_core-1.3.7-py3-none-any.whl",
+     "path": "packages/25/0c/21890c10cc94da917c8e47efc1c55cd3e56a1d25ab5947bdd35abaf9fdc1/hydra_core-1.3.7-py3-none-any.whl",
+     "sha256": "83606c4a05c770f1e026e0489875f28989829d151799eabd8cfa8cbe82164515",
+     "size": 168790,
+     "sdist": false
+    },
+    {
+     "name": "idna",
+     "version": "3.20",
+     "file": "idna-3.20-py3-none-any.whl",
+     "path": "packages/58/a2/bb081bab032533a855d44de1d56f8e8426114ff1ba5d1f07a438a0a654f8/idna-3.20-py3-none-any.whl",
+     "sha256": "ab7ae7122974553370f0bdb919e1a960b2cd1bc1ef0276416d896db81c14582c",
+     "size": 69583,
+     "sdist": false
+    },
+    {
+     "name": "iopath",
+     "version": "0.1.10",
+     "file": "iopath-0.1.10.tar.gz",
+     "path": "packages/72/73/b3d451dfc523756cf177d3ebb0af76dc7751b341c60e2a21871be400ae29/iopath-0.1.10.tar.gz",
+     "sha256": "3311c16a4d9137223e20f141655759933e1eda24f8bff166af834af3c645ef01",
+     "size": 42226,
+     "sdist": true
+    },
+    {
+     "name": "jinja2",
+     "version": "3.1.6",
+     "file": "jinja2-3.1.6-py3-none-any.whl",
+     "path": "packages/62/a1/3d680cbfd5f4b8f15abc1d571870c5fc3e594bb582bc3b64ea099db13e56/jinja2-3.1.6-py3-none-any.whl",
+     "sha256": "85ece4451f492d0c13c5dd7c13a64681a86afae63a5f347908daf103ce6d2f67",
+     "size": 134899,
+     "sdist": false
+    },
+    {
+     "name": "kiwisolver",
+     "version": "1.5.1",
+     "file": "kiwisolver-1.5.1-cp311-cp311-win_amd64.whl",
+     "path": "packages/bf/9f/6f9e489c188200e6fb3193935501894811e8c97577c8ffe9033589bf3521/kiwisolver-1.5.1-cp311-cp311-win_amd64.whl",
+     "sha256": "1a7587dc335f2c0f5bd577fd0540bd16c66006bdb60f759a1059f025e6c4f071",
+     "size": 70744,
+     "sdist": false
+    },
+    {
+     "name": "lightning-utilities",
+     "version": "0.15.3",
+     "file": "lightning_utilities-0.15.3-py3-none-any.whl",
+     "path": "packages/25/f4/ead6e0e37209b07c9baa3e984ccdb0348ca370b77cea3aaea8ddbb097e00/lightning_utilities-0.15.3-py3-none-any.whl",
+     "sha256": "6c55f1bee70084a1cbeaa41ada96e4b3a0fea5909e844dd335bd80f5a73c5f91",
+     "size": 31906,
+     "sdist": false
+    },
+    {
+     "name": "markupsafe",
+     "version": "3.0.3",
+     "file": "markupsafe-3.0.3-cp311-cp311-win_amd64.whl",
+     "path": "packages/83/8a/4414c03d3f891739326e1783338e48fb49781cc915b2e0ee052aa490d586/markupsafe-3.0.3-cp311-cp311-win_amd64.whl",
+     "sha256": "de8a88e63464af587c950061a5e6a67d3632e36df62b986892331d4620a35c01",
+     "size": 15077,
+     "sdist": false
+    },
+    {
+     "name": "matplotlib",
+     "version": "3.11.2",
+     "file": "matplotlib-3.11.2-cp311-cp311-win_amd64.whl",
+     "path": "packages/66/54/91fe3fdfa29100b4668cbf9721577a10acde6e009694618230e4e7a97527/matplotlib-3.11.2-cp311-cp311-win_amd64.whl",
+     "sha256": "a24d5fd36e4f0e742c3851dcd20810e56a95633a342e4bf6cb591c678e8fe61f",
+     "size": 9329982,
+     "sdist": false
+    },
+    {
+     "name": "mpmath",
+     "version": "1.3.0",
+     "file": "mpmath-1.3.0-py3-none-any.whl",
+     "path": "packages/43/e3/7d92a15f894aa0c9c4b49b8ee9ac9850d6e63b03c9c32c0367a13ae62209/mpmath-1.3.0-py3-none-any.whl",
+     "sha256": "a0b2b9fe80bbcd81a6647ff13108738cfb482d481d826cc0e02f5b35e5c88d2c",
+     "size": 536198,
+     "sdist": false
+    },
+    {
+     "name": "multidict",
+     "version": "7.2.0",
+     "file": "multidict-7.2.0-cp311-cp311-win_amd64.whl",
+     "path": "packages/9f/95/a4b9c45bb8123a07e883c2b05fb8f12b2bdeea0133356bed2ccf5c4bdcdd/multidict-7.2.0-cp311-cp311-win_amd64.whl",
+     "sha256": "755d416d7113a12888070cbc943d55ec297c8151a8680443c4c2337b92203d1f",
+     "size": 94703,
+     "sdist": false
+    },
+    {
+     "name": "networkx",
+     "version": "3.6.1",
+     "file": "networkx-3.6.1-py3-none-any.whl",
+     "path": "packages/9e/c9/b2622292ea83fbb4ec318f5b9ab867d0a28ab43c5717bb85b0a5f6b3b0a4/networkx-3.6.1-py3-none-any.whl",
+     "sha256": "d47fbf302e7d9cbbb9e2555a0d267983d2aa476bac30e90dfbe5669bd57f3762",
+     "size": 2068504,
+     "sdist": false
+    },
+    {
+     "name": "numpy",
+     "version": "2.4.6",
+     "file": "numpy-2.4.6-cp311-cp311-win_amd64.whl",
+     "path": "packages/c5/31/7fc6239c12bce7e931463251cca4426c465e1876ba3cc785402ef4dd8f4e/numpy-2.4.6-cp311-cp311-win_amd64.whl",
+     "sha256": "1e254a00cdf42b1e4d5b3d68d33af63268d41340d8885df2ab6470f2e1500147",
+     "size": 12608406,
+     "sdist": false
+    },
+    {
+     "name": "omegaconf",
+     "version": "2.3.1",
+     "file": "omegaconf-2.3.1-py3-none-any.whl",
+     "path": "packages/a4/0e/152509871bf30df6fc38569f52a2db9b55dd41aae957adae50a053ac7778/omegaconf-2.3.1-py3-none-any.whl",
+     "sha256": "3d701d14e9a8828f1edd28bb70b725908b34277cdd72cf7d6a83f94dadc6b6a0",
+     "size": 79502,
+     "sdist": false
+    },
+    {
+     "name": "opencv-python",
+     "version": "5.0.0.93",
+     "file": "opencv_python-5.0.0.93-cp37-abi3-win_amd64.whl",
+     "path": "packages/21/f0/9fa6e85cb10c8eb36a0222d27e50fe381b86ce49a55446bf39f491727564/opencv_python-5.0.0.93-cp37-abi3-win_amd64.whl",
+     "sha256": "f90ba04b8f73bc5c3814037699739f0156f597338a98f05956c684e7c3ca10d2",
+     "size": 44000345,
+     "sdist": false
+    },
+    {
+     "name": "opentelemetry-api",
+     "version": "1.45.1",
+     "file": "opentelemetry_api-1.45.1-py3-none-any.whl",
+     "path": "packages/1e/41/f7dcf80b81ee8e71c1a2b59f14208bc723edbd89ed027a73b175abf6348e/opentelemetry_api-1.45.1-py3-none-any.whl",
+     "sha256": "b31553efa588ae44bc306f863c785c5333a9ecc091248c6ee68b4b6c87fdedfb",
+     "size": 60256,
+     "sdist": false
+    },
+    {
+     "name": "packaging",
+     "version": "26.3",
+     "file": "packaging-26.3-py3-none-any.whl",
+     "path": "packages/63/34/ba1c580383c9eada3711951fef0795c80b829a078d72188184bcab9dd527/packaging-26.3-py3-none-any.whl",
+     "sha256": "d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c",
+     "size": 129956,
+     "sdist": false
+    },
+    {
+     "name": "pillow",
+     "version": "12.3.0",
+     "file": "pillow-12.3.0-cp311-cp311-win_amd64.whl",
+     "path": "packages/63/c6/4bad1b18d132a50b27e1365e1ab163616f7a5bb56d330f66f9d1d9d4f9d4/pillow-12.3.0-cp311-cp311-win_amd64.whl",
+     "sha256": "8e95e1385e4998ae9694eeaa4730ba5457ff61185b3a55e2e7bea0880aef452a",
+     "size": 7233653,
+     "sdist": false
+    },
+    {
+     "name": "portalocker",
+     "version": "4.4.1",
+     "file": "portalocker-4.4.1-py3-none-any.whl",
+     "path": "packages/47/ec/02e439b10c6b2aa26629f269a27ae2aa395fae70207fd344046858a34156/portalocker-4.4.1-py3-none-any.whl",
+     "sha256": "4a184e8fb1adb37e078ca1804f1b7c0d8e73d81136790b1ad695ae8f1c8be291",
+     "size": 129702,
+     "sdist": false
+    },
+    {
+     "name": "propcache",
+     "version": "0.5.4",
+     "file": "propcache-0.5.4-cp311-cp311-win_amd64.whl",
+     "path": "packages/0a/8a/3db6a3543d8101263b4c52978b6276a04ead2caff2c5ab880d934f47bd89/propcache-0.5.4-cp311-cp311-win_amd64.whl",
+     "sha256": "e904d4d01f36bd6e197590be1533c44e06058771e0746dd073a8ebb3ef880858",
+     "size": 46268,
+     "sdist": false
+    },
+    {
+     "name": "pydantic",
+     "version": "2.14.1",
+     "file": "pydantic-2.14.1-py3-none-any.whl",
+     "path": "packages/35/ea/a56b9fe5066f3537b7882f77e9c5dfb26d8c2eefdaed9b5fc73d57b4dc22/pydantic-2.14.1-py3-none-any.whl",
+     "sha256": "9195d967ec791692a04438115466764fb8b9a27b31f14a760437694f40d6b454",
+     "size": 488106,
+     "sdist": false
+    },
+    {
+     "name": "pydantic-core",
+     "version": "2.50.1",
+     "file": "pydantic_core-2.50.1-cp311-cp311-win_amd64.whl",
+     "path": "packages/24/65/3e875e7991eaecd4d70686293ff0d8a99aa8f93dc295e6a21c3d702912fb/pydantic_core-2.50.1-cp311-cp311-win_amd64.whl",
+     "sha256": "0048b6dddc8ef4b64fccaad878bd143b0c3882ea9936279dc11d613f6b7dd1bc",
+     "size": 2176332,
+     "sdist": false
+    },
+    {
+     "name": "pyparsing",
+     "version": "3.3.3",
+     "file": "pyparsing-3.3.3-py3-none-any.whl",
+     "path": "packages/38/bb/d215ee7c73b61497b28a5503f9f53523f294fcc936762b7caf90e0c1c2b5/pyparsing-3.3.3-py3-none-any.whl",
+     "sha256": "ece8c00a69cf01b45d0b1dedabb469c90d8caf996d4fda40f147627a122849a4",
+     "size": 126420,
+     "sdist": false
+    },
+    {
+     "name": "pyrootutils",
+     "version": "1.0.4",
+     "file": "pyrootutils-1.0.4-py3-none-any.whl",
+     "path": "packages/1c/6f/ed601aec632d908b86adbad0e1cc712f7073faf697134fb0465a3fbcc512/pyrootutils-1.0.4-py3-none-any.whl",
+     "sha256": "8bbf25425278693168ae03b167aa6509422dc21853a6ee01d5d5e40601a89f90",
+     "size": 5831,
+     "sdist": false
+    },
+    {
+     "name": "python-dateutil",
+     "version": "3.0.0",
+     "file": "python_dateutil-3.0.0-py2.py3-none-any.whl",
+     "path": "packages/5a/17/cebee01d1c0c1441174cf0456ddc91b280d79acb65340c05e41d77866ee8/python_dateutil-3.0.0-py2.py3-none-any.whl",
+     "sha256": "3c79630202e4152c6add678446984236efe4f57e84d8e892aab0637bab82e9fd",
+     "size": 94659,
+     "sdist": false
+    },
+    {
+     "name": "python-dotenv",
+     "version": "1.2.4",
+     "file": "python_dotenv-1.2.4-py3-none-any.whl",
+     "path": "packages/60/d1/38f3a3405989a89ac18390803e70c6ad7c7760da4f9b83cbeca0c44a0c72/python_dotenv-1.2.4-py3-none-any.whl",
+     "sha256": "42269a8a5b3fd54ffa6f3d84b18abed50064717576b4ecf03dc4a55d8aa04fdc",
+     "size": 23266,
+     "sdist": false
+    },
+    {
+     "name": "python-multipart",
+     "version": "0.0.32",
+     "file": "python_multipart-0.0.32-py3-none-any.whl",
+     "path": "packages/e1/04/e8135ebd1ad02c56ec633277529b2602ff99ff634be76cdba5744cf554fd/python_multipart-0.0.32-py3-none-any.whl",
+     "sha256": "ff6d3f776f16878c894e52e107296ffc890e913c611b1a4ec6c44e2821fe2e23",
+     "size": 30042,
+     "sdist": false
+    },
+    {
+     "name": "pytorch-lightning",
+     "version": "2.6.6",
+     "file": "pytorch_lightning-2.6.6-py3-none-any.whl",
+     "path": "packages/4f/cf/ba8e4cc1b982ff6dc6f9fdef0e4074605438b82640f6270888a10e7e42c3/pytorch_lightning-2.6.6-py3-none-any.whl",
+     "sha256": "71f95c7b22f25c4f91cc659e1734bcdc6c69c8b66543f2ed2d78dbe29ce2f167",
+     "size": 853045,
+     "sdist": false
+    },
+    {
+     "name": "pyyaml",
+     "version": "6.0.3",
+     "file": "pyyaml-6.0.3-cp311-cp311-win_amd64.whl",
+     "path": "packages/da/e3/ea007450a105ae919a72393cb06f122f288ef60bba2dc64b26e2646fa315/pyyaml-6.0.3-cp311-cp311-win_amd64.whl",
+     "sha256": "9f3bfb4965eb874431221a3ff3fdcddc7e74e3b07799e0e84ca4a0f867d449bf",
+     "size": 158763,
+     "sdist": false
+    },
+    {
+     "name": "roma",
+     "version": "1.8.0",
+     "file": "roma-1.8.0-py3-none-any.whl",
+     "path": "packages/3c/90/9b723c3fef1820dd94f30bde8bee75ed08f65b1a6c34a86cfd4e4b8d7a59/roma-1.8.0-py3-none-any.whl",
+     "sha256": "5096d77f807da25537d570714bdb5d6cc93b247f95f332abe2836600b1ddf8e8",
+     "size": 35374,
+     "sdist": false
+    },
+    {
+     "name": "safetensors",
+     "version": "0.8.0",
+     "file": "safetensors-0.8.0-cp310-abi3-win_amd64.whl",
+     "path": "packages/1b/6d/3fba214c1e5e0f69991677ec3bc17023f0421776975e1de0c682dca475e2/safetensors-0.8.0-cp310-abi3-win_amd64.whl",
+     "sha256": "096ec1a98435df7beb08853bb5aa9081a84f23d0adc67ed1a0a10550f608373f",
+     "size": 355540,
+     "sdist": false
+    },
+    {
+     "name": "scipy",
+     "version": "1.17.1",
+     "file": "scipy-1.17.1-cp311-cp311-win_amd64.whl",
+     "path": "packages/95/da/0d1df507cf574b3f224ccc3d45244c9a1d732c81dcb26b1e8a766ae271a8/scipy-1.17.1-cp311-cp311-win_amd64.whl",
+     "sha256": "d30e57c72013c2a4fe441c2fcb8e77b14e152ad48b5464858e07e2ad9fbfceff",
+     "size": 36607512,
+     "sdist": false
+    },
+    {
+     "name": "setuptools",
+     "version": "65.5.0",
+     "file": "setuptools-65.5.0-py3-none-any.whl",
+     "path": "packages/41/82/7f54bbfe5c247a8c9f78d8d1d7c051847bcb78843c397b866dba335c1e88/setuptools-65.5.0-py3-none-any.whl",
+     "sha256": "f62ea9da9ed6289bfe868cd6845968a2c854d1427f8548d52cae02a42b4f0356",
+     "size": 1232695,
+     "sdist": false
+    },
+    {
+     "name": "six",
+     "version": "1.17.0",
+     "file": "six-1.17.0-py2.py3-none-any.whl",
+     "path": "packages/b7/ce/149a00dd41f10bc29e5921b496af8b574d8413afcd5e30dfa0ed46c2cc5e/six-1.17.0-py2.py3-none-any.whl",
+     "sha256": "4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274",
+     "size": 11050,
+     "sdist": false
+    },
+    {
+     "name": "starlette",
+     "version": "1.9.0",
+     "file": "starlette-1.9.0-py3-none-any.whl",
+     "path": "packages/f3/93/181df62699d9b5aca1d87e5cfda131dac87e3cdaebf668662f7206ca3470/starlette-1.9.0-py3-none-any.whl",
+     "sha256": "fd3f159936e882d06c1108f84688f7cda2cf85fc6a592a50edbd175e882c2ddc",
+     "size": 80335,
+     "sdist": false
+    },
+    {
+     "name": "sympy",
+     "version": "1.14.0",
+     "file": "sympy-1.14.0-py3-none-any.whl",
+     "path": "packages/a2/09/77d55d46fd61b4a135c444fc97158ef34a095e5681d0a6c10b75bf356191/sympy-1.14.0-py3-none-any.whl",
+     "sha256": "e091cc3e99d2141a0ba2847328f5479b05d94a6635cb96148ccb3f34671bd8f5",
+     "size": 6299353,
+     "sdist": false
+    },
+    {
+     "name": "tabulate",
+     "version": "0.10.0",
+     "file": "tabulate-0.10.0-py3-none-any.whl",
+     "path": "packages/99/55/db07de81b5c630da5cbf5c7df646580ca26dfaefa593667fc6f2fe016d2e/tabulate-0.10.0-py3-none-any.whl",
+     "sha256": "f0b0622e567335c8fabaaa659f1b33bcb6ddfe2e496071b743aa113f8774f2d3",
+     "size": 39814,
+     "sdist": false
+    },
+    {
+     "name": "termcolor",
+     "version": "3.3.0",
+     "file": "termcolor-3.3.0-py3-none-any.whl",
+     "path": "packages/33/d1/8bb87d21e9aeb323cc03034f5eaf2c8f69841e40e4853c2627edf8111ed3/termcolor-3.3.0-py3-none-any.whl",
+     "sha256": "cf642efadaf0a8ebbbf4bc7a31cec2f9b5f21a9f726f4ccbb08192c9c26f43a5",
+     "size": 7734,
+     "sdist": false
+    },
+    {
+     "name": "timm",
+     "version": "1.0.30",
+     "file": "timm-1.0.30-py3-none-any.whl",
+     "path": "packages/f5/85/b897716d0fa016af23b11e6526f5ef76d2013e8bc36b9c7ce15d9200e456/timm-1.0.30-py3-none-any.whl",
+     "sha256": "c8e27adf6801a2fdfb570dbbdd171f2f084756eefc673df8cfaab06bd14864f3",
+     "size": 2668917,
+     "sdist": false
+    },
+    {
+     "name": "torchmetrics",
+     "version": "1.9.0",
+     "file": "torchmetrics-1.9.0-py3-none-any.whl",
+     "path": "packages/c3/a2/c7f6ebf546f8f644edf0f999aa98ece106986a77a7b922316bf6414ff825/torchmetrics-1.9.0-py3-none-any.whl",
+     "sha256": "bfdcbff3dd1d96b3374bb2496eb39f23c4b28b8a845b6a18c313688e0d2d9ca1",
+     "size": 983384,
+     "sdist": false
+    },
+    {
+     "name": "tqdm",
+     "version": "4.70.1",
+     "file": "tqdm-4.70.1-py3-none-any.whl",
+     "path": "packages/a7/03/921a3d3c75785aca9ebfbfcabfbc3a1be12e2ab5265deb026d55a5a3f83e/tqdm-4.70.1-py3-none-any.whl",
+     "sha256": "c293e525e6fef9c20e8728fd4612df02a0aa31bb5fe91ecd93e123b1b7bffa73",
+     "size": 80199,
+     "sdist": false
+    },
+    {
+     "name": "trimesh",
+     "version": "5.2.0",
+     "file": "trimesh-5.2.0-py3-none-any.whl",
+     "path": "packages/51/14/78624d9c89bab76c2a2e1e839c7641fa686828c2c1c8fb64aedf3b371a5d/trimesh-5.2.0-py3-none-any.whl",
+     "sha256": "04db2c7ec62afdd7763fb04c82bb5f257ddd984993a19ee83697f475fc58fd29",
+     "size": 751459,
+     "sdist": false
+    },
+    {
+     "name": "truststore",
+     "version": "0.10.5",
+     "file": "truststore-0.10.5-py3-none-any.whl",
+     "path": "packages/51/e9/3a7820be2bb0fe53b6bc9c3be26d3d1158004e4c3ab953aa6840b955b1e9/truststore-0.10.5-py3-none-any.whl",
+     "sha256": "9aaaedaefaf06d8b206278cf8b5012bc897f485a874503501e12d776df78951c",
+     "size": 19017,
+     "sdist": false
+    },
+    {
+     "name": "typing-extensions",
+     "version": "4.16.0",
+     "file": "typing_extensions-4.16.0-py3-none-any.whl",
+     "path": "packages/49/d3/b8441a820a491ddfc024b0b0cf0393375b75ea13866d9c66727e54c2fc80/typing_extensions-4.16.0-py3-none-any.whl",
+     "sha256": "481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8",
+     "size": 45571,
+     "sdist": false
+    },
+    {
+     "name": "typing-inspection",
+     "version": "0.4.4",
+     "file": "typing_inspection-0.4.4-py3-none-any.whl",
+     "path": "packages/67/81/4add07e5172b7ac40d8ed5ff580409a7801a4fe26d529bdd915401dabfbe/typing_inspection-0.4.4-py3-none-any.whl",
+     "sha256": "65b8397ba37ccbce054456aaccddfc91e6e3083c92824df348d96ca832f3f147",
+     "size": 14750,
+     "sdist": false
+    },
+    {
+     "name": "tzdata",
+     "version": "2026.5",
+     "file": "tzdata-2026.5-py2.py3-none-any.whl",
+     "path": "packages/94/21/1e5995a1c920cce14e4bffae20c665ec10e7ed03ab25e006cd741092b718/tzdata-2026.5-py2.py3-none-any.whl",
+     "sha256": "b683bd1b6659ddcd810ff02ad09ba821d4bf1065072805063eb35c49617905ac",
+     "size": 347996,
+     "sdist": false
+    },
+    {
+     "name": "uvicorn",
+     "version": "0.54.0",
+     "file": "uvicorn-0.54.0-py3-none-any.whl",
+     "path": "packages/38/0c/b54a4fdd7f90a3af8b02ebc9ce6712c2c208b7926a2f7bad95c33ebbe943/uvicorn-0.54.0-py3-none-any.whl",
+     "sha256": "505bdb0f318731d45f1f712071fc781a8981f6847a31c902c9f5e652d4f67faf",
+     "size": 87427,
+     "sdist": false
+    },
+    {
+     "name": "yacs",
+     "version": "0.1.8",
+     "file": "yacs-0.1.8-py3-none-any.whl",
+     "path": "packages/38/4f/fe9a4d472aa867878ce3bb7efb16654c5d63672b86dc0e6e953a67018433/yacs-0.1.8-py3-none-any.whl",
+     "sha256": "99f893e30497a4b66842821bac316386f7bd5c4f47ad35c9073ef089aa33af32",
+     "size": 14747,
+     "sdist": false
+    },
+    {
+     "name": "yarl",
+     "version": "1.25.1",
+     "file": "yarl-1.25.1-cp311-cp311-win_amd64.whl",
+     "path": "packages/aa/9d/8cdceec66a9b940700cb45931741403f045b162afd79bcb93c41cadd0972/yarl-1.25.1-cp311-cp311-win_amd64.whl",
+     "sha256": "d7306dee25b8a0e737363f347362b875094b4dc4e367311470656ae420fdbf8e",
+     "size": 102894,
+     "sdist": false
+    },
+    {
+     "name": "wheel",
+     "version": "0.45.1",
+     "file": "wheel-0.45.1-py3-none-any.whl",
+     "path": "packages/0b/2c/87f3254fd8ffd29e4c02732eee68a83a1d3c346ae39bc6822dcbcb697f2b/wheel-0.45.1-py3-none-any.whl",
+     "sha256": "708e7481cc80179af0e556bbf0cc00b8444c7321e2700b8d8580231d13017248",
+     "size": 72494,
+     "sdist": false
+    }
+   ]
+  },
+  "cp312": {
+   "python": {
+    "version": "3.12.10",
+    "file": "python-3.12.10-embed-amd64.zip",
+    "sha256": "4acbed6dd1c744b0376e3b1cf57ce906f9dc9e95e68824584c8099a63025a3c3",
+    "size": 11133606
+   },
+   "pip": {
+    "name": "pip",
+    "version": "26.2.2",
+    "file": "pip-26.2.2-py3-none-any.whl",
+    "path": "packages/3f/06/3e4420302363fbb71be3c7f35ce042f54bfca330e3e66b3a2e3c4cca579f/pip-26.2.2-py3-none-any.whl",
+    "sha256": "fd7f4dfa8190e014013b9f08f3e973f4e4c26ffd179a204895533a7254813a70",
+    "size": 1819850,
+    "sdist": false
+   },
+   "packages": [
+    {
+     "name": "aiohappyeyeballs",
+     "version": "2.7.1",
+     "file": "aiohappyeyeballs-2.7.1-py3-none-any.whl",
+     "path": "packages/71/43/1947f06babed6b3f1d7f38b0c767f52df66bfb2bc10b468c4a7de9eceff2/aiohappyeyeballs-2.7.1-py3-none-any.whl",
+     "sha256": "9243213661e29250eb41368e5daa826fc017156c3b8a11440826b2e3ed376472",
+     "size": 15038,
+     "sdist": false
+    },
+    {
+     "name": "aiohttp",
+     "version": "3.14.5",
+     "file": "aiohttp-3.14.5-cp312-cp312-win_amd64.whl",
+     "path": "packages/ae/ce/1f08114679d49655b30a6e0a29858375c94b82c1de1a0bd0a20c2fee8b02/aiohttp-3.14.5-cp312-cp312-win_amd64.whl",
+     "sha256": "2cc38a4f2b516bef1714e690df87a0e043faf1a7693c82d860091684453d5111",
+     "size": 506141,
+     "sdist": false
+    },
+    {
+     "name": "aiosignal",
+     "version": "1.4.0",
+     "file": "aiosignal-1.4.0-py3-none-any.whl",
+     "path": "packages/fb/76/641ae371508676492379f16e2fa48f4e2c11741bd63c48be4b12a6b09cba/aiosignal-1.4.0-py3-none-any.whl",
+     "sha256": "053243f8b92b990551949e63930a839ff0cf0b0ebbe0597b0f3fb19e1a0fe82e",
+     "size": 7490,
+     "sdist": false
+    },
+    {
+     "name": "annotated-doc",
+     "version": "0.0.5",
+     "file": "annotated_doc-0.0.5-py3-none-any.whl",
+     "path": "packages/3e/30/e900b21425a860e195f32e37657aa1f7c7f2b1bfb26f03ca209b90933c06/annotated_doc-0.0.5-py3-none-any.whl",
+     "sha256": "117bac03a25ede5df5440e855b32d556049ca169ead221505badf432fed4b101",
+     "size": 5302,
+     "sdist": false
+    },
+    {
+     "name": "annotated-types",
+     "version": "0.8.0",
+     "file": "annotated_types-0.8.0-py3-none-any.whl",
+     "path": "packages/99/91/8acff4f5e50511b911bbccb72b8628a49c68ce14148cd9f6431094859a90/annotated_types-0.8.0-py3-none-any.whl",
+     "sha256": "f072f4d804ea359e4eaf198b1af7a8b0943881a87f31bb764f8bf219bb9419e0",
+     "size": 13427,
+     "sdist": false
+    },
+    {
+     "name": "antlr4-python3-runtime",
+     "version": "4.9.3",
+     "file": "antlr4-python3-runtime-4.9.3.tar.gz",
+     "path": "packages/3e/38/7859ff46355f76f8d19459005ca000b6e7012f2f1ca597746cbcd1fbfe5e/antlr4-python3-runtime-4.9.3.tar.gz",
+     "sha256": "f224469b4168294902bb1efa80a8bf7855f24c99aef99cbefc1bcd3cce77881b",
+     "size": 117034,
+     "sdist": true
+    },
+    {
+     "name": "anyio",
+     "version": "4.15.1",
+     "file": "anyio-4.15.1-py3-none-any.whl",
+     "path": "packages/12/b8/4bd346e22b28902df4d651910f5242c28d84e4a5c2435ca5c3f797ed7e2e/anyio-4.15.1-py3-none-any.whl",
+     "sha256": "6152fdbbf9a77fdec97731721bebf7c4c44f7c29b424b0065826173efc7ed101",
+     "size": 132079,
+     "sdist": false
+    },
+    {
+     "name": "attrs",
+     "version": "26.1.0",
+     "file": "attrs-26.1.0-py3-none-any.whl",
+     "path": "packages/64/b4/17d4b0b2a2dc85a6df63d1157e028ed19f90d4cd97c36717afef2bc2f395/attrs-26.1.0-py3-none-any.whl",
+     "sha256": "c647aa4a12dfbad9333ca4e71fe62ddc36f4e63b2d260a37a8b83d2f043ac309",
+     "size": 67548,
+     "sdist": false
+    },
+    {
+     "name": "braceexpand",
+     "version": "0.1.7",
+     "file": "braceexpand-0.1.7-py2.py3-none-any.whl",
+     "path": "packages/fa/93/e8c04e80e82391a6e51f218ca49720f64236bc824e92152a2633b74cf7ab/braceexpand-0.1.7-py2.py3-none-any.whl",
+     "sha256": "91332d53de7828103dcae5773fb43bc34950b0c8160e35e0f44c4427a3b85014",
+     "size": 5923,
+     "sdist": false
+    },
+    {
+     "name": "certifi",
+     "version": "2026.10.23",
+     "file": "certifi-2026.10.23-py3-none-any.whl",
+     "path": "packages/32/d1/a3652fe2c19134d0d15922177821d863cbd7e842d53a21bbe7e8e3a1b5ac/certifi-2026.10.23-py3-none-any.whl",
+     "sha256": "e9b54de76e530bb6cf0ccd036787103acb58fd42ba930ea8bf948ddbaa2f61d1",
+     "size": 135082,
+     "sdist": false
+    },
+    {
+     "name": "click",
+     "version": "8.5.0",
+     "file": "click-8.5.0-py3-none-any.whl",
+     "path": "packages/58/50/6c0d534c5f134586a8e1ba4e330569e32f057e33372ae556463212fb4cd3/click-8.5.0-py3-none-any.whl",
+     "sha256": "255bc9599cf7748b4b1a446ccc735421bd08a2ae529a8b88597d3de5664ee360",
+     "size": 125251,
+     "sdist": false
+    },
+    {
+     "name": "colorama",
+     "version": "0.4.6",
+     "file": "colorama-0.4.6-py2.py3-none-any.whl",
+     "path": "packages/d1/d6/3965ed04c63042e047cb6a3e6ed1a63a35087b6a609aa3a15ed8ac56c221/colorama-0.4.6-py2.py3-none-any.whl",
+     "sha256": "4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6",
+     "size": 25335,
+     "sdist": false
+    },
+    {
+     "name": "contourpy",
+     "version": "1.3.3",
+     "file": "contourpy-1.3.3-cp312-cp312-win_amd64.whl",
+     "path": "packages/19/e8/6026ed58a64563186a9ee3f29f41261fd1828f527dd93d33b60feca63352/contourpy-1.3.3-cp312-cp312-win_amd64.whl",
+     "sha256": "8153b8bfc11e1e4d75bcb0bff1db232f9e10b274e0929de9d608027e0d34ff8b",
+     "size": 226567,
+     "sdist": false
+    },
+    {
+     "name": "cycler",
+     "version": "0.12.1",
+     "file": "cycler-0.12.1-py3-none-any.whl",
+     "path": "packages/e7/05/c19819d5e3d95294a6f5947fb9b9629efb316b96de511b418c53d245aae6/cycler-0.12.1-py3-none-any.whl",
+     "sha256": "85cef7cff222d8644161529808465972e51340599459b8ac3ccbac5a854e0d30",
+     "size": 8321,
+     "sdist": false
+    },
+    {
+     "name": "einops",
+     "version": "0.8.2",
+     "file": "einops-0.8.2-py3-none-any.whl",
+     "path": "packages/2a/09/f8d8f8f31e4483c10a906437b4ce31bdf3d6d417b73fe33f1a8b59e34228/einops-0.8.2-py3-none-any.whl",
+     "sha256": "54058201ac7087911181bfec4af6091bb59380360f069276601256a76af08193",
+     "size": 65638,
+     "sdist": false
+    },
+    {
+     "name": "fastapi",
+     "version": "0.162.0",
+     "file": "fastapi-0.162.0-py3-none-any.whl",
+     "path": "packages/b4/4f/3f2c25c9b43970b5e9a08beb5e04776247edea684ddc0930f4f02f0bb6cb/fastapi-0.162.0-py3-none-any.whl",
+     "sha256": "3785963de305dd09912426cb81f2d230fce98ab3521cdfe97265c8d14983128c",
+     "size": 148912,
+     "sdist": false
+    },
+    {
+     "name": "filelock",
+     "version": "3.32.3",
+     "file": "filelock-3.32.3-py3-none-any.whl",
+     "path": "packages/a7/8e/50f46a9c0ce8d2861a394c1347caae037ea0431d2f67d7feb151cbc4649a/filelock-3.32.3-py3-none-any.whl",
+     "sha256": "7f0ca4bcc0e181c60dbbd8aa9ab5b120ebb99e4e064e83636340056f833a1f09",
+     "size": 98901,
+     "sdist": false
+    },
+    {
+     "name": "fonttools",
+     "version": "4.67.0",
+     "file": "fonttools-4.67.0-cp312-cp312-win_amd64.whl",
+     "path": "packages/c1/3a/625a6dd0173e88dbea1826405b4bcbfa06c6ca095310ed720caba36b2e43/fonttools-4.67.0-cp312-cp312-win_amd64.whl",
+     "sha256": "2bfab2f5d1d255dec82f4bd082a1c10e77df808e42210890f50a9c30bf91570e",
+     "size": 2497985,
+     "sdist": false
+    },
+    {
+     "name": "frozenlist",
+     "version": "1.8.0",
+     "file": "frozenlist-1.8.0-cp312-cp312-win_amd64.whl",
+     "path": "packages/b8/af/38e51a553dd66eb064cdf193841f16f077585d4d28394c2fa6235cb41765/frozenlist-1.8.0-cp312-cp312-win_amd64.whl",
+     "sha256": "34187385b08f866104f0c0617404c8eb08165ab1272e884abc89c112e9c00746",
+     "size": 44591,
+     "sdist": false
+    },
+    {
+     "name": "fsspec",
+     "version": "2026.7.0",
+     "file": "fsspec-2026.7.0-py3-none-any.whl",
+     "path": "packages/fd/3c/6a2bf344106328fd04963664a60b9bb6496fc25df8e962fcdc1367285fb9/fsspec-2026.7.0-py3-none-any.whl",
+     "sha256": "b57ddbafedfaef7018c1ecab32aa200a9d7ca26b77965f64e48b70061249d279",
+     "size": 206583,
+     "sdist": false
+    },
+    {
+     "name": "fvcore",
+     "version": "0.1.5.post20221221",
+     "file": "fvcore-0.1.5.post20221221.tar.gz",
+     "path": "packages/a5/93/d056a9c4efc6c79ba7b5159cc66bb436db93d2cc46dca18ed65c59cc8e4e/fvcore-0.1.5.post20221221.tar.gz",
+     "sha256": "f2fb0bb90572ae651c11c78e20493ed19b2240550a7e4bbb2d6de87bdd037860",
+     "size": 50217,
+     "sdist": true
+    },
+    {
+     "name": "h11",
+     "version": "0.16.0",
+     "file": "h11-0.16.0-py3-none-any.whl",
+     "path": "packages/04/4b/29cac41a4d98d144bf5f6d33995617b185d14b22401f75ca86f384e87ff1/h11-0.16.0-py3-none-any.whl",
+     "sha256": "63cf8bbe7522de3bf65932fda1d9c2772064ffb3dae62d55932da54b31cb6c86",
+     "size": 37515,
+     "sdist": false
+    },
+    {
+     "name": "hf-xet",
+     "version": "1.7.0",
+     "file": "hf_xet-1.7.0-cp38-abi3-win_amd64.whl",
+     "path": "packages/4d/59/b35106dfa71b6eef605dc88bd038fe99c7f86fb132a15b60d0bf2f235b2c/hf_xet-1.7.0-cp38-abi3-win_amd64.whl",
+     "sha256": "2b7bb5727889b0f2436dbaaad8fc4c3e66b8240d992716989e0c086b4278b1bc",
+     "size": 3822644,
+     "sdist": false
+    },
+    {
+     "name": "httpcore",
+     "version": "1.0.9",
+     "file": "httpcore-1.0.9-py3-none-any.whl",
+     "path": "packages/7e/f5/f66802a942d491edb555dd61e3a9961140fd64c90bce1eafd741609d334d/httpcore-1.0.9-py3-none-any.whl",
+     "sha256": "2d400746a40668fc9dec9810239072b40b4484b640a8c38fd654a024c7a1bf55",
+     "size": 78784,
+     "sdist": false
+    },
+    {
+     "name": "httpcore2",
+     "version": "2.16.0",
+     "file": "httpcore2-2.16.0-py3-none-any.whl",
+     "path": "packages/af/c2/ce417c397afa5181f0e3c6ff01a4d01639414e1adef08730d97571297151/httpcore2-2.16.0-py3-none-any.whl",
+     "sha256": "5c4358319f2602d984ad93182c9fee5160f22e9da7babdda870a5e7c4e2dc34f",
+     "size": 85070,
+     "sdist": false
+    },
+    {
+     "name": "httpx",
+     "version": "0.28.1",
+     "file": "httpx-0.28.1-py3-none-any.whl",
+     "path": "packages/2a/39/e50c7c3a983047577ee07d2a9e53faf5a69493943ec3f6a384bdc792deb2/httpx-0.28.1-py3-none-any.whl",
+     "sha256": "d909fcccc110f8c7faf814ca82a9a4d816bc5a6dbfea25d6591d6985b8ba59ad",
+     "size": 73517,
+     "sdist": false
+    },
+    {
+     "name": "httpx2",
+     "version": "2.16.0",
+     "file": "httpx2-2.16.0-py3-none-any.whl",
+     "path": "packages/7b/3d/2e4bc4fd1ef9770871669adb348d612a6e4786b303a23f9935b81c48dd60/httpx2-2.16.0-py3-none-any.whl",
+     "sha256": "fd2c5d7909e8d86fe92d53020c310ca0e4e431b838c207c5754b9bbf0308d49a",
+     "size": 97880,
+     "sdist": false
+    },
+    {
+     "name": "huggingface-hub",
+     "version": "2.3.0",
+     "file": "huggingface_hub-2.3.0-py3-none-any.whl",
+     "path": "packages/c7/89/5f6ef1162d0323f167b6baab04d1b4bd6a946161a8af6d86f622d9d79aa1/huggingface_hub-2.3.0-py3-none-any.whl",
+     "sha256": "5da369600233568a126eb5578754935b2add9446b42d9e2fc0927d56840ac1a5",
+     "size": 855161,
+     "sdist": false
+    },
+    {
+     "name": "hydra-core",
+     "version": "1.3.7",
+     "file": "hydra_core-1.3.7-py3-none-any.whl",
+     "path": "packages/25/0c/21890c10cc94da917c8e47efc1c55cd3e56a1d25ab5947bdd35abaf9fdc1/hydra_core-1.3.7-py3-none-any.whl",
+     "sha256": "83606c4a05c770f1e026e0489875f28989829d151799eabd8cfa8cbe82164515",
+     "size": 168790,
+     "sdist": false
+    },
+    {
+     "name": "idna",
+     "version": "3.20",
+     "file": "idna-3.20-py3-none-any.whl",
+     "path": "packages/58/a2/bb081bab032533a855d44de1d56f8e8426114ff1ba5d1f07a438a0a654f8/idna-3.20-py3-none-any.whl",
+     "sha256": "ab7ae7122974553370f0bdb919e1a960b2cd1bc1ef0276416d896db81c14582c",
+     "size": 69583,
+     "sdist": false
+    },
+    {
+     "name": "iopath",
+     "version": "0.1.10",
+     "file": "iopath-0.1.10.tar.gz",
+     "path": "packages/72/73/b3d451dfc523756cf177d3ebb0af76dc7751b341c60e2a21871be400ae29/iopath-0.1.10.tar.gz",
+     "sha256": "3311c16a4d9137223e20f141655759933e1eda24f8bff166af834af3c645ef01",
+     "size": 42226,
+     "sdist": true
+    },
+    {
+     "name": "jinja2",
+     "version": "3.1.6",
+     "file": "jinja2-3.1.6-py3-none-any.whl",
+     "path": "packages/62/a1/3d680cbfd5f4b8f15abc1d571870c5fc3e594bb582bc3b64ea099db13e56/jinja2-3.1.6-py3-none-any.whl",
+     "sha256": "85ece4451f492d0c13c5dd7c13a64681a86afae63a5f347908daf103ce6d2f67",
+     "size": 134899,
+     "sdist": false
+    },
+    {
+     "name": "kiwisolver",
+     "version": "1.5.1",
+     "file": "kiwisolver-1.5.1-cp312-cp312-win_amd64.whl",
+     "path": "packages/6e/7c/7b210498f9f92e1cd7855f260fa69ef056881087b199ee20c208f0e4189a/kiwisolver-1.5.1-cp312-cp312-win_amd64.whl",
+     "sha256": "06a6917674de9e0fe3f66f5430787f59a9f2ddb64af9b714eaec547e29ef5c19",
+     "size": 70748,
+     "sdist": false
+    },
+    {
+     "name": "lightning-utilities",
+     "version": "0.15.3",
+     "file": "lightning_utilities-0.15.3-py3-none-any.whl",
+     "path": "packages/25/f4/ead6e0e37209b07c9baa3e984ccdb0348ca370b77cea3aaea8ddbb097e00/lightning_utilities-0.15.3-py3-none-any.whl",
+     "sha256": "6c55f1bee70084a1cbeaa41ada96e4b3a0fea5909e844dd335bd80f5a73c5f91",
+     "size": 31906,
+     "sdist": false
+    },
+    {
+     "name": "markupsafe",
+     "version": "3.0.3",
+     "file": "markupsafe-3.0.3-cp312-cp312-win_amd64.whl",
+     "path": "packages/aa/5b/bec5aa9bbbb2c946ca2733ef9c4ca91c91b6a24580193e891b5f7dbe8e1e/markupsafe-3.0.3-cp312-cp312-win_amd64.whl",
+     "sha256": "26a5784ded40c9e318cfc2bdb30fe164bdb8665ded9cd64d500a34fb42067b1c",
+     "size": 15105,
+     "sdist": false
+    },
+    {
+     "name": "matplotlib",
+     "version": "3.11.2",
+     "file": "matplotlib-3.11.2-cp312-cp312-win_amd64.whl",
+     "path": "packages/04/93/0d239bde12b308262265c2d98909b2f0ecad2b5deeae96241642e822e9c7/matplotlib-3.11.2-cp312-cp312-win_amd64.whl",
+     "sha256": "c5c1c68ee401fc98271263410f0e5ce88285abacf7627132914e8adf3d70ff43",
+     "size": 9349409,
+     "sdist": false
+    },
+    {
+     "name": "mpmath",
+     "version": "1.3.0",
+     "file": "mpmath-1.3.0-py3-none-any.whl",
+     "path": "packages/43/e3/7d92a15f894aa0c9c4b49b8ee9ac9850d6e63b03c9c32c0367a13ae62209/mpmath-1.3.0-py3-none-any.whl",
+     "sha256": "a0b2b9fe80bbcd81a6647ff13108738cfb482d481d826cc0e02f5b35e5c88d2c",
+     "size": 536198,
+     "sdist": false
+    },
+    {
+     "name": "multidict",
+     "version": "7.2.0",
+     "file": "multidict-7.2.0-cp312-cp312-win_amd64.whl",
+     "path": "packages/12/f3/60c014ab083f4d249f4f0c7d66355d701fe7551fe20f855f599a9955a6ff/multidict-7.2.0-cp312-cp312-win_amd64.whl",
+     "sha256": "23668abe836d0b576c74449f80dbe7f9075a406b75752229c4bb380b8fc98212",
+     "size": 95142,
+     "sdist": false
+    },
+    {
+     "name": "networkx",
+     "version": "3.6.1",
+     "file": "networkx-3.6.1-py3-none-any.whl",
+     "path": "packages/9e/c9/b2622292ea83fbb4ec318f5b9ab867d0a28ab43c5717bb85b0a5f6b3b0a4/networkx-3.6.1-py3-none-any.whl",
+     "sha256": "d47fbf302e7d9cbbb9e2555a0d267983d2aa476bac30e90dfbe5669bd57f3762",
+     "size": 2068504,
+     "sdist": false
+    },
+    {
+     "name": "numpy",
+     "version": "2.4.6",
+     "file": "numpy-2.4.6-cp312-cp312-win_amd64.whl",
+     "path": "packages/ab/ca/feab00bd44aa5fe1ad2c18f08b4d3bb92e26484b0b1d1443897809ed528c/numpy-2.4.6-cp312-cp312-win_amd64.whl",
+     "sha256": "d8e8286dd7cea7895157318d1b91cdacac64c479f3cbc8dce548331728484751",
+     "size": 12321687,
+     "sdist": false
+    },
+    {
+     "name": "omegaconf",
+     "version": "2.3.1",
+     "file": "omegaconf-2.3.1-py3-none-any.whl",
+     "path": "packages/a4/0e/152509871bf30df6fc38569f52a2db9b55dd41aae957adae50a053ac7778/omegaconf-2.3.1-py3-none-any.whl",
+     "sha256": "3d701d14e9a8828f1edd28bb70b725908b34277cdd72cf7d6a83f94dadc6b6a0",
+     "size": 79502,
+     "sdist": false
+    },
+    {
+     "name": "opencv-python",
+     "version": "5.0.0.93",
+     "file": "opencv_python-5.0.0.93-cp37-abi3-win_amd64.whl",
+     "path": "packages/21/f0/9fa6e85cb10c8eb36a0222d27e50fe381b86ce49a55446bf39f491727564/opencv_python-5.0.0.93-cp37-abi3-win_amd64.whl",
+     "sha256": "f90ba04b8f73bc5c3814037699739f0156f597338a98f05956c684e7c3ca10d2",
+     "size": 44000345,
+     "sdist": false
+    },
+    {
+     "name": "opentelemetry-api",
+     "version": "1.45.1",
+     "file": "opentelemetry_api-1.45.1-py3-none-any.whl",
+     "path": "packages/1e/41/f7dcf80b81ee8e71c1a2b59f14208bc723edbd89ed027a73b175abf6348e/opentelemetry_api-1.45.1-py3-none-any.whl",
+     "sha256": "b31553efa588ae44bc306f863c785c5333a9ecc091248c6ee68b4b6c87fdedfb",
+     "size": 60256,
+     "sdist": false
+    },
+    {
+     "name": "packaging",
+     "version": "26.3",
+     "file": "packaging-26.3-py3-none-any.whl",
+     "path": "packages/63/34/ba1c580383c9eada3711951fef0795c80b829a078d72188184bcab9dd527/packaging-26.3-py3-none-any.whl",
+     "sha256": "d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c",
+     "size": 129956,
+     "sdist": false
+    },
+    {
+     "name": "pillow",
+     "version": "12.3.0",
+     "file": "pillow-12.3.0-cp312-cp312-win_amd64.whl",
+     "path": "packages/45/89/da2f7971a317f83d807fdd4065c0af40208e59e692cc43d315a71a0e96d1/pillow-12.3.0-cp312-cp312-win_amd64.whl",
+     "sha256": "a2b55dd6b2a4c4b7d87ffa56bdb33fdc5fdb9a462173861a7bc097f17d91cb09",
+     "size": 7227137,
+     "sdist": false
+    },
+    {
+     "name": "portalocker",
+     "version": "4.4.1",
+     "file": "portalocker-4.4.1-py3-none-any.whl",
+     "path": "packages/47/ec/02e439b10c6b2aa26629f269a27ae2aa395fae70207fd344046858a34156/portalocker-4.4.1-py3-none-any.whl",
+     "sha256": "4a184e8fb1adb37e078ca1804f1b7c0d8e73d81136790b1ad695ae8f1c8be291",
+     "size": 129702,
+     "sdist": false
+    },
+    {
+     "name": "propcache",
+     "version": "0.5.4",
+     "file": "propcache-0.5.4-cp312-cp312-win_amd64.whl",
+     "path": "packages/58/7b/6e8ef26f6d510a7916064fec68d55fcbfbdf7eb01e377480d66a122152d8/propcache-0.5.4-cp312-cp312-win_amd64.whl",
+     "sha256": "98914de2c4d7f0f9f4a8c6ea4bf05841f4175796941e3ef7d47eb718f22311fb",
+     "size": 46190,
+     "sdist": false
+    },
+    {
+     "name": "pydantic",
+     "version": "2.14.1",
+     "file": "pydantic-2.14.1-py3-none-any.whl",
+     "path": "packages/35/ea/a56b9fe5066f3537b7882f77e9c5dfb26d8c2eefdaed9b5fc73d57b4dc22/pydantic-2.14.1-py3-none-any.whl",
+     "sha256": "9195d967ec791692a04438115466764fb8b9a27b31f14a760437694f40d6b454",
+     "size": 488106,
+     "sdist": false
+    },
+    {
+     "name": "pydantic-core",
+     "version": "2.50.1",
+     "file": "pydantic_core-2.50.1-cp312-cp312-win_amd64.whl",
+     "path": "packages/c5/17/8bbd530b8659e9d963f5b16f6cb8e159f4cd174b4d6304e48969ab12dba8/pydantic_core-2.50.1-cp312-cp312-win_amd64.whl",
+     "sha256": "132529c83901437ff642f585216831bf5fd7a91df66829907e155192ead62498",
+     "size": 2172522,
+     "sdist": false
+    },
+    {
+     "name": "pyparsing",
+     "version": "3.3.3",
+     "file": "pyparsing-3.3.3-py3-none-any.whl",
+     "path": "packages/38/bb/d215ee7c73b61497b28a5503f9f53523f294fcc936762b7caf90e0c1c2b5/pyparsing-3.3.3-py3-none-any.whl",
+     "sha256": "ece8c00a69cf01b45d0b1dedabb469c90d8caf996d4fda40f147627a122849a4",
+     "size": 126420,
+     "sdist": false
+    },
+    {
+     "name": "pyrootutils",
+     "version": "1.0.4",
+     "file": "pyrootutils-1.0.4-py3-none-any.whl",
+     "path": "packages/1c/6f/ed601aec632d908b86adbad0e1cc712f7073faf697134fb0465a3fbcc512/pyrootutils-1.0.4-py3-none-any.whl",
+     "sha256": "8bbf25425278693168ae03b167aa6509422dc21853a6ee01d5d5e40601a89f90",
+     "size": 5831,
+     "sdist": false
+    },
+    {
+     "name": "python-dateutil",
+     "version": "3.0.0",
+     "file": "python_dateutil-3.0.0-py2.py3-none-any.whl",
+     "path": "packages/5a/17/cebee01d1c0c1441174cf0456ddc91b280d79acb65340c05e41d77866ee8/python_dateutil-3.0.0-py2.py3-none-any.whl",
+     "sha256": "3c79630202e4152c6add678446984236efe4f57e84d8e892aab0637bab82e9fd",
+     "size": 94659,
+     "sdist": false
+    },
+    {
+     "name": "python-dotenv",
+     "version": "1.2.4",
+     "file": "python_dotenv-1.2.4-py3-none-any.whl",
+     "path": "packages/60/d1/38f3a3405989a89ac18390803e70c6ad7c7760da4f9b83cbeca0c44a0c72/python_dotenv-1.2.4-py3-none-any.whl",
+     "sha256": "42269a8a5b3fd54ffa6f3d84b18abed50064717576b4ecf03dc4a55d8aa04fdc",
+     "size": 23266,
+     "sdist": false
+    },
+    {
+     "name": "python-multipart",
+     "version": "0.0.32",
+     "file": "python_multipart-0.0.32-py3-none-any.whl",
+     "path": "packages/e1/04/e8135ebd1ad02c56ec633277529b2602ff99ff634be76cdba5744cf554fd/python_multipart-0.0.32-py3-none-any.whl",
+     "sha256": "ff6d3f776f16878c894e52e107296ffc890e913c611b1a4ec6c44e2821fe2e23",
+     "size": 30042,
+     "sdist": false
+    },
+    {
+     "name": "pytorch-lightning",
+     "version": "2.6.6",
+     "file": "pytorch_lightning-2.6.6-py3-none-any.whl",
+     "path": "packages/4f/cf/ba8e4cc1b982ff6dc6f9fdef0e4074605438b82640f6270888a10e7e42c3/pytorch_lightning-2.6.6-py3-none-any.whl",
+     "sha256": "71f95c7b22f25c4f91cc659e1734bcdc6c69c8b66543f2ed2d78dbe29ce2f167",
+     "size": 853045,
+     "sdist": false
+    },
+    {
+     "name": "pyyaml",
+     "version": "6.0.3",
+     "file": "pyyaml-6.0.3-cp312-cp312-win_amd64.whl",
+     "path": "packages/86/bf/899e81e4cce32febab4fb42bb97dcdf66bc135272882d1987881a4b519e9/pyyaml-6.0.3-cp312-cp312-win_amd64.whl",
+     "sha256": "5fcd34e47f6e0b794d17de1b4ff496c00986e1c83f7ab2fb8fcfe9616ff7477b",
+     "size": 154003,
+     "sdist": false
+    },
+    {
+     "name": "roma",
+     "version": "1.8.0",
+     "file": "roma-1.8.0-py3-none-any.whl",
+     "path": "packages/3c/90/9b723c3fef1820dd94f30bde8bee75ed08f65b1a6c34a86cfd4e4b8d7a59/roma-1.8.0-py3-none-any.whl",
+     "sha256": "5096d77f807da25537d570714bdb5d6cc93b247f95f332abe2836600b1ddf8e8",
+     "size": 35374,
+     "sdist": false
+    },
+    {
+     "name": "safetensors",
+     "version": "0.8.0",
+     "file": "safetensors-0.8.0-cp310-abi3-win_amd64.whl",
+     "path": "packages/1b/6d/3fba214c1e5e0f69991677ec3bc17023f0421776975e1de0c682dca475e2/safetensors-0.8.0-cp310-abi3-win_amd64.whl",
+     "sha256": "096ec1a98435df7beb08853bb5aa9081a84f23d0adc67ed1a0a10550f608373f",
+     "size": 355540,
+     "sdist": false
+    },
+    {
+     "name": "scipy",
+     "version": "1.17.1",
+     "file": "scipy-1.17.1-cp312-cp312-win_amd64.whl",
+     "path": "packages/a2/84/dc08d77fbf3d87d3ee27f6a0c6dcce1de5829a64f2eae85a0ecc1f0daa73/scipy-1.17.1-cp312-cp312-win_amd64.whl",
+     "sha256": "41b71f4a3a4cab9d366cd9065b288efc4d4f3c0b37a91a8e0947fb5bd7f31d87",
+     "size": 36549682,
+     "sdist": false
+    },
+    {
+     "name": "setuptools",
+     "version": "65.5.0",
+     "file": "setuptools-65.5.0-py3-none-any.whl",
+     "path": "packages/41/82/7f54bbfe5c247a8c9f78d8d1d7c051847bcb78843c397b866dba335c1e88/setuptools-65.5.0-py3-none-any.whl",
+     "sha256": "f62ea9da9ed6289bfe868cd6845968a2c854d1427f8548d52cae02a42b4f0356",
+     "size": 1232695,
+     "sdist": false
+    },
+    {
+     "name": "six",
+     "version": "1.17.0",
+     "file": "six-1.17.0-py2.py3-none-any.whl",
+     "path": "packages/b7/ce/149a00dd41f10bc29e5921b496af8b574d8413afcd5e30dfa0ed46c2cc5e/six-1.17.0-py2.py3-none-any.whl",
+     "sha256": "4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274",
+     "size": 11050,
+     "sdist": false
+    },
+    {
+     "name": "starlette",
+     "version": "1.9.0",
+     "file": "starlette-1.9.0-py3-none-any.whl",
+     "path": "packages/f3/93/181df62699d9b5aca1d87e5cfda131dac87e3cdaebf668662f7206ca3470/starlette-1.9.0-py3-none-any.whl",
+     "sha256": "fd3f159936e882d06c1108f84688f7cda2cf85fc6a592a50edbd175e882c2ddc",
+     "size": 80335,
+     "sdist": false
+    },
+    {
+     "name": "sympy",
+     "version": "1.14.0",
+     "file": "sympy-1.14.0-py3-none-any.whl",
+     "path": "packages/a2/09/77d55d46fd61b4a135c444fc97158ef34a095e5681d0a6c10b75bf356191/sympy-1.14.0-py3-none-any.whl",
+     "sha256": "e091cc3e99d2141a0ba2847328f5479b05d94a6635cb96148ccb3f34671bd8f5",
+     "size": 6299353,
+     "sdist": false
+    },
+    {
+     "name": "tabulate",
+     "version": "0.10.0",
+     "file": "tabulate-0.10.0-py3-none-any.whl",
+     "path": "packages/99/55/db07de81b5c630da5cbf5c7df646580ca26dfaefa593667fc6f2fe016d2e/tabulate-0.10.0-py3-none-any.whl",
+     "sha256": "f0b0622e567335c8fabaaa659f1b33bcb6ddfe2e496071b743aa113f8774f2d3",
+     "size": 39814,
+     "sdist": false
+    },
+    {
+     "name": "termcolor",
+     "version": "3.3.0",
+     "file": "termcolor-3.3.0-py3-none-any.whl",
+     "path": "packages/33/d1/8bb87d21e9aeb323cc03034f5eaf2c8f69841e40e4853c2627edf8111ed3/termcolor-3.3.0-py3-none-any.whl",
+     "sha256": "cf642efadaf0a8ebbbf4bc7a31cec2f9b5f21a9f726f4ccbb08192c9c26f43a5",
+     "size": 7734,
+     "sdist": false
+    },
+    {
+     "name": "timm",
+     "version": "1.0.30",
+     "file": "timm-1.0.30-py3-none-any.whl",
+     "path": "packages/f5/85/b897716d0fa016af23b11e6526f5ef76d2013e8bc36b9c7ce15d9200e456/timm-1.0.30-py3-none-any.whl",
+     "sha256": "c8e27adf6801a2fdfb570dbbdd171f2f084756eefc673df8cfaab06bd14864f3",
+     "size": 2668917,
+     "sdist": false
+    },
+    {
+     "name": "torchmetrics",
+     "version": "1.9.0",
+     "file": "torchmetrics-1.9.0-py3-none-any.whl",
+     "path": "packages/c3/a2/c7f6ebf546f8f644edf0f999aa98ece106986a77a7b922316bf6414ff825/torchmetrics-1.9.0-py3-none-any.whl",
+     "sha256": "bfdcbff3dd1d96b3374bb2496eb39f23c4b28b8a845b6a18c313688e0d2d9ca1",
+     "size": 983384,
+     "sdist": false
+    },
+    {
+     "name": "tqdm",
+     "version": "4.70.1",
+     "file": "tqdm-4.70.1-py3-none-any.whl",
+     "path": "packages/a7/03/921a3d3c75785aca9ebfbfcabfbc3a1be12e2ab5265deb026d55a5a3f83e/tqdm-4.70.1-py3-none-any.whl",
+     "sha256": "c293e525e6fef9c20e8728fd4612df02a0aa31bb5fe91ecd93e123b1b7bffa73",
+     "size": 80199,
+     "sdist": false
+    },
+    {
+     "name": "trimesh",
+     "version": "5.2.0",
+     "file": "trimesh-5.2.0-py3-none-any.whl",
+     "path": "packages/51/14/78624d9c89bab76c2a2e1e839c7641fa686828c2c1c8fb64aedf3b371a5d/trimesh-5.2.0-py3-none-any.whl",
+     "sha256": "04db2c7ec62afdd7763fb04c82bb5f257ddd984993a19ee83697f475fc58fd29",
+     "size": 751459,
+     "sdist": false
+    },
+    {
+     "name": "truststore",
+     "version": "0.10.5",
+     "file": "truststore-0.10.5-py3-none-any.whl",
+     "path": "packages/51/e9/3a7820be2bb0fe53b6bc9c3be26d3d1158004e4c3ab953aa6840b955b1e9/truststore-0.10.5-py3-none-any.whl",
+     "sha256": "9aaaedaefaf06d8b206278cf8b5012bc897f485a874503501e12d776df78951c",
+     "size": 19017,
+     "sdist": false
+    },
+    {
+     "name": "typing-extensions",
+     "version": "4.16.0",
+     "file": "typing_extensions-4.16.0-py3-none-any.whl",
+     "path": "packages/49/d3/b8441a820a491ddfc024b0b0cf0393375b75ea13866d9c66727e54c2fc80/typing_extensions-4.16.0-py3-none-any.whl",
+     "sha256": "481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8",
+     "size": 45571,
+     "sdist": false
+    },
+    {
+     "name": "typing-inspection",
+     "version": "0.4.4",
+     "file": "typing_inspection-0.4.4-py3-none-any.whl",
+     "path": "packages/67/81/4add07e5172b7ac40d8ed5ff580409a7801a4fe26d529bdd915401dabfbe/typing_inspection-0.4.4-py3-none-any.whl",
+     "sha256": "65b8397ba37ccbce054456aaccddfc91e6e3083c92824df348d96ca832f3f147",
+     "size": 14750,
+     "sdist": false
+    },
+    {
+     "name": "tzdata",
+     "version": "2026.5",
+     "file": "tzdata-2026.5-py2.py3-none-any.whl",
+     "path": "packages/94/21/1e5995a1c920cce14e4bffae20c665ec10e7ed03ab25e006cd741092b718/tzdata-2026.5-py2.py3-none-any.whl",
+     "sha256": "b683bd1b6659ddcd810ff02ad09ba821d4bf1065072805063eb35c49617905ac",
+     "size": 347996,
+     "sdist": false
+    },
+    {
+     "name": "uvicorn",
+     "version": "0.54.0",
+     "file": "uvicorn-0.54.0-py3-none-any.whl",
+     "path": "packages/38/0c/b54a4fdd7f90a3af8b02ebc9ce6712c2c208b7926a2f7bad95c33ebbe943/uvicorn-0.54.0-py3-none-any.whl",
+     "sha256": "505bdb0f318731d45f1f712071fc781a8981f6847a31c902c9f5e652d4f67faf",
+     "size": 87427,
+     "sdist": false
+    },
+    {
+     "name": "yacs",
+     "version": "0.1.8",
+     "file": "yacs-0.1.8-py3-none-any.whl",
+     "path": "packages/38/4f/fe9a4d472aa867878ce3bb7efb16654c5d63672b86dc0e6e953a67018433/yacs-0.1.8-py3-none-any.whl",
+     "sha256": "99f893e30497a4b66842821bac316386f7bd5c4f47ad35c9073ef089aa33af32",
+     "size": 14747,
+     "sdist": false
+    },
+    {
+     "name": "yarl",
+     "version": "1.25.1",
+     "file": "yarl-1.25.1-cp312-cp312-win_amd64.whl",
+     "path": "packages/bb/cc/51a7b4abf4ac593b8e7eb3794b28e5a35ae26eed8bc04787628d215af82f/yarl-1.25.1-cp312-cp312-win_amd64.whl",
+     "sha256": "7d575b54cb3863ef9bc290ea4b009999d55dc237326131e4853cf33e888fee03",
+     "size": 102593,
+     "sdist": false
+    },
+    {
+     "name": "wheel",
+     "version": "0.45.1",
+     "file": "wheel-0.45.1-py3-none-any.whl",
+     "path": "packages/0b/2c/87f3254fd8ffd29e4c02732eee68a83a1d3c346ae39bc6822dcbcb697f2b/wheel-0.45.1-py3-none-any.whl",
+     "sha256": "708e7481cc80179af0e556bbf0cc00b8444c7321e2700b8d8580231d13017248",
+     "size": 72494,
+     "sdist": false
+    }
+   ],
+   "components": {
+    "face": {
+     "packages": [
+      {
+       "name": "mediapipe",
+       "version": "1.1.1",
+       "file": "mediapipe-1.1.1-py3-none-win_amd64.whl",
+       "path": "packages/ae/49/600556ec6305f28c13ea917c9222cb6de84f5f587312979835e7fedc6677/mediapipe-1.1.1-py3-none-win_amd64.whl",
+       "sha256": "a4b27829e808cd659e7cf481cbbbfc31917092a1ebcb7eafed2395dbabcd2499",
+       "size": 22764009,
+       "sdist": false
+      }
+     ],
+     "skip": [
+      "python/Lib/site-packages/mediapipe",
+      "python/Lib/site-packages/mediapipe-1.1.1.dist-info"
+     ]
+    },
+    "audio": {
+     "packages": [
+      {
+       "name": "av",
+       "version": "13.1.0",
+       "file": "av-13.1.0-cp312-cp312-win_amd64.whl",
+       "path": "packages/7b/ff/48fa68888b8d5bae36d915556ff18f9e5fdc6b5ff5ae23dc4904c9713168/av-13.1.0-cp312-cp312-win_amd64.whl",
+       "sha256": "5ea0deab0e6a739cb742fba2a3983d8102f7516a3cdf3c46669f3cac0ed1f351",
+       "size": 25781343,
+       "sdist": false
+      }
+     ],
+     "skip": [
+      "python/Lib/site-packages/av",
+      "python/Lib/site-packages/av-13.1.0.dist-info",
+      "python/Lib/site-packages/av.libs"
+     ]
+    },
+    "detect": {
+     "packages": [
+      {
+       "name": "onnxruntime",
+       "version": "1.31.1",
+       "file": "onnxruntime-1.31.1-cp312-cp312-win_amd64.whl",
+       "path": "packages/45/b2/793b4051d8dc6acb379ead9b72050f0ffa283ca49a6904add2e218b83e2e/onnxruntime-1.31.1-cp312-cp312-win_amd64.whl",
+       "sha256": "ae8a9a351efda685cc59a66226cdefaa37a126c1d66872ca23a2de9425326130",
+       "size": 14888466,
+       "sdist": false
+      }
+     ],
+     "skip": [
+      "python/Lib/site-packages/onnxruntime",
+      "python/Lib/site-packages/onnxruntime-1.31.1.dist-info"
+     ]
+    }
+   }
+  }
+ },
+ "torch": {
+  "cu128": {
+   "env": "cp311",
+   "label": "CUDA 12.8",
+   "base": "https://download.pytorch.org/whl/cu128/",
+   "mirrors": true,
+   "files": [
+    {
+     "name": "torch",
+     "version": "2.11.0+cu128",
+     "file": "torch-2.11.0+cu128-cp311-cp311-win_amd64.whl",
+     "sha256": "90ef0c2454e5296a9fb021ddd42252e4ce1abe2c0a4988a173ef90a6cded0bf5",
+     "size": 2753148611
+    },
+    {
+     "name": "torchvision",
+     "version": "0.26.0+cu128",
+     "file": "torchvision-0.26.0+cu128-cp311-cp311-win_amd64.whl",
+     "sha256": "d26091b15cd6e3c74c148d9b68c9a901ad6fb9b0f66fa3ea3ab09f04132a07d3",
+     "size": 9313819
+    }
+   ]
+  },
+  "cu126": {
+   "env": "cp311",
+   "label": "CUDA 12.6",
+   "base": "https://download.pytorch.org/whl/cu126/",
+   "mirrors": true,
+   "files": [
+    {
+     "name": "torch",
+     "version": "2.11.0+cu126",
+     "file": "torch-2.11.0+cu126-cp311-cp311-win_amd64.whl",
+     "sha256": "ce9aeead7950ae8eb48891568f9314a9a4130996b55e797c75e0c0d2846714ae",
+     "size": 2596413186
+    },
+    {
+     "name": "torchvision",
+     "version": "0.26.0+cu126",
+     "file": "torchvision-0.26.0+cu126-cp311-cp311-win_amd64.whl",
+     "sha256": "67eb5dab7ae058e4a7ce44c682db8dbf28a9b381a658c7f778f08029d37574d4",
+     "size": 8474493
+    }
+   ]
+  },
+  "cpu": {
+   "env": "cp311",
+   "label": "CPU",
+   "base": "https://download.pytorch.org/whl/cpu/",
+   "mirrors": true,
+   "files": [
+    {
+     "name": "torch",
+     "version": "2.11.0+cpu",
+     "file": "torch-2.11.0+cpu-cp311-cp311-win_amd64.whl",
+     "sha256": "51a221769d4a316f4b47a786c12e67c3f4807db8ed13c7b8817ebe73786acbbc",
+     "size": 114432833
+    },
+    {
+     "name": "torchvision",
+     "version": "0.26.0+cpu",
+     "file": "torchvision-0.26.0+cpu-cp311-cp311-win_amd64.whl",
+     "sha256": "f0c80af8e2807d52f3d480d9828d550f097ad55589f28aab4d65471b3d636359",
+     "size": 3983943
+    }
+   ]
+  },
+  "rocm": {
+   "env": "cp312",
+   "label": "ROCm 7.2.1",
+   "base": "https://repo.radeon.com/rocm/windows/rocm-rel-7.2.1/",
+   "mirrors": false,
+   "files": [
+    {
+     "name": "rocm-sdk-core",
+     "version": "7.2.1",
+     "file": "rocm_sdk_core-7.2.1-py3-none-win_amd64.whl",
+     "sha256": "f68989d48df71cbfc3cb68bf705dc37c0f56e9666feddb59a1a0f5ff7539fe1c",
+     "size": 644793492,
+     "sdist": false
+    },
+    {
+     "name": "rocm-sdk-devel",
+     "version": "7.2.1",
+     "file": "rocm_sdk_devel-7.2.1-py3-none-win_amd64.whl",
+     "sha256": "19e6ee67e13432b7c1e8a4077df795dcb1239546ae314700c4b4d97e5b4b8f63",
+     "size": 232840013,
+     "sdist": false
+    },
+    {
+     "name": "rocm-sdk-libraries-custom",
+     "version": "7.2.1",
+     "file": "rocm_sdk_libraries_custom-7.2.1-py3-none-win_amd64.whl",
+     "sha256": "c7fe0b0731af8896093ff69e11496830d3cb6a4aed73e895c60b7cbdc200be92",
+     "size": 489964648,
+     "sdist": false
+    },
+    {
+     "name": "rocm",
+     "version": "7.2.1",
+     "file": "rocm-7.2.1.tar.gz",
+     "sha256": "9084902eaa69213a00a90784ad89e6e5fe73c702df0cc6cc3a70d777c7a6142b",
+     "size": 15940,
+     "sdist": true
+    },
+    {
+     "name": "torch",
+     "version": "2.9.1+rocm7.2.1",
+     "file": "torch-2.9.1+rocm7.2.1-cp312-cp312-win_amd64.whl",
+     "sha256": "e88bf270163b48f7f27f7ea3db5ffb3be4ba107301933022bcb3c6ddedfeeabb",
+     "size": 821065907,
+     "sdist": false
+    },
+    {
+     "name": "torchvision",
+     "version": "0.24.1+rocm7.2.1",
+     "file": "torchvision-0.24.1+rocm7.2.1-cp312-cp312-win_amd64.whl",
+     "sha256": "b5c34d76a2f01fb97e1e0f224bd97fc3a58ec1ee1ef2376af2d72086e9aca34c",
+     "size": 1863312,
+     "sdist": false
+    }
+   ]
+  }
+ },
+ "sam3d": {
+  "commit": "b5c765a0d89d789985e186d396315e7590887b94",
+  "url": "https://github.com/facebookresearch/sam-3d-body/archive/b5c765a0d89d789985e186d396315e7590887b94.zip",
+  "root": "sam-3d-body-b5c765a0d89d789985e186d396315e7590887b94",
+  "files": {
+   ".gitignore": "612171740a09a631735d95e2df336f4e788dfb1ae1a2e5b0b5f8307aa2d1c2d9",
+   "CODE_OF_CONDUCT.md": "56ac910502072a85487cc5b067f3d8fb1a7c53383dc8780e7fac85642dd8f978",
+   "CONTRIBUTING.md": "502836067bb375e14f9ea5beda239f7014814b350a53ca2eef76fecebcd5242e",
+   "INSTALL.md": "63a732dadcbabc444d480fbb9fd229e191308dda8b64edf24476cdd55577c3a8",
+   "LICENSE": "b3a5a0e2d973ab80e6610ccf1cffc40756050d0ace3cd4fec879b3ec290b2e9b",
+   "README.md": "95a4a2f373a56dc433deff5bc07581539b2a9f328918e078890f6158e4431fbb",
+   "assets/model_diagram.png": "897193cde349d4bebde5740685fc1428b6eb403b5b25519cad50b034d7cec852",
+   "assets/qualitative_comparisons/sample1/4dhumans.png": "d2aeb12845c9e34cc1cebdbeabfc66467cc3b80df98371ff559fe7d2288cc6b7",
+   "assets/qualitative_comparisons/sample1/SAM 3D Body.png": "61fe297a0a375bd4cfba1351f38990859b982116a8d46a6621c3c93a6812df5d",
+   "assets/qualitative_comparisons/sample1/camerahmr.png": "4a58f93ef21139444fc19b83769c73d739b5441f46b0102f1eae5d2defbbfb62",
+   "assets/qualitative_comparisons/sample1/input_bbox.png": "d46f926e8067b79a18a8e657b93d8998e4aec63ec06dc6bd36814a29aafe840a",
+   "assets/qualitative_comparisons/sample1/nlf.png": "6091e4041d98f769d5446ce7cc5e538e3575d4ef5f2a284330d08ee9a78e3624",
+   "assets/qualitative_comparisons/sample2/4dhumans.png": "7a11097954c8db688ff29032f76f039637af2cd5c329c6ebaee63f92d52cc48c",
+   "assets/qualitative_comparisons/sample2/SAM 3D Body.png": "8873977afa180475273cba46f2ce655e85ab4162ad6440701df741c8c121f225",
+   "assets/qualitative_comparisons/sample2/camerahmr.png": "fccd63e15bc5ee9dcd55d290e708948a608b78235e1ad315e54109dffa7bb3c5",
+   "assets/qualitative_comparisons/sample2/input_bbox.png": "4df2c680c6aafcc3fd510382473961f4e0faceb3c5d6a15fe54835bfa44d6253",
+   "assets/qualitative_comparisons/sample2/nlf.png": "f93cc6dbc8aed9d7cfcd96924fa516162c23700fc81cb4527a3b2a52018d0bf6",
+   "assets/qualitative_comparisons/sample3/4dhumans.png": "0135ac9c552b008d09779f23f58ce1d5e751c6e012afd243b5130b44427fba14",
+   "assets/qualitative_comparisons/sample3/SAM 3D Body.png": "281fcb3653e43869bc0f1851142b3f672e88e03d0461b288adc65a74c75d1645",
+   "assets/qualitative_comparisons/sample3/camerahmr.png": "c870157c088839b291003650e4cde616c48c4e416441ed0e10fe8efa9e2d77ea",
+   "assets/qualitative_comparisons/sample3/input_bbox.png": "3457c25ee225a39db76179eaed03a383a4f827ebe768d752d3d6137d768ac2a9",
+   "assets/qualitative_comparisons/sample3/nlf.png": "130966965429ba40a8167355efeeeb449b76ece407ff04c9e1b51a7965bb1fa5",
+   "assets/qualitative_comparisons/sample4/4dhumans.png": "9fd90d2ee3e7025e7917a36dbd7db7f3aaf7cd23fd6394628170df6f16d7842a",
+   "assets/qualitative_comparisons/sample4/SAM 3D Body.png": "72b7f2a7dc0f0633cd1de2d90d7ab87b24d01dc563ea006b34b619415cdaf089",
+   "assets/qualitative_comparisons/sample4/camerahmr.png": "3b4a9294cc6ff84f9c09fd9438ccd59d52d58cbbd16cf959960ec46232c0378c",
+   "assets/qualitative_comparisons/sample4/input_bbox.png": "8f6469fa23488af937d0d394e007ec2dca1333a65609b02c122fbcd4bbe4c125",
+   "assets/qualitative_comparisons/sample4/nlf.png": "56a4dd1603c0f47aab5670dc829bfea1ad4349c2bc0211dccdfb85e9a5ff4fe3",
+   "data/README.md": "9fce86c795d566be284b3138cc431cb91359d2b598f474e167d59a5af452d484",
+   "data/scripts/3dpw/README.md": "6696b93211fc00572458f339463526d7737a686415adc8db7ac0d43e8539bf13",
+   "data/scripts/aic/README.md": "d4e6f0e23acbdcecc1235a387d0d4d36367483cf1a6348bfb442b39ed006f697",
+   "data/scripts/coco/README.md": "3756f59a7b18508f6f6791f94fe2e035bba36bfd0042be9bf06891feff9d89fb",
+   "data/scripts/create_webdataset.py": "4b4b11126e1b6818d88aa9a2fd3ccf8168b1099e89bb9c3ada83c4fafb00969c",
+   "data/scripts/download.py": "881a1f5fb5cb2beef799f26d5b52c2c2d8a9b821abb008bb5f5a046614989db5",
+   "data/scripts/egoexo4d/README.md": "4836340b240e251e81acbf84358b4ecee14ee68e6c43a13750b7f708140c63b1",
+   "data/scripts/egohumans/README.md": "ca1dc69affd19e59214a9d9b5d58a1d40e9019ecbb7e1e3ff2babc7afc34d36b",
+   "data/scripts/egohumans/__init__.py": "abe836cd309d15d814afb3cf18e6eb7abd0726ea6ecc3091335bb82d7236c379",
+   "data/scripts/egohumans/_init_paths.py": "b14e58b06e1772b169378201fc84969484f59d16f5461fdede2b5095c779001e",
+   "data/scripts/egohumans/config/__init__.py": "e64c25cb04b8772469d4d0f04a5c3225cef23c0536abe87f2428d3bf6d3ecb37",
+   "data/scripts/egohumans/config/default.py": "608ad7a8eb67b947113f916c9cf74c93f4911d46f888af084bacd3d55a63c5ef",
+   "data/scripts/egohumans/undistort_images.py": "60fe6710ea375010df71b9072b95b076d9221975281b126db5f562450430d040",
+   "data/scripts/harmony4d/README.md": "b1edee340b0eabbf31313cf974331ba976c5fdc4152305c66ac372bee9ab3157",
+   "data/scripts/harmony4d/_init_paths.py": "b14e58b06e1772b169378201fc84969484f59d16f5461fdede2b5095c779001e",
+   "data/scripts/harmony4d/config/__init__.py": "22cb34c2d713e8b4f11f6bb070979603107d8159425b16c920c46b2e14461c74",
+   "data/scripts/harmony4d/config/default.py": "d90e7eff9e92edb288f44db66c4a8bbf9aa5ca8dbd1671e273196bdb9d275e09",
+   "data/scripts/harmony4d/undistort_images.py": "0e3cc235ba9b8cfb7b22771aa292609f23ff0f3443f6fb11fe229a758c19628e",
+   "data/scripts/mpii/README.md": "7cfde542fa0cfa64d6c3a3a990f8b975d6a58793d4b90aab82ddea3a0f8ccd64",
+   "data/scripts/sa1b/README.md": "e9de69c9468467cc4cf49f2f32c573091c6ab1ab8f19c0f60eb3c02b2780a460",
+   "demo.py": "cce03386c8d894097784823b12916ca3efaa4ca9b27a74968b6163f219fa6f5c",
+   "sam_3d_body/__init__.py": "f69e252dc42ef8d58ae1b72e97c5d34d6ac8d2fb342ba63c5f620caaa875db3f",
+   "sam_3d_body/build_models.py": "445b5408109232c770b892cbced52c34c3a104a76c685885e66963dcc349a41e",
+   "sam_3d_body/data/__init__.py": "abe836cd309d15d814afb3cf18e6eb7abd0726ea6ecc3091335bb82d7236c379",
+   "sam_3d_body/data/transforms/__init__.py": "ca65add3a731bf54d9917382f34f4eb3c3d8a45e9813a72c7896338f331eb4fc",
+   "sam_3d_body/data/transforms/bbox_utils.py": "0f49a3f857a09f98d1fd9c609df42f875899515f5e10a0ea6b25acd7a9197d79",
+   "sam_3d_body/data/transforms/common.py": "165697629df2fe23a62bb90daa2ac8a0f67cac09d70f36844b3c089a9af5a45f",
+   "sam_3d_body/data/utils/io.py": "821bd310455dafeb1bbb0314d239d4802d6c889a203462ff964a90e5a62df079",
+   "sam_3d_body/data/utils/prepare_batch.py": "c0555035944f02cfdb9d811b377a3c1ffdd2bfbfe256ee6dc501c8d9409298d0",
+   "sam_3d_body/metadata/__init__.py": "0f8dc30002c8612ef4897dea399f8b7fa45ec4e5d8d78e149f976480a3b89b53",
+   "sam_3d_body/metadata/mhr70.py": "695c2c7d472e32757c480114fdb054d54ee4af53f69b2a6e040b00a55b270dc9",
+   "sam_3d_body/models/__init__.py": "abe836cd309d15d814afb3cf18e6eb7abd0726ea6ecc3091335bb82d7236c379",
+   "sam_3d_body/models/backbones/__init__.py": "d20122a214bc25371bf679b9e7aeb9aa8e195019e277843b69662a3eccc5a8cd",
+   "sam_3d_body/models/backbones/dinov3.py": "53ae01ccdffa647f16b0fefe366f947162874a9e593d510864d52ffcd259e0e8",
+   "sam_3d_body/models/backbones/vit.py": "361308ff8fd80c6fd4a32baec1b8eee738fdf8cf638fc0c72921f3ceb408c794",
+   "sam_3d_body/models/decoders/__init__.py": "943c89cb865277d6bb2274a086f314143a6e115b6b5ec99ac5858f7633c0d464",
+   "sam_3d_body/models/decoders/keypoint_prompt_sampler.py": "8f7692c5f4a5b0b8999c46651b702f4f7c02d0297a99e008a3d7a42df72bee81",
+   "sam_3d_body/models/decoders/prompt_encoder.py": "a9160aa5ccdd4d5e2ae047605d86eee9e0e558344b85f716d963fd091f9a33d1",
+   "sam_3d_body/models/decoders/promptable_decoder.py": "73c1219c176478e52358d9448d8087017e8294202653ca9fb62e2c964f7c363a",
+   "sam_3d_body/models/heads/__init__.py": "e7605eced4289ad6e8d0d55d006949de6960ce1ad7483577016c6bca072cc02e",
+   "sam_3d_body/models/heads/camera_head.py": "84a14112e5c4b216559c1f9a39c3a33d6fa277182c2037f44a76a9cb538de55e",
+   "sam_3d_body/models/heads/mhr_head.py": "03793d51ef82484c5d9906358c6314981c0bff9dbcc6f6e6b175bd977a251b35",
+   "sam_3d_body/models/meta_arch/__init__.py": "68a23d54173e7a34a7224d16f015c4af18ceb143fa5cb87e1a5e9d7b7ac16b05",
+   "sam_3d_body/models/meta_arch/base_lightning_module.py": "c04fa1f3fcc840bf6b51ab8a90b4334fb260e851099b7a59cb9357914f1dc783",
+   "sam_3d_body/models/meta_arch/base_model.py": "baf4c93ab865e6e9f4f498056a673698e59bafe89b17f969833884a3b352e8bc",
+   "sam_3d_body/models/meta_arch/sam3d_body.py": "851b7475f18b56891aa02606e7c0ee9e03120fa208cc85df5127b792e1abfeee",
+   "sam_3d_body/models/modules/__init__.py": "ddad96a6a9bf09d36156ba82ebaa9ee6798045fe1fc715174cec4c0b4bd2ead1",
+   "sam_3d_body/models/modules/camera_embed.py": "42f2483368fa3249557464aaa188c5d422f4e2faeb29ecd6facc131a97141539",
+   "sam_3d_body/models/modules/drop_path.py": "04c2f8bf7f13382c3d5c992fca00692a0591d187a2d271f49afaa5bce2ec9525",
+   "sam_3d_body/models/modules/geometry_utils.py": "2553899d9a0f781da1a1d73e8d49dcdd08376c5c0e471d6262e662229b645ef1",
+   "sam_3d_body/models/modules/layer_scale.py": "ef4e0f769dd072425384f354c9527e2fdd7346843379e5f3b0cb2110a72c1c81",
+   "sam_3d_body/models/modules/mhr_utils.py": "5d95cca73aead5c783b29962b4bb2d930bd84a8d90f78627b534723cb1277e0c",
+   "sam_3d_body/models/modules/misc.py": "f942d181ee8578c67a9ab4c0828d030aefdadd8891450ab1319b33a8237891eb",
+   "sam_3d_body/models/modules/swiglu_ffn.py": "7a25fff5fa99c910c8daea7737f3650881a92da11388ddfbfd57794dc9de5355",
+   "sam_3d_body/models/modules/transformer.py": "0cc343878ba8cdf28f9061de53ac0bc0fd6f829889ade96341729db5860ecbe4",
+   "sam_3d_body/models/optim/__init__.py": "abe836cd309d15d814afb3cf18e6eb7abd0726ea6ecc3091335bb82d7236c379",
+   "sam_3d_body/models/optim/fp16_utils.py": "90e25559a99fa341666c9c5da5b7e91d679ffdfab635aed9e9cf21d8f43c107d",
+   "sam_3d_body/sam_3d_body_estimator.py": "8bfa34316d82eabbe185c1cd64a77c47670785cdb0fa489b1481fb468266a145",
+   "sam_3d_body/utils/__init__.py": "f7b853e9727808b777120cacc5ef9835af0ceaee101e134f7b7a8dc6cbe0a410",
+   "sam_3d_body/utils/checkpoint.py": "a54ec1f1c1ac899f29e1fa6bc5ab8c46834f7a803ce21dcc54ded658a883e4c0",
+   "sam_3d_body/utils/config.py": "9c7ce1d62d4dc5b62b027ebf63d7ac825d8fd29784db518b3aa7bf75f17fdbbc",
+   "sam_3d_body/utils/dist.py": "db6b4ebe17043c13eb7aa1c9b26debdb7e12a13310a349f5225f0b7105b2b87b",
+   "sam_3d_body/utils/logging.py": "d4b62bb43b5c383a8e237e63333f4ab5e84f4601bd21c27d060166c668210c54",
+   "sam_3d_body/visualization/__init__.py": "abe836cd309d15d814afb3cf18e6eb7abd0726ea6ecc3091335bb82d7236c379",
+   "sam_3d_body/visualization/renderer.py": "7c58769b2165b3b067dc514e883670c1e5a61b40bd43799bb3d010d6e9ca1460",
+   "sam_3d_body/visualization/skeleton_visualizer.py": "04d24ff555265aecc878c5ccd979c1456b5ddc553240df2cd3bbe7b40dcf2e74",
+   "sam_3d_body/visualization/utils.py": "119552d35e5374a7d9e8ac1f9e87af5a33ad6634bce4ea883531196a09bd748f",
+   "tools/__init__.py": "abe836cd309d15d814afb3cf18e6eb7abd0726ea6ecc3091335bb82d7236c379",
+   "tools/build_detector.py": "04209c79a3b7013385a21cd5dd074d9629e332376efc29868db6ae7e36913f31",
+   "tools/build_fov_estimator.py": "8de23d52841886cdb4c45e8840d0a91a5118bd3b61061542b71104372fe1b75c",
+   "tools/build_sam.py": "05ce7354ecf3802c9c8f5769d4a431ea1ca640fe06a4fc801efd710de08d20fb",
+   "tools/cascade_mask_rcnn_vitdet_h_75ep.py": "63375483239fbc506b5bf4f2b134fdabc8829df3de85563a231b059e96e9de65",
+   "tools/vis_utils.py": "6d7f1e2e58b0b22fe5b5f2587628c77b692ebe76dac6003432b9046f26f46c6c"
+  }
+ },
+ "weights": {
+  "repo": "facebook/sam-3d-body-vith",
+  "dir": "sam-3d-body-vith",
+  "files": [
+   {
+    "path": "model_config.yaml",
+    "sha256": "d2e772e108b8727e9367681845fecb32806144acd0debc20868d100689470570",
+    "size": 1486
+   },
+   {
+    "path": "LICENSE",
+    "sha256": "b3a5a0e2d973ab80e6610ccf1cffc40756050d0ace3cd4fec879b3ec290b2e9b",
+    "size": 8204
+   },
+   {
+    "path": "assets/mhr_model.pt",
+    "sha256": "352e271a6c42729c68554ceaea0c955e866970160c31e35506d782dc0f7377bc",
+    "size": 696110248
+   },
+   {
+    "path": "model.ckpt",
+    "sha256": "3b1cb897f4bbd977bf81cbb0b30780a9582681ac642ee112865790ceb4d66056",
+    "size": 1691205237
+   }
+  ]
+ },
+ "components": [
+  {
+   "id": "face",
+   "name": "面捕（表情、头部朝向）",
+   "nameEn": "Face capture (expressions, head direction)",
+   "check": [
+    "python/Lib/site-packages/mediapipe/__init__.py",
+    "backend/checkpoints/face/face_landmarker.task"
+   ],
+   "url": "https://github.com/extrant/Posegraph/releases/download/backend-components-1/posegraph-face-1.zip",
+   "size": 66564098,
+   "sha256": "ac62fb58b2a7600f73c48f08811e6bd15a47f1104fb8dd1f00b9f6fd24604721"
+  },
+  {
+   "id": "depth",
+   "name": "深度图（镜头焦距、地面）",
+   "nameEn": "Depth (camera focal length, floor)",
+   "check": [
+    "python/Lib/site-packages/moge/__init__.py",
+    "backend/checkpoints/moge/model.pt"
+   ],
+   "url": "https://github.com/extrant/Posegraph/releases/download/backend-components-1/posegraph-depth-1.zip",
+   "size": 419807657,
+   "sha256": "23e387d0008c7065fd5573d7b7fec8b28ca7997a899fff4efb4e1eabd80b03bf"
+  },
+  {
+   "id": "audio",
+   "name": "音频（视频播放、录制时放音乐）",
+   "nameEn": "Audio (music for video playback and recording)",
+   "check": [
+    "python/Lib/site-packages/av/__init__.py"
+   ],
+   "url": "https://github.com/extrant/Posegraph/releases/download/backend-components-2/posegraph-audio-2.zip",
+   "size": 73754999,
+   "sha256": "91e63c7c0d97fca103b499437d57cc93246828cc5305732a6356e3a6f3fee378"
+  },
+  {
+   "id": "detect",
+   "name": "人物检测（视频找人、跟踪）",
+   "nameEn": "Person detection (finding and tracking people in videos)",
+   "check": [
+    "python/Lib/site-packages/onnxruntime/__init__.py",
+    "backend/checkpoints/detectors/yolo11m.onnx",
+    "backend/checkpoints/detectors/anime_person_v1.3_s.onnx"
+   ],
+   "url": "https://github.com/extrant/Posegraph/releases/download/backend-components-2/posegraph-detect-2.zip",
+   "size": 165503929,
+   "sha256": "c562b7de20be434f71ca44a1b603c350d3a972e74ac2258b4401e5d5405f2f25"
+  }
+ ]
+}

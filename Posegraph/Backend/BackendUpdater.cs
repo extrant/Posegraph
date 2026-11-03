@@ -58,6 +58,23 @@ public sealed class BackendUpdater : IDisposable
         }
     }
 
+    /// <summary>
+    /// 一键包的 Python 版本（runtime.json 的 python，安装脚本写的）；没写的是发布的一键包（3.11）。
+    /// 安装脚本给 AMD 显卡（ROCm）装的是 3.12，组件里编译好的包只能给 3.11 用。
+    /// </summary>
+    public static string PackagePython(string backendDir)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(PackageRoot(backendDir), "runtime.json")));
+            return doc.RootElement.TryGetProperty("python", out var py) ? py.GetString() ?? "3.11" : "3.11";
+        }
+        catch
+        {
+            return "3.11";
+        }
+    }
+
     /// <summary>已安装的后端是否比插件旧，或者缺组件（需要更新）。版本读不到也算旧。</summary>
     public static bool NeedsUpdate(string backendDir)
         => Installed(backendDir) is not { } v || !System.Version.TryParse(v.Version, out var installed) || installed < Trim(PluginVersion)
@@ -152,6 +169,9 @@ public sealed class BackendUpdater : IDisposable
                 using (var reader = new StreamReader(manifest.Open()))
                     missing = Missing(ParseComponents(await reader.ReadToEndAsync()), packageRoot);
             var downloads = new List<string>();
+            if (missing.Length > 0 && !PackagePython(backendDir).StartsWith("3.11", StringComparison.Ordinal))
+                return Loc.F("这个后端是安装脚本装的 Python {0} 环境（AMD 显卡），新组件要用安装脚本补：再运行 Install-Posegraph.bat，选这个文件夹",
+                             PackagePython(backendDir));
             if (missing.Length > 0)
             {
                 var need = missing.Sum(c => c.Size) * 3;   // 压缩包 + 解压后，留余量

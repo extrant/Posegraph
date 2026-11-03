@@ -27,3 +27,6 @@ obj/
 dist/
 *.zip
 *.7z
+
+# Installer: per-user choices and runtime copies
+installer/installer-settings.json
