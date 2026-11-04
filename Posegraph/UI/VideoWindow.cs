@@ -425,7 +425,7 @@ public sealed partial class VideoWindow : Window, IDisposable
             _config.VideoFace = face;
             _pi.SavePluginConfig(_config);
         }
-        Tip(Loc.T("逐帧识别脸上的表情（眼睛、眉毛、嘴、下巴），套到脸部骨骼上。视频里比照片保守：强度打七折、时间上平滑得更多，脸太小、侧脸的帧不用。关掉时保留角色现在的表情"));
+        Tip(Loc.T("逐帧识别表情套到脸部骨骼上（比照片保守，脸太小、侧脸的帧不用）。关掉时保留角色现在的表情"));
     }
 
     private void DrawRecognize()
@@ -759,7 +759,7 @@ public sealed partial class VideoWindow : Window, IDisposable
                 using (ImRaii.Disabled(_rebuilding || _recorder.Running))
                     if (ImGui.SmallButton(Loc.T("重算走位")))
                         _ = Task.Run(() => RebuildAsync(clip, actor, Loc.T("已重算走位和镜头")));
-                Tip(Loc.T("用存下的识别数据重算角色走位、脚底防滑和自动镜头（几秒，不重新识别）。\n旧数据里没有原视频镜头的运动，原运镜按固定机位算；要分出镜头运动请重新识别"));
+                Tip(Loc.T("用存下的识别数据重算走位、防滑和自动镜头（几秒，不重新识别）"));
             }
             return;
         }
@@ -952,7 +952,7 @@ public sealed partial class VideoWindow : Window, IDisposable
         var source = MusicSource(clip);
         Tip(source is null
             ? Loc.T("把原视频的音乐按时间对齐配进去。这个片段没记原视频在哪（旧版本识别的），点右边选一个视频或音频文件")
-            : Loc.F("把原视频的音乐按时间对齐配进去（从第 {0:0.0} 秒起）：{1}\n视频里没有声音时用同一文件夹里同名的音频文件（.m4a、.mp3 等）", clip.Start, source));
+            : Loc.F("配上原视频的音乐（从第 {0:0.0} 秒起）：{1}\n视频没声音时用同文件夹里同名的音频", clip.Start, source));
         if (music)
         {
             ImGui.SameLine();

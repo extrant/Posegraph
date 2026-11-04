@@ -23,7 +23,7 @@ public sealed partial class MainWindow
         }
         ImGui.SameLine();
         ImGui.TextUnformatted(Loc.T("多图识别并行数（实验）"));
-        ItemTip(Loc.T("只影响图库的批量识别，单张识别始终逐张进行。默认 1（逐张）。\n2～8 时几张图共享一份模型同时识别：GPU 上整批约省 25%~35% 的时间，每多一路约多占 200MB 显存（CPU 模式约 350MB 内存）。\n后端按剩余显存 / 内存自动减少路数；出错时自动改回逐张识别，并提示一次。\nCPU 模式提速有限，还会和游戏抢 CPU，不建议开"));
+        ItemTip(Loc.T("只影响图库的批量识别。2～8 时几张图共用一份模型同时识别：GPU 上约省 25%~35% 的时间，每多一路多占约 200MB 显存。\nCPU 模式不建议开"));
         if (parallelism > 1 && _config.BackendDevice == "cpu")
         {
             ImGui.SameLine();

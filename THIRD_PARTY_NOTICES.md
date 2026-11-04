@@ -20,7 +20,35 @@ backend folder's `LICENSES` folder.
 | ★ FastAPI, Uvicorn, Starlette, Pydantic, NumPy, SciPy, OpenCV, Pillow, roma, timm, … | Backend dependencies | Their respective open-source licenses (see each package's `*.dist-info` in `python/Lib/site-packages`) |
 | [Brio](https://github.com/Etheirys/Brio) — `Brio.API` | Applying poses and freezing actors through IPC | See the Brio repository |
 | [Dalamud](https://github.com/goatcorp/Dalamud) | Plugin framework | AGPL-3.0 |
+| [ReAnimate](https://github.com/Nyotee/ReAnimate) (Nyaughty) | "Convert to idle" (`Posegraph/Idle/`) ports its approach and code: baking a pose into the game's idle `.pap` with the game's own Havok runtime, keeping the original breathing motion, grounding, the `_start` transition easing, the idle slot table and race fallbacks, and saving it as a Penumbra mod | MIT, Copyright (c) 2026 Nyaughty |
+| [VFXEditor](https://github.com/0ceal0t/Dalamud-VFXEditor) (0ceal0t) | Driving the game's Havok runtime from a plugin (loading, sampling and saving animations; the interleaved-animation vtable signature), used by the face data export and "Convert to idle" | MIT |
 | [Illusio Vitae Custom Skeletons (IVCS)](https://discord.gg/RvuPrCNBWP) | The FFXIV skeleton data in `backend/src/posegraph/retarget/data/ffxiv_*.json` (bone names, hierarchy, bind pose) was extracted from the IVCS 2.2 skeleton files; the racial deformer format was studied from IVCS's `human.pbd` | Credit to Illusio Vitae |
 | The Body SE-X, hrBody 3 | Body sizes in `body_extents.json` were measured from these meshes (only aggregate measurements are included, no mesh data) | Credit to their authors |
+
+## ReAnimate license
+
+```
+MIT License
+
+Copyright (c) 2026 Nyaughty
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
 
 FINAL FANTASY XIV © SQUARE ENIX CO., LTD. All Rights Reserved. Posegraph is a fan-made tool and is not affiliated with or endorsed by Square Enix.

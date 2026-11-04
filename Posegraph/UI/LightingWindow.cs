@@ -212,7 +212,7 @@ public sealed class LightingWindow : Window
         DrawFraming();
         UiText.SameLineIfFits(UiText.CheckboxWidth(Loc.T("跟随角色")));
         if (Check(Loc.T("跟随角色"), _config.LightFollowSubject, v => _config.LightFollowSubject = v,
-                  Loc.T("Posegraph 给这个角色换了姿势、或角色被挪动 / 转身后，自动重新读脸再摆（在 Brio 里手动掰骨骼不算，掰完点「重新摆」）")))
+                  Loc.T("角色换了姿势、被挪动或转身后自动重新摆灯（在 Brio 里手动改骨骼后点「重新摆」）")))
             _pi.SavePluginConfig(_config);
         DrawPeople();
         DrawLibraryRow();

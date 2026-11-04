@@ -135,8 +135,8 @@ public sealed class SplitWindow : Window, IDisposable
         if (ImGui.IsItemHovered()) ImGui.SetTooltip(Loc.T("一张图里的多个人分给各个角色"));
         ImGui.SameLine();
         ImGuiComponents.HelpMarker(merge
-            ? Loc.T("主窗口当前那张图里有多个人时用：\n1. 「找人」自动框出图里的人（主窗口图像页上可以拖边角调整、空白处拖出新框、右键删除）\n2. 勾选要识别的人，点「识别」\n3. 给每个人选一个角色，点「全部应用」\n要细调某个人：点「编辑」，主窗口切到这个人（各人的调整值分开保存）。\n角色只在这次 GPose 里有效。")
-            : Loc.T("从图库把图拖到角色左边的格子里绑定，每个角色一张图。\n「全部应用」用每张图保存的修正（3D 页保存），没有就用当前预设；挂了辅助视角的自动融合。\n要细调某个角色：点「编辑」切到主窗口，调好后在 3D 页保存修正。\n绑定只在这次 GPose 里有效。"));
+            ? Loc.T("图里有多个人时用：\n1. 「找人」框出图里的人（可以在主窗口图像页拖框调整）\n2. 勾选要识别的人，点「识别」\n3. 给每人选一个角色，点「全部应用」\n点「编辑」单独细调某个人")
+            : Loc.T("从图库把图拖到角色左边的格子里，每个角色一张图。\n「全部应用」用每张图保存的修正，点「编辑」单独细调；绑定只在这次 GPose 里有效"));
         // 放得下就和模式切换同一行，否则另起一行（英文较长）
         var dockLabel = Loc.T("贴在主窗口右边");
         var dockWidth = ImGui.GetFrameHeight() + ImGui.GetStyle().ItemInnerSpacing.X + ImGui.CalcTextSize(dockLabel).X;
@@ -330,7 +330,7 @@ public sealed class SplitWindow : Window, IDisposable
             _pi.SavePluginConfig(_config);
         }
         if (ImGui.IsItemHovered())
-            ImGui.SetTooltip(Loc.T("「全部应用」后按照片摆好各角色的位置和朝向：选中「站位基准」的人的角色不动，其他人摆在它周围；照片里看得见地面时按地面摆正、大家踩在同一高度"));
+            ImGui.SetTooltip(Loc.T("「全部应用」后按照片摆好各角色的位置和朝向：「站位基准」的角色不动，其他人围着它摆"));
 
         using (ImRaii.Disabled(busy || !_main.MergeSessionActive || !_main.InGpose || _main.Anchor is null))
             if (ImGuiComponents.IconButton("##mergeCamera", FontAwesomeIcon.Video)) _main.ReplicateMergeCamera();

@@ -45,8 +45,9 @@ The UI screenshots are made with the [offline screenshot tool](../../tools/UiPre
 14. [Lighting](#14-lighting)
 15. [Framing and screenshots](#15-framing-and-screenshots)
 16. [Video motion (beta)](#16-video-motion-beta)
-17. [Updates](#17-updates)
-18. [FAQ](#18-faq)
+17. [Convert to idle](#17-convert-to-idle)
+18. [Updates](#18-updates)
+19. [FAQ](#19-faq)
 
 ---
 
@@ -334,7 +335,23 @@ Face bones and helper bones such as shoulders and elbows can't be kept (helper b
 Current limits: fingers come straight from the recognition model and are often wrong for small or blurry hands - fix them with timeline corrections; for videos with cuts, select one continuous shot;
 when the person is small in the frame (wide shots), motion and expressions get worse.
 
-## 17. Updates
+## 17. Convert to idle
+
+Turns the pose of a library image into an idle that loops while your character stands, sits or dozes, saved as a Penumbra mod
+(Penumbra required). It uses the image's saved correction, so fine-tune it on the 3D / Tuning tabs first.
+
+1. Right-click the image in the library and choose **Convert to idle…**.
+2. Pick the **Type** (standing / chair sit / ground sit / doze) and the **Slot**: "default" is the one used without `/cpose`, the numbers are the `/cpose` variations.
+3. Tick the races to **build for** (male and female separately); your current character's race has a *. Some races borrow another race's animation for a slot, and the window tells you which race changes too.
+4. Click **Preview position**: the side / front views on the right loop the motion, grey is the original animation and teal the result. Scroll to zoom, drag to pan, double-click to reset; "Preview zoom" only exaggerates the motion in the preview so the breathing is visible.
+5. Adjust the position if needed: **forward / back, up / down, left / right** (cm) move the body, **lean, turn, tilt** (degrees) rotate it around the pelvis. Sitting and lying poses put the pelvis where the original animation has it (so they sit on the chair); standing poses are put on the floor automatically.
+6. **How much each part follows the original**: 0% holds the pose, 100% moves like the original. By default only the torso breathes and arms, legs and pelvis stay still (the original's arm swings and weight shifts look odd on another pose and make the feet slide).
+7. Enter a **Mod name** and click **Build and enable**. A taken name makes a new "Name 2"; saving the same image again overwrites the mod you just made; tick "Add to an existing mod with the same name" to collect several slots in one mod.
+
+Switch to that pose in game (use `/cpose` for standing) to see it. In Penumbra the mod has one group per race and one option per slot, so each can be turned on or off or deleted.
+Facial expressions aren't part of the idle; other players only see it through a sync plugin such as Mare.
+
+## 18. Updates
 
 - **Plugin**: updates automatically through the plugin repository. The changelog pops up the first time you open the main window after an update.
 - **Backend**: after a plugin update the Settings tab shows the backend version. When it's older, click the download button next to it:
@@ -347,7 +364,7 @@ when the person is small in the frame (wide shots), motion and expressions get w
 
 ![Changelog](images/en/tut-changelog.png)
 
-## 18. FAQ
+## 19. FAQ
 
 **Recognition is slow / not enough VRAM**
 Keep the device on Auto; with less than 3 GB of VRAM it uses the CPU automatically. CPU recognition takes about 10–20 s

@@ -44,6 +44,9 @@ public sealed class LibraryWindow : Window, IDisposable
     private readonly AuxViewsMenu _auxMenu;
     private readonly FileDialogManager _fileDialog = new();
 
+    /// <summary>右键「转换为 idle…」：打开转换窗口（Plugin 接上）。</summary>
+    public Action<string>? ConvertToIdle { get; set; }
+
     private string _folder;
     private volatile FolderListing? _listing;
     private volatile string[]? _searchResults;
@@ -782,7 +785,12 @@ public sealed class LibraryWindow : Window, IDisposable
         if (single is not null && ImGui.MenuItem(Loc.T("在资源管理器中显示"))) ShowInExplorer(single, true);
         ImGui.Separator();
         if (images.Count > 0 && ImGui.MenuItem(Loc.F("存到 Brio 姿势库（{0} 张）", images.Count))) SaveToBrio(images);
-        if (ImGui.IsItemHovered()) ImGui.SetTooltip(Loc.F("用每张图保存的修正（没有就用默认值）和当前种族计算姿势，保存到 {0}，在 Brio 资料库里直接能用。没识别过的会先识别", BrioPoseLibrary.Folder));
+        if (ImGui.IsItemHovered()) ImGui.SetTooltip(Loc.T("按每张图保存的修正和当前种族算好姿势，存进 Brio 的姿势库（Brio 资料库里直接能用）"));
+        if (single is not null && File.Exists(single) && ConvertToIdle is not null)
+        {
+            if (ImGui.MenuItem(Loc.T("转换为 idle…"))) ConvertToIdle(single);
+            if (ImGui.IsItemHovered()) ImGui.SetTooltip(Loc.T("把这张图的姿势做成站着、坐着或打盹时循环播放的待机动作，存成 Penumbra 模组"));
+        }
         ImGui.Separator();
         if (items.Count > 0 && ImGui.MenuItem(Loc.F("删除到回收站（{0} 项）", items.Count))) OpenPopup("delete", items, "");
     }

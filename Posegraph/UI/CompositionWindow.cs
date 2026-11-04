@@ -205,7 +205,7 @@ public sealed class CompositionWindow : Window
         var edited = ImGui.SliderFloat(Loc.T("等效焦距"), ref focal, 10f, 300f, "%.0f mm", ImGuiSliderFlags.Logarithmic);
         if (ImGui.IsItemActivated()) _fovOffset = proj.FovY - proj.Zoom;
         if (ImGui.IsItemDeactivated()) _fovOffset = null;
-        Tip(Loc.T("相当于全画幅相机（36×24mm）拍这个构图框用的焦距：24 广角、35 / 50 人文、85 人像、135 以上长焦压缩。\n按构图框的长边换算，横竖构图都准；拖动直接改 GPose 视角（游戏下限约 12.6°）"));
+        Tip(Loc.T("相当于全画幅相机的焦距：24 广角、35 / 50 人文、85 人像、135 以上长焦；拖动直接改 GPose 视角"));
         if (edited && focal > 1f)
         {
             var fovY = 2 * MathF.Atan(18f / focal / longRatio);
@@ -222,8 +222,8 @@ public sealed class CompositionWindow : Window
             if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Camera, Loc.T("截图")))
                 Shoot();
         Tip(_config.ShotReShade
-            ? Loc.T("拷屏幕上游戏窗口的最终画面（带 ReShade 等后期），PNG 无损；显示构图框时按框裁切。\n截的时候游戏界面和 Posegraph 的窗口会自动藏一下，截完恢复；别的插件窗口要自己关")
-            : Loc.T("只截游戏渲染的画面（不含插件和 Dalamud 的窗口），PNG 无损；显示构图框时按框裁切。\n游戏自己的界面要先隐藏（GPose 里的隐藏界面）"));
+            ? Loc.T("拷屏幕上的最终画面（带 ReShade），PNG 无损，按构图框裁切。\n截时会藏起游戏界面和 Posegraph 窗口，别的插件窗口要自己关")
+            : Loc.T("只截游戏渲染的画面（不含插件窗口），PNG 无损，按构图框裁切。\n游戏界面要先隐藏"));
         ImGui.SameLine();
         var reshade = _config.ShotReShade;
         if (ImGui.Checkbox(Loc.T("ReShade 兼容"), ref reshade))
@@ -231,7 +231,7 @@ public sealed class CompositionWindow : Window
             _config.ShotReShade = reshade;
             _pi.SavePluginConfig(_config);
         }
-        Tip(Loc.T("ReShade 的效果是最后才叠到画面上的，普通截图截不到。勾上后截图时自动藏起游戏界面和插件窗口，直接拷屏幕上的最终画面，截完恢复。\n要用窗口或无边框窗口模式（全屏独占读不到），游戏窗口别被挡住"));
+        Tip(Loc.T("普通截图截不到 ReShade 的效果。勾上后截图时先藏起界面，拷屏幕上的最终画面。\n需要窗口或无边框模式"));
         ImGui.SameLine();
         if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.FolderOpen, Loc.T("打开文件夹")))
         {

@@ -5,6 +5,30 @@
   },
   "entries": [
     {
+      "version": "0.7.5",
+      "date": "2026-11-04",
+      "title": {
+        "zh": "姿势转 idle：把图片姿势做成站着、坐着、打盹时的待机动作",
+        "en": "Pose to idle: turn an image's pose into a standing, sitting or dozing idle"
+      },
+      "items": {
+        "zh": [
+          "转换为 idle：图库里右键一张图「转换为 idle…」，选类型（站立 / 坐椅子 / 坐地上 / 打盹）和 /cpose 槽位、要生成的种族（男女分开勾），用这张图保存的修正按各种族骨架算好姿势，存成 Penumbra 模组并在自己的合集里启用",
+          "保留原版的呼吸起伏：骨盆、脊椎、胸和肩、头颈、手臂、手指、腿、其他各部位跟着原版动多少可以单独调（默认只让躯干呼吸，手脚不乱动、脚不滑）",
+          "动作预览：侧视 / 正视实时播放生成后的动作和原版对比，滚轮缩放、拖动平移；位置可以前后、上下、左右偏移，整体可以前后倾、转身、侧倾。坐、躺默认把骨盆放在原版动作的位置，坐得上椅子",
+          "模组可以自己命名，重名时自动新建「名字 2」；同一张图调完再存覆盖刚才那个，也可以勾选加进已有的同名模组",
+          "精简了一批太长的悬停提示"
+        ],
+        "en": [
+          "Convert to idle: right-click an image in the library → \"Convert to idle…\", pick the type (standing / chair sit / ground sit / doze), the /cpose slot and the races (male and female listed separately). The pose is computed for each race's skeleton with the image's saved correction, saved as a Penumbra mod and enabled in your collection",
+          "Keeps the original breathing: how much the pelvis, spine, chest and shoulders, head and neck, arms, fingers, legs and the rest follow the original idle can be set separately (by default only the torso breathes, so hands don't wave and feet don't slide)",
+          "Motion preview: side / front views play the result live against the original, with scroll zoom and drag pan; offset the body forward / back, up / down, left / right and rotate it (lean, turn, tilt). Sitting and lying poses put the pelvis where the original animation has it, so they sit on the chair",
+          "Name the mod yourself; a taken name makes a new \"Name 2\". Saving the same image again overwrites the mod you just made, or tick to add to an existing mod with the same name",
+          "Shortened a number of overly long tooltips"
+        ]
+      }
+    },
+    {
       "version": "0.7.4",
       "date": "2026-11-03",
       "title": {

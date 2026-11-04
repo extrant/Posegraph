@@ -101,7 +101,7 @@ public sealed partial class MainWindow
         using (ImRaii.Disabled(_brioAbsorbing))
             if (ImGui.SmallButton(Loc.T("收进修正并存进图库")))
                 AbsorbBrioEdits();
-        ItemTip(Loc.T("把 Brio 里的改动换成 3D 页的关节偏移，按图存进图库：下次打开这张图自动套上，改调整值重新应用时也不会被冲掉。\n只收身体骨骼的朝向；脸部骨骼、骨骼位置和缩放不收"));
+        ItemTip(Loc.T("把 Brio 里的改动存进这张图（变成 3D 页的关节偏移），下次打开自动套上。\n只收身体骨骼的朝向"));
         ImGui.SameLine();
         if (ImGui.SmallButton(Loc.T("忽略")))
         {

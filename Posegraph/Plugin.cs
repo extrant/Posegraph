@@ -39,6 +39,7 @@ public sealed class Plugin : IDalamudPlugin
     private bool _openedByGpose;
     private bool _shotRequested;
     private readonly IDataManager _data;
+    private readonly IdleWindow _idleWindow;
     private bool _faceDumping;   // 当前窗口是进入 GPose 时自动打开的：退出 GPose 时自动关闭
 
     public Plugin(
@@ -53,6 +54,7 @@ public sealed class Plugin : IDalamudPlugin
         IDragDropManager dragDrop,
         IGameGui gameGui,
         IDataManager data,
+        ISigScanner sigScanner,
         IPluginLog log)
     {
         _data = data;
@@ -109,6 +111,10 @@ public sealed class Plugin : IDalamudPlugin
                                                             body.GetProperty("fps").GetDouble(), body.GetProperty("reshade").GetBoolean());
         _windows.AddWindow(_video);
         _main.ToggleVideo = _video.Toggle;
+        var idle = new Idle.IdleService(pi, data, framework, sigScanner, log);
+        _idleWindow = new IdleWindow(idle, () => _main.CurrentRace, _main.PosesForRacesAsync, () => _main.BackendOnline);
+        _windows.AddWindow(_idleWindow);
+        _library.ConvertToIdle = _idleWindow.Open;
 #if DEBUG
         // 导出到 Blender 还在试，只有 Debug 版有（Release 版不编 Export 目录，主窗口也不显示按钮）
         var blender = new Export.BlenderExport(framework, clientState, applier, _lighting, () => _main.Actors);

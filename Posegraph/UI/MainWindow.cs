@@ -984,6 +984,31 @@ public sealed partial class MainWindow : Window, IDisposable
         }
     }
 
+    /// <summary>当前角色的骨架编号（用户改过种族就用改的）；还没选角色时为 null。</summary>
+    public string? CurrentRace => _raceOverride ?? _detectedRace;
+
+    /// <summary>
+    /// 转 idle 用：这张图按每个种族的骨架算出的 Brio 姿势（用这张图保存的修正，没有就用当前预设；骨长用标准骨长，只取旋转）。
+    /// 没识别过的先识别。返回 种族 → 姿势 JSON。
+    /// </summary>
+    public async Task<Dictionary<string, string>> PosesForRacesAsync(string image, IReadOnlyList<string> races)
+    {
+        var (info, sha1) = await Recognition.OpenAsync(image);
+        try
+        {
+            if (Library.AuxCount(sha1) > 0) await Recognition.AttachAuxAsync(info.SessionId, sha1);
+            var p = Library.ReadCorrection(sha1)?.Params.Clone() ?? LoadParams(_preset);
+            var poses = new Dictionary<string, string>();
+            foreach (var race in races)
+                poses[race] = (await _client.RetargetAsync(info.SessionId, 0, p, null, race)).Pose;
+            return poses;
+        }
+        finally
+        {
+            _ = _client.DeleteSessionAsync(info.SessionId).ContinueWith(_ => { });
+        }
+    }
+
     // ------------------------------------------------------------------ 拆分模式（角色列表窗口调用）
 
     public (int Index, string Name)[] Actors => _actors;
@@ -1337,7 +1362,7 @@ public sealed partial class MainWindow : Window, IDisposable
         {
             if (ImGui.MenuItem(Loc.T("导出 .pose 文件…"))) Export();
             if (ImGui.MenuItem(Loc.T("存到 Brio 姿势库"), _imagePath is not null)) SaveCurrentToBrio();
-            if (ImGui.IsItemHovered()) ImGui.SetTooltip(Loc.F("带预览图和标签保存到 {0}，在 Brio 资料库里直接能用", BrioPoseLibrary.Folder));
+            if (ImGui.IsItemHovered()) ImGui.SetTooltip(Loc.F("带预览图和标签存进 Brio 的姿势库（Brio 资料库里直接能用）", BrioPoseLibrary.Folder));
             ImGui.EndPopup();
         }
         ImGui.SameLine();
@@ -1572,7 +1597,7 @@ public sealed partial class MainWindow : Window, IDisposable
                 _params.Face = apply;
                 RequestRetarget(_config.PushOnRelease);
             }
-        ItemTip(Loc.T("把照片里的表情换算成游戏的脸部骨骼，和姿势一起应用。\n以中性脸为底换算，重复应用不会越叠越多；关掉后脸部骨骼不再改动（保持当前的样子）"));
+        ItemTip(Loc.T("把照片里的表情换算成脸部骨骼，和姿势一起应用；重复应用不会叠加"));
         if (!apply) return;
         ImGui.SameLine();
         var strength = _params.FaceStrength;
@@ -1618,7 +1643,7 @@ public sealed partial class MainWindow : Window, IDisposable
     {
         var w = _params.FaceHead;
         Slider(Loc.T("头部跟脸##facehead"), ref w, 0, 1, "%.2f", 0.5f,
-               Loc.T("用面捕的脸部朝向修正头的朝向：整身识别时头只占很小一块，面捕专看脸，低头、侧脸的角度更准。\n0 = 只用整身识别的头，1 = 完全按脸；和识别差太多（45° 以上，多半认错了脸）时不改。不开表情也生效"));
+               Loc.T("用面捕的脸部朝向修正头的朝向，低头、侧脸更准。\n0 = 只用整身识别，1 = 完全按脸；相差 45° 以上时不改"));
         _params.FaceHead = w;
         if (_result?.HeadFromFaceDeg is { } diff && w > 0)
             ImGui.TextDisabled(diff > 45 ? Loc.F("脸和识别的头差 {0:0}°，太多了，没改", diff) : Loc.F("脸和识别的头差 {0:0}°，已按权重修正", diff));
@@ -2166,7 +2191,7 @@ public sealed partial class MainWindow : Window, IDisposable
         var python = _config.BackendPython;
         ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X - ImGui.GetFrameHeight() - 60);
         if (ImGui.InputText("python##py", ref python, 512)) { _config.BackendPython = python.Trim('"'); changed = true; }
-        ItemTip(Loc.T(@"后端的 python.exe：一键包里是 <解压目录>\python\python.exe，源码安装是 backend\.venv\Scripts\python.exe"));
+        ItemTip(Loc.T(@"后端的 python.exe：<后端文件夹>\python\python.exe（源码安装是 backend\.venv\Scripts\python.exe）"));
         ImGui.SameLine();
         if (IconButton("##browsePy", FontAwesomeIcon.FolderOpen, Loc.T("浏览")))
             _fileDialog.OpenFileDialog(Loc.T("选择 python.exe"), "python{.exe}", (ok, paths) =>
@@ -2339,14 +2364,14 @@ public sealed partial class MainWindow : Window, IDisposable
                 }
             ImGui.EndCombo();
         }
-        ItemTip(Loc.T("释放后显存/内存归还给游戏，下次识别重新加载（约 5~10 秒）。\nGPU 模式用过一次后，CUDA 运行时会常驻少量显存，直到后端退出"));
+        ItemTip(Loc.T("释放后显存 / 内存还给游戏，下次识别重新加载（约 5~10 秒）"));
         // 快速识别删掉了 MHR 的修正形变权重，剩约 29MB，直接放显卡：这一项不再起作用
         using (ImRaii.Disabled(_config.BackendDevice == "cpu" || _config.FastRecognition))
             changed |= Check(Loc.T("GPU 模式下 MHR 放 CPU"), _config.MhrOnCpu, v => _config.MhrOnCpu = v,
                              _config.FastRecognition ? Loc.T("快速识别开着时 MHR 只有约 29MB，直接放显卡，这一项不起作用")
                                                      : Loc.T("显存约省 750MB，结果一致，每张约慢 0.5 秒"));
-        changed |= Check(Loc.T("快速识别"), _config.FastRecognition, v => _config.FastRecognition = v, Loc.T("移植自 Fast SAM 3D Body：左右手合成一批识别，MHR 不算修正形变（只影响网格表面，骨架不变）。\nRTX 4060 笔记本实测：单人每张约 1.3 秒 → 0.6 秒，两人约 1.7 秒 → 0.8 秒；显存多约 0.1GB，内存少约 0.6GB。\n和关掉时的结果差别：关节平均约 3mm、画面上约 3px，肉眼基本看不出。CPU 模式只快约 10%。\n改了要重新加载模型；已识别过的图片读的是缓存"));
-        changed |= Check(Loc.T("深度辅助识别"), _config.UseDepth, v => _config.UseDepth = v, Loc.T("用 MoGe 估照片的深度：镜头焦距更准、多人时按前后关系修正遮罩和远近、看得见脚和地面时按地面扶正（斜拍、俯拍更稳）。\n代价（RTX 4070 实测）：单人每张多约 0.5 秒（深度模型本身约 0.05 秒，其余是找地面等计算），「识别后立即释放」时含重新加载约多 2 秒；显存峰值多约 0.75GB，内存多约 2GB。\nCPU 模式深度模型每张约 1 秒。\n已识别过的图片读的是缓存，改了要点「重新识别」才看得到区别"));
+        changed |= Check(Loc.T("快速识别"), _config.FastRecognition, v => _config.FastRecognition = v, Loc.T("左右手合成一批识别、跳过 MHR 的修正形变（移植自 Fast SAM 3D Body）：单人约快一倍，结果几乎一样。\n改了要重新加载模型"));
+        changed |= Check(Loc.T("深度辅助识别"), _config.UseDepth, v => _config.UseDepth = v, Loc.T("用 MoGe 估照片深度：焦距更准，多人时按前后关系修正，看得见地面时按地面扶正。\n每张多约 0.5 秒、显存多约 0.75GB（RTX 4070）；改了要「重新识别」才看得到"));
         changed |= DrawRecognitionConcurrencySettings();
         return changed;
     }

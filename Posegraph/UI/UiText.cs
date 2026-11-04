@@ -23,6 +23,17 @@ public static class UiText
         return lo == 0 ? "…" : text[..lo] + "…";
     }
 
+    /// <summary>彩色多行文字，在 width 宽处换行（自动调大小的窗口里 TextWrapped 没有固定宽度可换）。</summary>
+    public static void Wrapped(string text, Vector4 color, float width)
+    {
+        using (ImRaii.PushColor(ImGuiCol.Text, color))
+        {
+            ImGui.PushTextWrapPos(ImGui.GetCursorPosX() + width);
+            ImGui.TextUnformatted(text);
+            ImGui.PopTextWrapPos();
+        }
+    }
+
     /// <summary>彩色单行文字，按剩余宽度截断，截断时悬停显示全文。</summary>
     public static void Fit(string text, Vector4 color, float? width = null)
     {
