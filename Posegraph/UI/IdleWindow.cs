@@ -100,7 +100,7 @@ public sealed class IdleWindow : Window
         if (!_idle.PenumbraReady) UiText.Fit(Loc.T("没有检测到 Penumbra：idle 要存成 Penumbra 模组，请先安装并启用 Penumbra"), Red);
 
         var primary = _currentRace() is { } cur && _races.Contains(cur) ? cur : _races.Order().FirstOrDefault() ?? _currentRace() ?? "c0101";
-        var footer = ImGui.GetFrameHeightWithSpacing() * 2 + ImGui.GetTextLineHeightWithSpacing();
+        var footer = ImGui.GetFrameHeightWithSpacing() + ImGui.GetStyle().ItemSpacing.Y;   // 底下一行：生成按钮和状态
         var height = MathF.Max(200 * s, ImGui.GetContentRegionAvail().Y - footer);
         using (var left = ImRaii.Child("##settings", new Vector2(330 * s, height), true))
             if (left) DrawSettings(primary);
@@ -255,8 +255,10 @@ public sealed class IdleWindow : Window
         if (_view != View.Side) DrawView("##front", Loc.T("正视"), size, fit, minY, p => p.X, preview, vanilla, ours);
         UiText.Fit(Loc.T("灰色：原版动作；青色：生成后的。滚轮缩放，拖动平移，双击复位"), Grey);
 
-        // 位置和旋转：两列三行
-        var width = (ImGui.GetContentRegionAvail().X - ImGui.GetStyle().ItemSpacing.X) / 2 - 110 * s;
+        // 位置和旋转：两列三行；滑杆宽度给最长的标签留够地方（英文标签更长）
+        var labels = new[] { "前后（厘米）", "前后倾（度）", "上下（厘米）", "转身（度）", "左右（厘米）", "侧倾（度）" }
+            .Max(l => ImGui.CalcTextSize(Loc.T(l)).X);
+        var width = (ImGui.GetContentRegionAvail().X - ImGui.GetStyle().ItemSpacing.X) / 2 - labels - ImGui.GetStyle().ItemInnerSpacing.X * 2;
         if (ImGui.BeginTable("##place", 2, ImGuiTableFlags.SizingStretchSame))
         {
             void Slider(string label, ref float value, float range)
@@ -326,8 +328,8 @@ public sealed class IdleWindow : Window
         for (var i = 0; i < preview.Names.Length; i++)
         {
             var p = preview.Parents[i];
-            // n_root 在脚下的原点，连到身体的那根线没有意义
-            if (p < 0 || preview.Names[p] == "n_root") continue;
+            // n_root 在脚下的原点，连到身体的那根线没有意义；武器、装备挂点、裙摆、扩展骨骼不画（拉出很长的线，看不出身体）
+            if (p < 0 || preview.Names[p] == "n_root" || !BodyBone(preview.Names[i])) continue;
             draw.AddLine(Project(vanillaPos[p]), Project(vanillaPos[i]), vanilla, thick);
             draw.AddLine(Project(oursPos[p]), Project(oursPos[i]), ours, 1.5f * thick);
         }
@@ -341,6 +343,10 @@ public sealed class IdleWindow : Window
         draw.AddText(origin + new Vector2(6 * s, 4 * s), ImGui.GetColorU32(new Vector4(1, 1, 1, 0.7f)), title);
         draw.PopClipRect();
     }
+
+    /// <summary>预览里画的骨骼：身体本身（j_ 开头、不含武器 j_buki 和裙摆 j_sk_），加上骨盆 n_hara 和尾巴 n_sippo。</summary>
+    private static bool BodyBone(string name)
+        => name is "n_hara" || name.StartsWith("n_sippo") || (name.StartsWith("j_") && !name.StartsWith("j_buki") && !name.StartsWith("j_sk_"));
 
     /// <summary>这些种族的姿势：算过的直接用，没算过的找后端算（每张图、每个种族只算一次）。</summary>
     private async Task<Dictionary<string, string>> PosesAsync(string image, IReadOnlyList<string> races)

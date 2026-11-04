@@ -340,6 +340,8 @@ when the person is small in the frame (wide shots), motion and expressions get w
 Turns the pose of a library image into an idle that loops while your character stands, sits or dozes, saved as a Penumbra mod
 (Penumbra required). It uses the image's saved correction, so fine-tune it on the 3D / Tuning tabs first.
 
+![Convert to idle](images/en/tut-idle.png)
+
 1. Right-click the image in the library and choose **Convert to idle…**.
 2. Pick the **Type** (standing / chair sit / ground sit / doze) and the **Slot**: "default" is the one used without `/cpose`, the numbers are the `/cpose` variations.
 3. Tick the races to **build for** (male and female separately); your current character's race has a *. Some races borrow another race's animation for a slot, and the window tells you which race changes too.

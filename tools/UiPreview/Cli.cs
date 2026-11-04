@@ -44,6 +44,7 @@ public static class Cli
         using var host = new Host(new Vector2(1600, 1000), scale);
         Tutorial.Register(Scenes.All);
         MergeScenes.Register(Scenes.All);
+        IdleDemo.Register(Scenes.All);
         var app = new App(host, lang, demo);
         foreach (var name in scenes.SelectMany(s => s == "all" ? Scenes.All.Keys.Where(k => !k.StartsWith("bench-")).ToList() : [s]))
         {
@@ -125,10 +126,13 @@ public sealed class App
         Masks = new MaskEditorWindow(Main, textures);
         Main.MaskEditor = Masks;
         Update = new UpdateWindow(Config, pi, textures);
-        Lighting = new Posegraph.Lighting.LightingService(framework, clientState, new PoseApplier(framework, clientState, targets, brio), Config);
-        LightingWindow = new LightingWindow(Lighting, Config, pi, () => null, () => Gposing);
+        var gameGui = Stub.Create<IGameGui>();
+        Lighting = new Posegraph.Lighting.LightingService(framework, clientState, new PoseApplier(framework, clientState, targets, brio), Config, gameGui);
+        LightingWindow = new LightingWindow(Lighting, Config, pi, () => null, () => Gposing, () => false,
+                                            () => Task.FromResult<Posegraph.Backend.PhotoLighting?>(null), () => null, Main.Library,
+                                            () => FakeActors ?? []);
         Main.ToggleLighting = LightingWindow.Toggle;
-        Composition = new CompositionWindow(Config, pi, framework, clientState, textures, readback, () => [535, 758], () => null,
+        Composition = new CompositionWindow(Config, pi, framework, clientState, textures, readback, gameGui, () => [535, 758], () => null,
                                     () => [new Posegraph.Backend.Segment([150, 120], [180, 400], "c"),
                                            new Posegraph.Backend.Segment([180, 400], [120, 700], "l"),
                                            new Posegraph.Backend.Segment([180, 400], [330, 690], "r")]);
