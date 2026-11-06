@@ -130,6 +130,7 @@ EN = {
     "人物框太小或超出图片范围": "A person box is too small or outside the image",
     "人物遮罩要和人物框、遮罩尺寸一起给": "Person masks need person boxes and the mask size",
     "人物遮罩不对：{error}": "Invalid person masks: {error}",
+    "焦距要在 {low:.0f}～{high:.0f}mm 之间": "Focal length must be between {low:.0f} and {high:.0f} mm",
     "kind 只能是 auto / photo / anime": "kind must be auto / photo / anime",
     "剩余显存 {free} MB，只够 {n} 路": "{free} MB of VRAM free, enough for {n} at once",
     "可用内存 {free} MB，只够 {n} 路": "{free} MB of RAM available, enough for {n} at once",

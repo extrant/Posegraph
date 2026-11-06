@@ -5,6 +5,32 @@
   },
   "entries": [
     {
+      "version": "0.7.7",
+      "date": "2026-11-06",
+      "title": {
+        "zh": "复刻镜头：竖图横拍、焦距可改、一次对准",
+        "en": "Camera matching: portrait in landscape, adjustable focal length, lines up in one go"
+      },
+      "items": {
+        "zh": [
+          "复刻镜头点开有「普通 / 顺旋 / 逆旋」：拍竖图时游戏照常横屏，镜头侧倒 90°，竖照片能占满画面（不用开 ReShade 竖屏模式，SSAO、景深照常）；构图框和原图参考跟着躺下来，截图自动转回正的",
+          "照片焦距可以改：复刻镜头旁边显示识别用的焦距，猜得不对时（贴脸特写、白底棚拍常被猜成广角）选 24～135mm 或自己填，按新焦距重新识别并记住；照片带 EXIF 焦距时自动用它",
+          "复刻镜头更准：跳过游戏的镜头过渡，并按实际误差自动修正到对上为止，不用再多点几次",
+          "复刻镜头跟着调整页的「整体旋转」一起转：转人把动作摆正后，构图仍和照片一致",
+          "构图框用照片比例时也能强制横构图 / 竖构图（照片会被裁掉一部分）",
+          "视频窗口去掉了「录成视频」（和 ReShade 冲突）；选音乐的按钮挪到「放音乐」旁边"
+        ],
+        "en": [
+          "Match camera now offers \"Normal / Roll right / Roll left\": for portrait shots the game stays in landscape and the camera rolls 90°, so a portrait photo fills the screen (no ReShade portrait mode needed, SSAO and depth of field work as usual); the framing guide and photo reference lie down with it, and screenshots are turned back upright",
+          "The photo's focal length can be changed: the focal length used for recognition is shown next to Match camera; when it's wrong (close-ups and plain studio backdrops are often guessed too wide), pick 24–135mm or type one in and the photo is recognized again with it and remembered. A photo's EXIF focal length is used automatically",
+          "More accurate camera matching: it skips the game's camera transition and corrects itself from the measured error until it lines up, so no more clicking several times",
+          "Camera matching follows the Adjust tab's whole-body rotation: after rotating the person to fix the pose, the framing still matches the photo",
+          "With the photo ratio, the framing guide can be forced to landscape or portrait (part of the photo gets cropped)",
+          "Removed \"Record video\" from the video window (it conflicts with ReShade); the music picker moved next to \"Play music\""
+        ]
+      }
+    },
+    {
       "version": "0.7.5",
       "date": "2026-11-04",
       "title": {

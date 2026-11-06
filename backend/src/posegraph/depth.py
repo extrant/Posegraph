@@ -62,8 +62,9 @@ def model_class():
     return MoGeModel
 
 
-def estimate(rgb: np.ndarray, device: str) -> PhotoDepth:
-    """跑 MoGe-2。模型第一次用时加载，换设备时重载；和 SAM 3D Body 一起在 Estimator.unload 时释放（unload）。"""
+def estimate(rgb: np.ndarray, device: str, focal: float | None = None) -> PhotoDepth:
+    """跑 MoGe-2。模型第一次用时加载，换设备时重载；和 SAM 3D Body 一起在 Estimator.unload 时释放（unload）。
+    focal：已知的像素焦距（这张图的尺寸下；用户指定或 EXIF）：按它定视角，不让 MoGe 自己猜，深度和点云跟着这个焦距算。"""
     import torch
 
     if device == "cuda" and sys.platform == "win32" and getattr(torch.version, "hip", None) and hasattr(torch, "backends"):
@@ -75,10 +76,11 @@ def estimate(rgb: np.ndarray, device: str) -> PhotoDepth:
             _model = model_class().from_pretrained(str(settings.moge_model)).to(device).eval()
             _model_device = device
         H, W = rgb.shape[:2]
+        fov_x = None if focal is None else float(np.degrees(2 * np.arctan(W / 2 / focal)))
         with torch.no_grad():
             # 半精度只在显卡上快；CPU 上开着会慢几十倍
             out = _model.infer(torch.tensor(rgb / 255.0, dtype=torch.float32, device=device).permute(2, 0, 1),
-                               num_tokens=NUM_TOKENS, use_fp16=device != "cpu")
+                               num_tokens=NUM_TOKENS, use_fp16=device != "cpu", fov_x=fov_x)
         K = out["intrinsics"].float().cpu().numpy()
         depth = out["depth"].float().cpu().numpy()
         valid = out["mask"].cpu().numpy().astype(bool) & np.isfinite(depth)

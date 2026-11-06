@@ -203,6 +203,12 @@ public static unsafe class GposeCamera
         if (req.Pan is { Length: 2 } p) cam->Pan = new Vector2(p[0], p[1]);
         if (req.Roll is { } r) cam->Roll = r;
         if (req.Zoom is { } z) cam->Zoom = z;
+        if (req.Snap == true)
+        {
+            // 直接到位：同时写游戏平滑用的当前距离和当前视角，跳过约 0.6 秒的过渡（复刻镜头时读到过渡中途的值会算歪）
+            cam->Camera.InterpDistance = cam->Distance;
+            *(float*)((byte*)cam + CurrentFovOffset) = cam->FoV + cam->Zoom;
+        }
         return true;
     }
 
@@ -226,4 +232,6 @@ public sealed class CameraRequest
     public float? Zoom { get; set; }
     /// <summary>解除距离上下限（GPose 默认 1.5~20）。</summary>
     public bool? Delimit { get; set; }
+    /// <summary>直接到位，跳过游戏的平滑过渡（距离、视角）。</summary>
+    public bool? Snap { get; set; }
 }

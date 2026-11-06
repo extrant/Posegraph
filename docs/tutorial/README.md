@@ -132,7 +132,7 @@ Tips:
 - **Stance**: gravity correction (straightens the body when the photo's camera is tilted), snapping to the ground, and "Flatten planted feet" (feet standing on the ground are laid flat like in game; only the foot turns, the legs stay).
   **Turn off snapping for jumps and mid-air poses.**
 - **Helper bones**: how strongly the skin helpers at elbows, knees, shoulders etc. follow.
-- **Whole-body rotation / offset**: when the whole person leans or needs raising or lowering (someone sitting on a chair), rotate around the hips or move everything; camera matching doesn't undo it.
+- **Whole-body rotation / offset**: when the whole person leans or needs raising or lowering (someone sitting on a chair), rotate around the hips or move everything; camera matching turns and moves with the person, so the framing still matches the photo.
 - New images start from the defaults; keep this image's values with **Save correction** at the top, which also tells you about unsaved changes.
 
 ## 7. Hints tab
@@ -202,7 +202,13 @@ Three characters, one image each, after "Apply all":
 
 Buttons at the bottom of the main window:
 
-- **Match camera** (camera icon): moves the GPose camera to the photo's position, distance and angle. Needs the Posegraph HTTP service (Settings, on by default).
+- **Match camera** (camera icon): moves the GPose camera to the photo's position, distance and angle. Needs the Posegraph HTTP service (Settings, on by default). Clicking it offers three options:
+  - **Normal**: matches the photo as it is.
+  - **Roll right / roll left**: for portrait shots. The game keeps rendering in landscape and the camera rolls 90° (ReShade's SSAO and depth of field don't break the way they do in portrait mode), so the photo's width spans the game's height and the person fills the screen.
+    With roll right the person's head points left in the game, with roll left it points right; the framing guide and photo reference lie down with it, and screenshots are turned back upright. The composition window shows which mode is on and can switch back to normal.
+- **Photo focal length** (the button such as "25mm" next to Match camera): the full-frame equivalent focal length used for recognition; camera matching takes its angle of view and distance from it.
+  A photo's EXIF focal length is used when present, otherwise the depth model estimates it from the image; close-ups and plain studio backdrops are often guessed too wide, and long-lens portraits aren't recognized as such.
+  If the person looks distorted or the matched camera is too wide, pick 24 / 35 / 50 / 85 / 135mm or type one in: the photo is recognized again with it and saved in the recognition cache, so it stays next time; "Auto" switches back.
 - **Restore** (↶): goes back to the pose before the first apply.
 - **Export** (disk icon): export a `.pose` file, or save to the Brio pose library (with preview and tags, ready in Brio's library).
 
@@ -284,13 +290,14 @@ The crop button in the second toolbar row.
 ![Composition and screenshots](images/en/tut-composition.png)
 
 - **Show framing guide** draws a frame of the chosen aspect ratio over the game, dims the outside and can add guides such as the rule of thirds; switch between landscape and portrait.
-- **Fit to photo** takes the ratio and orientation from the photo. "Photo reference" overlays the photo inside the frame so you can line up the camera; you can also overlay the skeleton recognized from it.
+- **Fit to photo** takes the ratio and orientation from the photo; with the photo ratio you can still force landscape or portrait (the ratio is flipped and part of the photo is cropped). "Photo reference" overlays the photo inside the frame so you can line up the camera; you can also overlay the skeleton recognized from it.
 - In GPose it shows and sets the **equivalent full-frame focal length** (the 35 mm, 85 mm photographers talk about).
 - **Screenshot** captures the game's own render inside the frame, saved to Documents\Posegraph\Screenshots by default; the button next to it opens the folder.
+- When the camera was matched with roll right / roll left (see section 11), the framing guide and photo reference lie on their side and screenshots are turned back upright automatically; the window shows a note, and "Back to normal" only changes the guide and screenshots.
 
 ## 16. Video motion (beta)
 
-Recognize the motion in a video frame by frame and play it in GPose like an animation, then correct it or record it to video. The film button in the second toolbar row opens the video window.
+Recognize the motion in a video frame by frame and play it in GPose like an animation, then correct it. The film button in the second toolbar row opens the video window.
 
 **Recognize**
 
@@ -314,7 +321,7 @@ Recognize the motion in a video frame by frame and play it in GPose like an anim
 
 **Timeline corrections**
 
-Fix what recognition got wrong (fingers especially) by hand; corrections are saved in the clip and kept when rebuilding for another race and when recording. Open "Timeline corrections" below the player:
+Fix what recognition got wrong (fingers especially) by hand; corrections are saved in the clip and kept when rebuilding for another race. Open "Timeline corrections" below the player:
 
 1. Pause on the frame to fix and move bones directly in **Brio**.
 2. The panel says "The pose at x s was changed in Brio"; click **Keep as correction** and that frame becomes a keyframe (a diamond on the track). "Revert" discards the change.
@@ -327,10 +334,6 @@ Fix what recognition got wrong (fingers especially) by hand; corrections are sav
 
 Each change only rebuilds the affected frames (a few dozen frames take a second or two). The first correction after opening an older clip rebuilds the whole clip once to read the character's current bone lengths.
 Face bones and helper bones such as shoulders and elbows can't be kept (helper bones follow the main bones automatically).
-
-**Record to video**
-
-"Record video" poses each frame and captures the game screen, saved to Documents\Posegraph\Videos, optionally with the video's music. Don't move the camera or windows while recording.
 
 Current limits: fingers come straight from the recognition model and are often wrong for small or blurry hands - fix them with timeline corrections; for videos with cuts, select one continuous shot;
 when the person is small in the frame (wide shots), motion and expressions get worse.

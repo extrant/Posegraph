@@ -10,6 +10,9 @@
    - 大幅移动时游戏会平滑过渡约 0.6 秒：每次设置后等到相机不再移动再读（原来固定等 0.15 秒会读到过渡中的值，
      导致迭代很多次、画面一顿一顿）
    通常 3～4 次设置就到位（原来的有限差分迭代最多约 150 次）。
+3. 设置时带 snap：插件同时写游戏平滑用的当前距离 / 视角，没有过渡，读数不会是半路的值。
+   解完再按实测的位置、视线、上方向、视角误差闭环修正（最多 REFINE_ROUNDS 轮），到容差内为止——
+   以前偶尔读到过渡中途的值或轴心估歪，差一点，要用户多点几次复刻镜头才对上。
 """
 
 from __future__ import annotations
@@ -53,10 +56,14 @@ class CameraState:
 
 
 def photo_camera_in_world(z, rt, model_position: np.ndarray, model_rotation: np.ndarray,
-                          model_scale: np.ndarray, mhr_names: list[str]) -> CameraTarget:
+                          model_scale: np.ndarray, mhr_names: list[str], root_rotation_deg=None) -> CameraTarget:
     """z：image_to_pose 生成的 npz；rt：retarget 结果（需含 all_positions / upright_rotation）；
-    model_*：角色模型的世界变换（Brio 姿势 JSON 的 ModelAbsoluteValues，旋转为 xyzw）。"""
+    model_*：角色模型的世界变换（Brio 姿势 JSON 的 ModelAbsoluteValues，旋转为 xyzw）；
+    root_rotation_deg：调整页的整体旋转（度，模型系 xyz，同 RetargetParams.root_rotation）。给了的话镜头跟着人绕髋部一起转——
+    整体旋转是用来把动作大致摆正的，镜头跟着转，画面里人和照片的相对角度不变（整体位移本来就跟着髋部走）。"""
     up_rot = R.from_quat(rt.upright_rotation) if rt.upright_rotation is not None else R.identity()
+    manual = R.from_euler("xyz", root_rotation_deg, degrees=True) if root_rotation_deg is not None and any(root_rotation_deg) \
+        else R.identity()
     mc = up_rot.apply(z["joint_coords"] * _FLIP)
     J = lambda n: mc[mhr_names.index(n)]
     cam_m = up_rot.apply(-z["cam_t"] * _FLIP)
@@ -64,17 +71,30 @@ def photo_camera_in_world(z, rt, model_position: np.ndarray, model_rotation: np.
     mhr_hip, ff_hip = (J("l_upleg") + J("r_upleg")) / 2, (P["j_asi_a_l"] + P["j_asi_a_r"]) / 2
     # 体型比例：两套骨架的髋→颈长度之比，让机位按 FFXIV 角色的大小缩放、构图保持一致
     scale = np.linalg.norm(P["j_kubi"] - ff_hip) / np.linalg.norm(J("c_neck") - mhr_hip)
-    cam_ff = ff_hip + scale * (cam_m - mhr_hip)
+    cam_ff = ff_hip + scale * manual.apply(cam_m - mhr_hip)
 
     q = R.from_quat(model_rotation)
     w, h = (int(v) for v in z["image_size"])
     return CameraTarget(
         position=model_position + q.apply(model_scale * cam_ff),
-        forward=q.apply(up_rot.apply([0.0, 0.0, -1.0])),
-        up=q.apply(up_rot.apply([0.0, 1.0, 0.0])),
+        forward=q.apply(manual.apply(up_rot.apply([0.0, 0.0, -1.0]))),
+        up=q.apply(manual.apply(up_rot.apply([0.0, 1.0, 0.0]))),
         fov_y_deg=float(np.degrees(2 * np.arctan(h / 2 / float(z["focal_length"])))),
         aspect=w / h,
     )
+
+
+def rotate_target(target: CameraTarget, rotate: int) -> CameraTarget:
+    """顺旋 / 逆旋：镜头绕视线转 90°，照片的宽对着游戏画面的高（拍竖图时游戏照常横屏，截图再转回来）。
+    rotate = 1：照片的上方朝游戏画面左边（画面顺时针转 90° 变正）；-1：朝右边（逆时针转正）；0 不转。
+    游戏相机的上方向 = ±照片的右方向，垂直视角换成照片的水平视角，宽高比取倒数。"""
+    if rotate == 0:
+        return target
+    right = np.cross(target.forward, target.up)   # 照片的右方向（相机看 forward，上为 up）
+    right /= np.linalg.norm(right)
+    half_x = np.tan(np.radians(target.fov_y_deg) / 2) * target.aspect
+    return CameraTarget(position=target.position, forward=target.forward, up=right * (1 if rotate > 0 else -1),
+                        fov_y_deg=float(np.degrees(2 * np.arctan(half_x))), aspect=1 / target.aspect)
 
 
 def read_state(client: BridgeClient) -> CameraState:
@@ -111,6 +131,11 @@ def _wrap(a: float) -> float:
 
 
 SETTLE_FRAMES = 3   # 相机隔这么多帧都没动才算停稳
+REFINE_ROUNDS = 4   # 解完后闭环修正最多几轮
+POSITION_TOL = 0.01                 # 米
+FORWARD_TOL = np.radians(0.15)      # 视线
+UP_TOL = np.radians(0.3)            # 上方向（滚转）
+FOV_TOL = np.radians(0.2)
 
 
 def _settled(client: BridgeClient, timeout: float = 2.5, step: float = 0.03) -> CameraState:
@@ -142,7 +167,7 @@ def solve_gpose_camera(client: BridgeClient, target: CameraTarget, log=print) ->
         nonlocal moves
         moves += 1
         client.set_camera(angle=[p["ax"], p["ay"]], distance=p["dist"], pan=[p["px"], p["py"]],
-                          roll=p["roll"], zoom=p["zoom"], delimit=True)
+                          roll=p["roll"], zoom=p["zoom"], delimit=True, snap=True)
         return _settled(client)
 
     def pivot_of(s: CameraState) -> np.ndarray:
@@ -184,17 +209,40 @@ def solve_gpose_camera(client: BridgeClient, target: CameraTarget, log=print) ->
             p["zoom"] += float(fov_error)
         s = apply()
 
+    # 3. 闭环修正：按这一刻实际的误差再拧（相当于替用户多点几次）。世界偏航 = 基准 − Pan.x、滚转 = −Roll，
+    #    所以 Pan.x、Roll 按误差直接加；俯仰 Pan.y 按误差加；位置按当前轴心重新放；视角按误差改 Zoom。
+    refined = 0
+    for _ in range(REFINE_ROUNDS):
+        s = read_state(client)
+        position_error = float(np.linalg.norm(s.position - target.position))
+        fov_error = target_fov - np.radians(s.fov_y_deg)
+        fov_ok = abs(fov_error) < FOV_TOL or target_fov <= MIN_FOV_RAD
+        if (position_error < POSITION_TOL and _angle_between(s.forward, target.forward) < FORWARD_TOL
+                and _angle_between(s.up, target.up) < UP_TOL and fov_ok):
+            break
+        if position_error >= POSITION_TOL:
+            place(pivot_of(s))
+        now = _view_angles(s.forward, s.up)
+        p["px"] = _wrap(p["px"] + _wrap(now[0] - goal[0]))
+        p["py"] = float(p["py"] + goal[1] - now[1])
+        p["roll"] = _wrap(p["roll"] + _wrap(now[2] - goal[2]))
+        if not fov_ok:
+            p["zoom"] += float(fov_error)
+        apply()
+        refined += 1
+
     final = read_state(client)
     result = {
         "params": p,
         "moves": moves,
+        "refined": refined,
         "position_error_cm": float(np.linalg.norm(final.position - target.position) * 100),
         "forward_error_deg": float(np.degrees(_angle_between(final.forward, target.forward))),
         "up_error_deg": float(np.degrees(_angle_between(final.up, target.up))),
         "fov_deg": final.fov_y_deg,
         "target_fov_deg": float(np.degrees(target_fov)),
     }
-    log(f"{moves} 次设置：位置误差 {result['position_error_cm']:.1f}cm，视线误差 {result['forward_error_deg']:.2f}°，"
+    log(f"{moves} 次设置（闭环修正 {refined} 轮）：位置误差 {result['position_error_cm']:.1f}cm，视线误差 {result['forward_error_deg']:.2f}°，"
         f"上方向误差 {result['up_error_deg']:.2f}°，视角 {final.fov_y_deg:.1f}°/{np.degrees(target_fov):.1f}°")
     return result
 
@@ -204,11 +252,11 @@ _FRAMING_PAIRS = [("j_kao", "c_head"), ("j_ude_a_l", "l_uparm"), ("j_ude_a_r", "
                   ("j_asi_c_r", "r_lowleg"), ("j_asi_d_l", "l_foot"), ("j_asi_d_r", "r_foot")]
 
 
-def framing_error(client: BridgeClient, z, pose, mhr_names: list[str], actor: int | None = None) -> float:
+def framing_error(client: BridgeClient, z, pose, mhr_names: list[str], actor: int | None = None, rotate: int = 0) -> float:
     """构图检查：游戏相机下角色关节的屏幕位置 vs 照片中对应关节，返回平均偏差（占画面高度的比例）。
     只统计照片画面内的关节（半身照里画面外的腿是模型猜的）。
     坐标以游戏画面半高为单位、原点在中心；照片比游戏画面宽时照片按宽度放进画面（见 game_fov_y），换算时一并缩小。
-    pose 为游戏当前姿势（BrioPose）。"""
+    pose 为游戏当前姿势（BrioPose）；rotate 同 rotate_target（顺旋 / 逆旋时照片转 90° 放进画面）。"""
     cam = client.get_camera()["camera"]
     V, Pm = np.array(cam["view"]), np.array(cam["projection"])
     aspect = Pm[1][1] / Pm[0][0]
@@ -217,15 +265,18 @@ def framing_error(client: BridgeClient, z, pose, mhr_names: list[str], actor: in
     mp, mq, ms = vec(m["Position"]), R.from_quat(vec(m["Rotation"])), vec(m["Scale"])
     W, H = (int(v) for v in z["image_size"])
     f = float(z["focal_length"])
-    fit = min(1.0, aspect / (W / H))   # 照片半高占游戏画面半高的比例
+    long = W if rotate else H          # 照片在游戏画面里竖着的那条边
+    fit = min(1.0, aspect / ((H / W) if rotate else (W / H)))   # 照片竖边的一半占游戏画面半高的比例
     jc = z["joint_coords"] + z["cam_t"]
     diffs = []
     for ff, mh in _FRAMING_PAIRS:
         clip = np.append(mp + mq.apply(ms * pose.get(ff).position), 1) @ V @ Pm
         game = np.array([clip[0] / clip[3] * aspect, clip[1] / clip[3]])
         p = jc[mhr_names.index(mh)]
-        photo = np.array([f * p[0] / p[2], -f * p[1] / p[2]]) / (H / 2)
-        if abs(photo[0]) > W / H or abs(photo[1]) > 1:
+        u, v = f * p[0] / p[2], -f * p[1] / p[2]   # 照片平面坐标（右、上，像素）
+        if abs(u) > W / 2 or abs(v) > H / 2:
             continue
+        # 顺旋 / 逆旋：照片的上方朝画面左边（rotate=1）时画面坐标 = (-v, u)，朝右边时 = (v, -u)
+        photo = np.array([u, v] if rotate == 0 else [-v, u] if rotate > 0 else [v, -u]) / (long / 2)
         diffs.append(np.linalg.norm(game - photo * fit))
     return float(np.mean(diffs) / 2)

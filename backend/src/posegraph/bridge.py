@@ -27,7 +27,7 @@ class BridgeClient:
         return self._http.get("/camera").raise_for_status().json()
 
     def set_camera(self, **fields) -> dict:
-        """fields：distance, angle[2], pan[2], roll, zoom, delimit。"""
+        """fields：distance, angle[2], pan[2], roll, zoom, delimit, snap（跳过游戏的平滑过渡；旧版插件忽略）。"""
         return self._http.post("/camera", json=fields).raise_for_status().json()
 
     def apply_pose(self, pose_json: str, actor: int | None = None) -> dict:

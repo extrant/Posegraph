@@ -101,6 +101,8 @@ public class Configuration : IPluginConfiguration
     public bool FrameShow { get; set; }
     public string FrameAspect { get; set; } = "photo";
     public bool FramePortrait { get; set; }
+    /// <summary>构图框用照片比例时的朝向：0 按照片，1 强制横，2 强制竖（比例取倒数，照片会被裁掉一部分）。</summary>
+    public int FramePhotoOrientation { get; set; }
     public float FrameDim { get; set; } = 0.6f;
     public int FrameGuides { get; set; } = 1;
 
@@ -113,6 +115,11 @@ public class Configuration : IPluginConfiguration
 
     /// <summary>ReShade 兼容截图：自动藏起游戏界面和插件窗口，拷屏幕上的最终画面（带 ReShade 等后期），截完恢复。</summary>
     public bool ShotReShade { get; set; }
+    /// <summary>
+    /// 上次复刻镜头选的转向：0 普通，1 顺旋（镜头侧倒 90°，游戏里人头朝左，截图顺时针转回正），-1 逆旋（反过来）。
+    /// 拍竖图时游戏照常横屏（ReShade 的深度效果不出问题）；构图框、原图参考跟着躺下来，截图转回正的。
+    /// </summary>
+    public int CameraRotation { get; set; }
 
     /// <summary>视频：上次打开视频的文件夹、识别帧率、平滑程度。</summary>
     public string LastVideoDir { get; set; } = "";

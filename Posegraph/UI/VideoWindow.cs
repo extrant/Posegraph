@@ -19,7 +19,6 @@ namespace Posegraph.UI;
 /// 视频：载入视频 → 拖到某一帧「找人」并点选 → 选起止、帧率 → 后端逐帧识别（backend video.py，可取消）→ 结果存成片段文件
 /// （文档\Posegraph\Clips）→ 播放器在游戏里逐帧套姿势、摆镜头（ClipPlayer：跟拍 / 走动两种镜头）。
 /// 第一版只认一个人、一个角色；视频里有切镜时只提示（截取一段连续镜头）。
-/// 片段可以录成视频（ClipRecorder：逐帧摆好再截游戏画面，后端编码成 mp4，存在 文档\Posegraph\Videos）。
 /// </summary>
 public sealed partial class VideoWindow : Window, IDisposable
 {
@@ -27,7 +26,6 @@ public sealed partial class VideoWindow : Window, IDisposable
     private static readonly Vector4 Yellow = PosegraphTheme.Yellow;
     private static readonly Vector4 Grey = PosegraphTheme.Grey;
     private static readonly int[] FpsChoices = [5, 10, 15, 30];
-    private static readonly int[] RecordFpsChoices = [0, 30, 60];   // 0 = 跟片段一样
     private static readonly string VideoFilter = "{.mp4,.mov,.m4v,.webm,.mkv,.avi}";
 
     private readonly Configuration _config;
@@ -35,7 +33,6 @@ public sealed partial class VideoWindow : Window, IDisposable
     private readonly ITextureProvider _textures;
     private readonly MainWindow _main;
     private readonly ClipPlayer _player;
-    private readonly ClipRecorder _recorder;
     private readonly PoseApplier _applier;
     private readonly FileDialogManager _dialog = new();
 
@@ -59,7 +56,7 @@ public sealed partial class VideoWindow : Window, IDisposable
     private DateTime _nextBodyCheck;
     private string? _skipBody;
     private readonly ClipAudio _audio;
-    private (string? Clip, string Path)? _musicOverride;   // 录制配音乐：某个片段手动选的音乐文件            // 这个体型重算失败过，不再自动重试（换了体型再试）
+    private (string? Clip, string Path)? _musicOverride;   // 放音乐：某个片段手动选的音乐文件            // 这个体型重算失败过，不再自动重试（换了体型再试）
 
     public VideoWindow(Configuration config, IDalamudPluginInterface pi, IFramework framework, ITextureProvider textures,
                        ITextureReadbackProvider readback, IGameGui gameGui, MainWindow main, BrioBridge brio, PoseApplier applier)
@@ -77,23 +74,17 @@ public sealed partial class VideoWindow : Window, IDisposable
         _player.SetMode(config.VideoWalk ? ClipCameraMode.Walk : ClipCameraMode.Follow);
         _player.WalkCamera = (WalkCamera)Math.Clamp(config.VideoWalkCamera, 0, 3);
         _player.HiddenCamera = (HiddenCamera)Math.Clamp(config.VideoHiddenCamera, 0, 2);
-        _recorder = new ClipRecorder(framework, textures, readback, gameGui);
         _audio = new ClipAudio(framework, _player, () => _main.Client)
         {
             Enabled = config.VideoPlayMusic,
             Volume = config.VideoMusicVolume,
             Source = MusicSource,
-            Muted = () => _recorder.Running,
         };
         _applier = applier;
         Size = new Vector2(620, 760);
         SizeCondition = ImGuiCond.FirstUseEver;
     }
 
-    /// <summary>ReShade 兼容录制期间为 true：插件窗口都不画。</summary>
-    public bool HideUi => _recorder.HideUi;
-
-    public static string VideosFolder => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Posegraph", "Videos");
 
     public override void PreDraw() => PosegraphTheme.Push();
 
@@ -124,7 +115,7 @@ public sealed partial class VideoWindow : Window, IDisposable
     /// </summary>
     private void SyncActors()
     {
-        if (_recorder.Running || _rebuilding) return;
+        if (_rebuilding) return;
         var actors = _main.Actors;
         bool Exists(int? index) => index is { } i && actors.Any(x => x.Index == i);
         if (!Exists(_actor)) _actor = Exists(_main.SelectedActor) ? _main.SelectedActor : actors.Length > 0 ? actors[0].Index : null;
@@ -148,7 +139,7 @@ public sealed partial class VideoWindow : Window, IDisposable
     /// </summary>
     private void WatchActorBody()
     {
-        if (DateTime.UtcNow < _nextBodyCheck || _rebuilding || _busy || _recorder.Running || !_main.InGpose
+        if (DateTime.UtcNow < _nextBodyCheck || _rebuilding || _busy || !_main.InGpose
             || _player.Clip is not { } clip || _player.Actor is not { } actor)
             return;
         _nextBodyCheck = DateTime.UtcNow.AddSeconds(1);
@@ -655,7 +646,6 @@ public sealed partial class VideoWindow : Window, IDisposable
         }
         if (_player.Actor is null) ImGui.TextColored(Yellow, Loc.T("先选一个游戏角色（进 GPose 后才有）"));
 
-        using var recording = ImRaii.Disabled(_recorder.Running);
         using (ImRaii.Disabled(!_main.InGpose || _player.Actor is null))
         {
             if (ImGuiComponents.IconButton("##play", _player.Playing ? FontAwesomeIcon.Pause : FontAwesomeIcon.Play))
@@ -726,8 +716,6 @@ public sealed partial class VideoWindow : Window, IDisposable
             Directory.CreateDirectory(Clip.Folder);
             Dalamud.Utility.Util.OpenLink(Clip.Folder);
         }
-        recording.Dispose();
-        DrawRecord(clip);
         if (_player.Error is { } error) ImGui.TextColored(Yellow, error);
     }
 
@@ -756,7 +744,7 @@ public sealed partial class VideoWindow : Window, IDisposable
             if (clip.RawPath is not null && _player.Actor is { } actor && _main.InGpose)
             {
                 ImGui.SameLine();
-                using (ImRaii.Disabled(_rebuilding || _recorder.Running))
+                using (ImRaii.Disabled(_rebuilding))
                     if (ImGui.SmallButton(Loc.T("重算走位")))
                         _ = Task.Run(() => RebuildAsync(clip, actor, Loc.T("已重算走位和镜头")));
                 Tip(Loc.T("用存下的识别数据重算走位、防滑和自动镜头（几秒，不重新识别）"));
@@ -909,120 +897,6 @@ public sealed partial class VideoWindow : Window, IDisposable
         });
     }
 
-    /// <summary>录成视频：按钮、帧率、视频文件夹；录制中显示进度和取消。</summary>
-    private void DrawRecord(Clip clip)
-    {
-        if (_recorder.Running)
-        {
-            var scale = ImGuiHelpers.GlobalScale;
-            ImGui.ProgressBar(_recorder.Total == 0 ? 0 : (float)_recorder.Done / _recorder.Total, new Vector2(-90 * scale, 0),
-                              Loc.F("录制中 {0}/{1}", _recorder.Done, _recorder.Total));
-            ImGui.SameLine();
-            if (ImGui.Button(Loc.T("取消") + "##record", new Vector2(-1, 0))) _recorder.Cancel();
-            return;
-        }
-        using (ImRaii.Disabled(!_main.InGpose || _player.Actor is null))
-            if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Video, Loc.T("录成视频")))
-                StartRecording(clip);
-        Tip(Loc.T(_config.ShotReShade
-            ? "从头到尾一帧一帧摆好姿势和镜头再截图，编码成 mp4。录的时候比实时慢。\n构图窗口勾了「ReShade 兼容」：录制期间藏起游戏界面和插件窗口、拷屏幕上的画面（带 ReShade），游戏窗口不要被挡住"
-            : "从头到尾一帧一帧摆好姿势和镜头再截图，编码成 mp4。录的时候比实时慢。\n录制期间藏起游戏界面；画面不带 ReShade（要带的话在构图窗口勾「ReShade 兼容」）"));
-        ImGui.SameLine();
-        var current = Math.Max(0, Array.IndexOf(RecordFpsChoices, _config.VideoRecordFps));
-        string Label(int f) => f == 0 ? Loc.F("跟片段（{0:0.##} 帧/秒）", clip.Fps) : Loc.F("{0} 帧/秒", f);
-        ImGui.SetNextItemWidth(150 * ImGuiHelpers.GlobalScale);
-        if (ImGui.BeginCombo("##recordFps", Label(RecordFpsChoices[current])))
-        {
-            foreach (var f in RecordFpsChoices)
-                if (ImGui.Selectable(Label(f), f == RecordFpsChoices[current]))
-                {
-                    _config.VideoRecordFps = f;
-                    _pi.SavePluginConfig(_config);
-                }
-            ImGui.EndCombo();
-        }
-        Tip(Loc.T("生成视频的帧率：帧之间按片段插值，30 / 60 更顺"));
-        ImGui.SameLine();
-        var music = _config.VideoMusic;
-        if (ImGui.Checkbox(Loc.T("配音乐"), ref music))
-        {
-            _config.VideoMusic = music;
-            _pi.SavePluginConfig(_config);
-        }
-        var source = MusicSource(clip);
-        Tip(source is null
-            ? Loc.T("把原视频的音乐按时间对齐配进去。这个片段没记原视频在哪（旧版本识别的），点右边选一个视频或音频文件")
-            : Loc.F("配上原视频的音乐（从第 {0:0.0} 秒起）：{1}\n视频没声音时用同文件夹里同名的音频", clip.Start, source));
-        if (music)
-        {
-            ImGui.SameLine();
-            if (ImGuiComponents.IconButton("##musicPick", FontAwesomeIcon.Music))
-                _dialog.OpenFileDialog(Loc.T("选音乐"), Loc.T("视频或音频") + "{.mp4,.mkv,.mov,.webm,.m4a,.mp3,.aac,.wav,.ogg,.opus,.flac}", (ok, paths) =>
-                {
-                    if (ok && paths.Count > 0) _musicOverride = (clip.Path, paths[0]);
-                }, 1, source is null ? _config.LastVideoDir : Path.GetDirectoryName(source));
-            Tip(Loc.T("换一个音乐文件（只对这个片段）"));
-        }
-        UiText.SameLineIfFits(UiText.IconButtonWidth(Loc.T("视频文件夹")));
-        if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.FolderOpen, Loc.T("视频文件夹")))
-        {
-            Directory.CreateDirectory(VideosFolder);
-            Dalamud.Utility.Util.OpenLink(VideosFolder);
-        }
-    }
-
-    /// <summary>临时测试（/spike/record）：载入片段、选角色，录到视频文件夹，返回结果或错误。</summary>
-    internal async Task<object> SpikeRecordAsync(IFramework framework, string clipPath, int actor, double fps, bool reshade)
-    {
-        var clip = Clip.Load(clipPath);
-        _player.Load(clip, actor);
-        await framework.DelayTicks(3);
-        var (id, size) = await framework.RunOnFrameworkThread(() => (ImGui.GetMainViewport().ID, ImGui.GetMainViewport().Size));
-        var path = Path.Combine(VideosFolder, $"spike_{DateTime.Now:yyyyMMdd_HHmmss}.mp4");
-        var clock = System.Diagnostics.Stopwatch.StartNew();
-        try
-        {
-            var result = await _recorder.RecordAsync(_main.Client, _player, path, fps, reshade, id, size);
-            return new { result.Path, result.Frames, result.Codec, seconds = clock.Elapsed.TotalSeconds, viewport = new[] { size.X, size.Y } };
-        }
-        catch (Exception ex)
-        {
-            return new { error = ex.ToString() };
-        }
-    }
-
-    private void StartRecording(Clip clip)
-    {
-        var viewport = ImGui.GetMainViewport();
-        var (viewportId, viewportSize) = (viewport.ID, viewport.Size);
-        var fps = _config.VideoRecordFps > 0 ? _config.VideoRecordFps : clip.Fps;
-        var reshade = _config.ShotReShade;
-        var music = _config.VideoMusic ? MusicSource(clip) : null;
-        var safe = string.Concat(clip.Name.Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c)).Trim();
-        var path = Path.Combine(VideosFolder, $"{(safe.Length > 0 ? safe : "clip")}_{DateTime.Now:yyyyMMdd_HHmmss}.mp4");
-        SetStatus(reshade ? Loc.T("录制中…（ReShade 兼容：插件窗口先藏起来，录完自动回来）") : Loc.T("录制中…"), Yellow);
-        Task.Run(async () =>
-        {
-            try
-            {
-                var result = await _recorder.RecordAsync(_main.Client, _player, path, fps, reshade, viewportId, viewportSize, music);
-                SetStatus(Loc.F("已录好 {0}（{1} 帧）", Path.GetFileName(result.Path), result.Frames)
-                          + (result.MusicSeconds > 0 ? Loc.T("，带音乐") : "")
-                          + (result.Codec == "H264" ? "" : Loc.T("；这台电脑没有 H.264 编码器，用的是 MPEG-4，个别播放器放不了"))
-                          + (string.IsNullOrEmpty(result.Warning) ? "" : "；" + result.Warning),
-                          string.IsNullOrEmpty(result.Warning) ? Green : Yellow);
-            }
-            catch (OperationCanceledException)
-            {
-                SetStatus(Loc.T("已取消录制"), Grey);
-            }
-            catch (Exception ex)
-            {
-                SetStatus(Loc.F("录制失败：{0}", ex.Message), Yellow);
-            }
-        });
-    }
-
     /// <summary>
     /// 表情权重（同主窗口的面部权重）：强度 × 分项（眼睑、眉毛、嘴部、下巴、视线）。下次识别按它算；
     /// 当前片段有识别原始数据时，松开滑条就按新权重重算（几秒）。
@@ -1052,7 +926,7 @@ public sealed partial class VideoWindow : Window, IDisposable
         ImGui.TreePop();
         if (!changed) return;
         _pi.SavePluginConfig(_config);
-        if (clip.RawPath is not null && _player.Actor is { } actor && _main.InGpose && !_recorder.Running)
+        if (clip.RawPath is not null && _player.Actor is { } actor && _main.InGpose)
             _ = Task.Run(() => RebuildAsync(clip, actor, Loc.T("已按新的表情权重重算")));
     }
 
@@ -1068,19 +942,26 @@ public sealed partial class VideoWindow : Window, IDisposable
         }
         var source = MusicSource(clip);
         Tip(source is null
-            ? Loc.T("播放时同步放原视频的音乐。这个片段没记原视频在哪（旧版本识别的），在下面「配音乐」旁边选一个视频或音频文件")
+            ? Loc.T("播放时同步放原视频的音乐。这个片段没记原视频在哪（旧版本识别的），点旁边的音符按钮选一个视频或音频文件")
             : Loc.F("播放时同步放原视频的音乐（按片段时间对齐，拖进度、循环、调速都跟着；调速时音调会跟着变）：{0}", source));
         if (!on) return;
+        ImGui.SameLine();
+        if (ImGuiComponents.IconButton("##musicPick", FontAwesomeIcon.Music))
+            _dialog.OpenFileDialog(Loc.T("选音乐"), Loc.T("视频或音频") + "{.mp4,.mkv,.mov,.webm,.m4a,.mp3,.aac,.wav,.ogg,.opus,.flac}", (ok, paths) =>
+            {
+                if (ok && paths.Count > 0) _musicOverride = (clip.Path, paths[0]);
+            }, 1, source is null ? _config.LastVideoDir : Path.GetDirectoryName(source));
+        Tip(Loc.T("换一个音乐文件（只对这个片段）"));
         ImGui.SameLine();
         var volume = _config.VideoMusicVolume;
         ImGui.SetNextItemWidth(90 * ImGuiHelpers.GlobalScale);
         if (ImGui.SliderFloat("##musicVolume", ref volume, 0f, 1.5f, Loc.T("音量 %.1f"))) _audio.Volume = _config.VideoMusicVolume = volume;
         if (ImGui.IsItemDeactivatedAfterEdit()) _pi.SavePluginConfig(_config);
-        if (source is null) ImGui.TextColored(Yellow, Loc.T("没找到原视频：在下面「配音乐」旁边的音符按钮选音乐文件"));
+        if (source is null) ImGui.TextColored(Yellow, Loc.T("没找到原视频：点「放音乐」旁边的音符按钮选音乐文件"));
         else if (_audio.Error is { } error) ImGui.TextColored(Yellow, Loc.F("放不了音乐：{0}", error));
     }
 
-    /// <summary>配音乐的来源：这个片段手动选过的文件，否则原视频（片段里记的完整路径，文件还在时）。</summary>
+    /// <summary>放音乐的来源：这个片段手动选过的文件，否则原视频（片段里记的完整路径，文件还在时）。</summary>
     private string? MusicSource(Clip clip)
     {
         if (_musicOverride is { } o && o.Clip == clip.Path && File.Exists(o.Path)) return o.Path;

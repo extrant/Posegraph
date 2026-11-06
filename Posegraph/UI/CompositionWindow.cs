@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Numerics;
+using System.Runtime.InteropServices;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface;
 using Dalamud.Interface.Components;
@@ -99,6 +100,7 @@ public sealed class CompositionWindow : Window
             if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Image, Loc.T("适配原图")))
             {
                 _config.FrameAspect = "photo";
+                _config.FramePhotoOrientation = 0;
                 _config.FrameShow = true;
                 changed = true;
             }
@@ -118,17 +120,25 @@ public sealed class CompositionWindow : Window
             }
             if (key == "photo") Tip(_photoSize() is { } s ? Loc.F("当前照片 {0}×{1}", s[0], s[1]) : Loc.T("主窗口还没有照片"));
         }
-        using (ImRaii.Disabled(_config.FrameAspect == "photo"))
+        if (_config.FrameAspect == "photo")
+        {
+            // 照片比例：默认跟照片的朝向；也可以强制横 / 竖（比例取倒数，照片两边或上下会被框裁掉一部分）
+            var orientation = Math.Clamp(_config.FramePhotoOrientation, 0, 2);
+            if (ImGui.RadioButton(Loc.T("按照片"), orientation == 0)) { _config.FramePhotoOrientation = 0; changed = true; }
+            Tip(Loc.T("横竖跟照片本身一样"));
+            ImGui.SameLine();
+            if (ImGui.RadioButton(Loc.T("横构图") + "##photoLandscape", orientation == 1)) { _config.FramePhotoOrientation = 1; changed = true; }
+            Tip(Loc.T("强制横构图：竖照片的比例倒过来用，照片上下会被裁掉一部分"));
+            ImGui.SameLine();
+            if (ImGui.RadioButton(Loc.T("竖构图") + "##photoPortrait", orientation == 2)) { _config.FramePhotoOrientation = 2; changed = true; }
+            Tip(Loc.T("强制竖构图：横照片的比例倒过来用，照片左右会被裁掉一部分"));
+        }
+        else
         {
             var portrait = _config.FramePortrait;
             if (ImGui.RadioButton(Loc.T("横构图"), !portrait)) { _config.FramePortrait = false; changed = true; }
             ImGui.SameLine();
             if (ImGui.RadioButton(Loc.T("竖构图"), portrait)) { _config.FramePortrait = true; changed = true; }
-            if (_config.FrameAspect == "photo")
-            {
-                ImGui.SameLine();
-                ImGui.TextDisabled(Loc.T("（照片比例按照片本身）"));
-            }
         }
 
         var dim = _config.FrameDim;
@@ -245,6 +255,22 @@ public sealed class CompositionWindow : Window
             _config.ScreenshotDir = dir;
             _pi.SavePluginConfig(_config);
         }
+        DrawPortrait();
+    }
+
+    /// <summary>复刻镜头选了顺旋 / 逆旋时提示一句：构图框、原图参考是躺着的，截图转回正的；可以改回普通。</summary>
+    private void DrawPortrait()
+    {
+        if (Rotation == 0) return;
+        ImGui.AlignTextToFramePadding();
+        ImGui.TextColored(Yellow, Rotation > 0 ? Loc.T("镜头顺旋 90°：构图框是躺着的，截图顺时针转回正") : Loc.T("镜头逆旋 90°：构图框是躺着的，截图逆时针转回正"));
+        ImGui.SameLine();
+        if (ImGui.SmallButton(Loc.T("改回普通")))
+        {
+            _config.CameraRotation = 0;
+            _pi.SavePluginConfig(_config);
+        }
+        Tip(Loc.T("只改构图框和截图；镜头要重新复刻（选普通）或自己转回来"));
     }
 
     /// <summary>截游戏画面（ImGui 绘制之前的那一帧），按构图框裁切后存 PNG。必须在绘制线程调用（读 ImGui 视口）。</summary>
@@ -264,6 +290,7 @@ public sealed class CompositionWindow : Window
             args.Uv1 = (frame.Min + frame.Size) / vp.Size;
         }
         var path = Path.Combine(ShotDir, $"Posegraph_{DateTime.Now:yyyyMMdd_HHmmss_fff}.png");
+        var rotation = Rotation;
         _shooting = true;
         SetStatus(Loc.T("截图中…"), Yellow);
         Task.Run(async () =>
@@ -272,11 +299,13 @@ public sealed class CompositionWindow : Window
             {
                 Directory.CreateDirectory(ShotDir);
                 using var texture = await _textures.CreateFromImGuiViewportAsync(args, "Posegraph screenshot");
+                using var rotated = rotation != 0 ? await RotateAsync(texture, rotation) : null;
+                var output = rotated ?? texture;
                 var encoder = _readback.GetSupportedImageEncoderInfos()
                     .FirstOrDefault(c => c.MimeTypes.Contains("image/png", StringComparer.OrdinalIgnoreCase))
                     ?? throw new InvalidOperationException(Loc.T("未找到 PNG 图像编码器"));
-                await _readback.SaveToFileAsync(texture, encoder.ContainerGuid, path, null, true);
-                SetStatus(Loc.F("已保存 {0}（{1}×{2}）", Path.GetFileName(path), texture.Width, texture.Height), Green);
+                await _readback.SaveToFileAsync(output, encoder.ContainerGuid, path, null, true);
+                SetStatus(Loc.F("已保存 {0}（{1}×{2}）", Path.GetFileName(path), output.Width, output.Height), Green);
             }
             catch (Exception ex)
             {
@@ -317,6 +346,7 @@ public sealed class CompositionWindow : Window
             crop = new TextureModificationArgs { Uv0 = frame.Min / vp.Size, Uv1 = (frame.Min + frame.Size) / vp.Size };
         }
         var path = Path.Combine(ShotDir, $"Posegraph_{DateTime.Now:yyyyMMdd_HHmmss_fff}.png");
+        var rotation = Rotation;
         var window = Process.GetCurrentProcess().MainWindowHandle;
         _shooting = true;
         HideUi = true;
@@ -335,7 +365,8 @@ public sealed class CompositionWindow : Window
                 Directory.CreateDirectory(ShotDir);
                 using var image = await _textures.CreateFromRawAsync(RawImageSpecification.Bgra32(shot.Width, shot.Height), shot.Pixels, "Posegraph screen shot");
                 using var cropped = crop is { } args ? await _textures.CreateFromExistingTextureAsync(image, args, true, "Posegraph screen crop") : null;
-                var output = cropped ?? image;
+                using var rotated = rotation != 0 ? await RotateAsync(cropped ?? image, rotation) : null;
+                var output = rotated ?? cropped ?? image;
                 var encoder = _readback.GetSupportedImageEncoderInfos()
                     .FirstOrDefault(c => c.MimeTypes.Contains("image/png", StringComparer.OrdinalIgnoreCase))
                     ?? throw new InvalidOperationException(Loc.T("未找到 PNG 图像编码器"));
@@ -355,15 +386,39 @@ public sealed class CompositionWindow : Window
         });
     }
 
-    /// <summary>构图框的宽高比（宽 / 高）；"照片" 但主窗口没有照片时按 3:2。</summary>
+    /// <summary>
+    /// 复刻镜头选的转向（MainWindow 的弹出菜单）：1 顺旋（游戏里人头朝左，截图顺时针转回正）、-1 逆旋、0 普通。
+    /// 构图框、原图参考跟着躺下来，截图转回正的。
+    /// </summary>
+    private int Rotation => Math.Sign(_config.CameraRotation);
+
+    /// <summary>构图框画在游戏画面上的宽高比：顺旋 / 逆旋时是逻辑比例的倒数（框躺下来）。</summary>
     public float Aspect()
     {
+        var a = LogicalAspect();
+        return Rotation != 0 ? 1 / a : a;
+    }
+
+    /// <summary>构图框的宽高比（宽 / 高，截图转正后的）；"照片" 但主窗口没有照片时按 3:2。</summary>
+    private float LogicalAspect()
+    {
         if (_config.FrameAspect == "photo")
-            return _photoSize() is [var w, var h, ..] && w > 0 && h > 0 ? (float)w / h : 1.5f;
+        {
+            var photo = PhotoAspect() ?? 1.5f;
+            return _config.FramePhotoOrientation switch
+            {
+                1 => MathF.Max(photo, 1 / photo),   // 强制横
+                2 => MathF.Min(photo, 1 / photo),   // 强制竖
+                _ => photo,
+            };
+        }
         var r = Ratios.FirstOrDefault(r => r.Key == _config.FrameAspect);
         var a = r.W > 0 ? r.W / r.H : 1.5f;
         return _config.FramePortrait ? 1f / a : a;
     }
+
+    /// <summary>照片的宽高比；主窗口没有照片时为 null。</summary>
+    private float? PhotoAspect() => _photoSize() is [var w, var h, ..] && w > 0 && h > 0 ? (float)w / h : null;
 
     /// <summary>构图框在游戏画面里的位置（相对视口左上角）：放得下的最大尺寸、居中。</summary>
     private (Vector2 Min, Vector2 Size) FrameRect(Vector2 viewport) => FitRect(viewport, Aspect());
@@ -374,13 +429,11 @@ public sealed class CompositionWindow : Window
         return ((viewport - size) / 2, size);
     }
 
-    /// <summary>别处要求暂时不画构图框（视频的 ReShade 兼容录制期间）。</summary>
-    public Func<bool> Suppressed { get; set; } = () => false;
 
     /// <summary>每帧画构图框（背景层，在所有窗口下面、游戏画面上面；截图时不会被截进去）。</summary>
     public void DrawOverlay()
     {
-        if (!_clientState.IsGPosing || HideUi || Suppressed()) return;
+        if (!_clientState.IsGPosing || HideUi) return;
         DrawPhotoOverlay();
         if (!_config.FrameShow) return;
         var vp = ImGui.GetMainViewport();
@@ -435,21 +488,36 @@ public sealed class CompositionWindow : Window
         if (_photoSize() is not [var w, var h, ..] || w <= 0 || h <= 0) return;
         var texture = _photoTexture();
         var bones = _config.FramePhotoSkeleton ? _photoSkeleton() : null;
-        var outline = _config.FrameShow && _config.FrameAspect != "photo";
+        var outline = _config.FrameShow && MathF.Abs(LogicalAspect() - (float)w / h) > 1e-3f;   // 框不是原图比例（含强制横 / 竖）时标出原图的边
         if ((_config.FramePhotoAlpha <= 0 || texture is null) && bones is null && !outline) return;
         var vp = ImGui.GetMainViewport();
-        var (min, size) = FitRect(vp.Size, (float)w / h);
+        var rotation = Rotation;
+        var (min, size) = FitRect(vp.Size, rotation != 0 ? (float)h / w : (float)w / h);
         min += vp.Pos;
         var max = min + size;
         var dl = ImGui.GetBackgroundDrawList(vp);
+        // 照片像素 (px, py) → 屏幕：顺旋时照片的上方朝左、逆旋时朝右
+        var scale = (rotation != 0 ? size.Y : size.X) / w;
+        Vector2 ToScreen(float px, float py) => min + rotation switch
+        {
+            > 0 => new Vector2(py, w - px) * scale,
+            < 0 => new Vector2(h - py, px) * scale,
+            _ => new Vector2(px, py) * scale,
+        };
         if (_config.FramePhotoAlpha > 0 && texture is not null)
-            dl.AddImage(texture.Handle, min, max, Vector2.Zero, Vector2.One, ImGui.GetColorU32(new Vector4(1, 1, 1, _config.FramePhotoAlpha)));
+        {
+            var tint = ImGui.GetColorU32(new Vector4(1, 1, 1, _config.FramePhotoAlpha));
+            if (rotation == 0)
+                dl.AddImage(texture.Handle, min, max, Vector2.Zero, Vector2.One, tint);
+            else   // 四个角按照片的四个角摆（左上、右上、右下、左下）
+                dl.AddImageQuad(texture.Handle, ToScreen(0, 0), ToScreen(w, 0), ToScreen(w, h), ToScreen(0, h),
+                                Vector2.Zero, new Vector2(1, 0), Vector2.One, new Vector2(0, 1), tint);
+        }
         var green = ImGui.GetColorU32(new Vector4(0.35f, 0.95f, 0.45f, 0.9f));
         if (bones is not null)
         {
-            var scale = size.X / w;
             foreach (var s in bones)
-                dl.AddLine(min + new Vector2(s.A[0], s.A[1]) * scale, min + new Vector2(s.B[0], s.B[1]) * scale, green, 2.5f);
+                dl.AddLine(ToScreen(s.A[0], s.A[1]), ToScreen(s.B[0], s.B[1]), green, 2.5f);
         }
         if (!outline) return;
         const float dash = 10f;
@@ -464,6 +532,23 @@ public sealed class CompositionWindow : Window
             dl.AddLine(new Vector2(max.X, y), new Vector2(max.X, Math.Min(y + dash, max.Y)), green, 1.5f);
         }
         dl.AddText(min + new Vector2(6, 4), green, Loc.T("原图"));
+    }
+
+    /// <summary>截图转 90°（顺旋 / 逆旋）：1 顺时针、-1 逆时针。读回像素在内存里转，再建一张新贴图（原贴图不关）。</summary>
+    private async Task<IDalamudTextureWrap> RotateAsync(IDalamudTextureWrap texture, int rotation)
+    {
+        var (spec, data) = await _readback.GetRawImageAsync(texture, default, true);
+        if (spec.BitsPerPixel != 32) throw new InvalidOperationException(Loc.F("截图格式不支持旋转：{0}", spec.DxgiFormat));
+        int w = spec.Width, h = spec.Height, pitch = spec.Pitch;
+        var output = new byte[w * h * 4];
+        var src = MemoryMarshal.Cast<byte, uint>(data.AsSpan());
+        var dst = MemoryMarshal.Cast<byte, uint>(output.AsSpan());
+        var srcStride = pitch / 4;
+        // 转完是 h 宽 × w 高。顺时针：目标 (x, y) ← 源 (y, h − 1 − x)；逆时针：← 源 (w − 1 − y, x)
+        for (var y = 0; y < w; y++)
+        for (var x = 0; x < h; x++)
+            dst[y * h + x] = rotation > 0 ? src[(h - 1 - x) * srcStride + y] : src[x * srcStride + (w - 1 - y)];
+        return await _textures.CreateFromRawAsync(new RawImageSpecification(h, w, h * 4, spec.DxgiFormat), output, "Posegraph rotated shot");
     }
 
     private void SetStatus(string text, Vector4 color) => (_status, _statusColor) = (text, color);

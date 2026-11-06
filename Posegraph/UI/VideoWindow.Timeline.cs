@@ -109,7 +109,7 @@ public sealed partial class VideoWindow
             }
         }
 
-        using var busy = ImRaii.Disabled(_editBusy || _rebuilding || _recorder.Running);
+        using var busy = ImRaii.Disabled(_editBusy || _rebuilding);
         DrawTrack(clip);
         DrawBrioBanner(clip);
         DrawEditButtons(clip);
@@ -440,7 +440,7 @@ public sealed partial class VideoWindow
     private void PollBrioEdits()
     {
         if (_player.Clip is not { RawPath: not null } clip || _player.Playing || _player.AppliedTime is not { } time
-            || _brioPolling || _editBusy || _rebuilding || _recorder.Running || !_main.InGpose) return;
+            || _brioPolling || _editBusy || _rebuilding || !_main.InGpose) return;
         if (_brioEdited is not null && Math.Abs(_brioTime - time) > 1e-6) _brioEdited = null;   // 换了帧：之前的改动已被冲掉
         if (DateTime.UtcNow - _brioPolledAt < BrioPollInterval) return;
         if (_editPerson >= clip.People.Length || ActorFor(_editPerson) is not { } actor) return;

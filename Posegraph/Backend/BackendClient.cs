@@ -46,11 +46,13 @@ public sealed partial class BackendClient(Func<int> port) : IDisposable
     /// <summary>hold：同一批后面还有图要识别，这张识别完后端先不按「立即释放」卸载模型（整批结束再 UnloadModelAsync）。
     /// parallel：批量队列的请求，后端可以共享模型并行识别（实验，见 BackendClient.Parallel.cs）。</summary>
     /// masks：合并模式的人物遮罩（标签 k + 1 为第 k 个框的人，见 MaskData），和图片一起用 multipart 发。</summary>
+    /// focalMm：指定照片的等效焦距（全画幅长边 36mm）；null 时后端用 EXIF 或深度模型估。</summary>
     public async Task<SessionInfo> CreateSessionAsync(byte[] image, string name, bool hold = false, bool parallel = false,
-                                                     string? boxes = null, MaskData? masks = null)
+                                                     string? boxes = null, MaskData? masks = null, double? focalMm = null)
     {
         var query = $"/sessions?name={Uri.EscapeDataString(name)}{(hold ? "&hold=true" : "")}{(parallel ? "&parallel=true" : "")}"
-                    + (boxes is null ? "" : "&boxes=" + Uri.EscapeDataString(boxes));
+                    + (boxes is null ? "" : "&boxes=" + Uri.EscapeDataString(boxes))
+                    + (focalMm is { } mm ? "&focal_mm=" + mm.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture) : "");
         HttpContent content;
         if (masks is null)
         {
@@ -172,9 +174,10 @@ public sealed partial class BackendClient(Func<int> port) : IDisposable
         return (await ReadAsync<BrioEditsResult>(resp))!;
     }
 
-    public async Task<CameraResult> CameraAsync(string sid, int person, RetargetParams p, int? actor, string? race, bool useAux = true)
+    /// <summary>复刻镜头。rotate：竖图横拍，1 照片的上方朝画面左边（顺时针转正）、-1 朝右边、0 不转。</summary>
+    public async Task<CameraResult> CameraAsync(string sid, int person, RetargetParams p, int? actor, string? race, bool useAux = true, int rotate = 0)
     {
-        using var resp = await _http.PostAsJsonAsync(Url($"/sessions/{sid}/camera"), new { person, @params = p, actor, race, use_aux = useAux }, Json);
+        using var resp = await _http.PostAsJsonAsync(Url($"/sessions/{sid}/camera"), new { person, @params = p, actor, race, use_aux = useAux, rotate }, Json);
         return (await ReadAsync<CameraResult>(resp))!;
     }
 

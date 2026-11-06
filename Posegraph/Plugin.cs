@@ -106,9 +106,6 @@ public sealed class Plugin : IDalamudPlugin
         _windows.AddWindow(_composition);
         _main.ToggleComposition = _composition.Toggle;
         _video = new VideoWindow(_config, pi, framework, textures, readback, gameGui, _main, brio, applier);
-        _composition.Suppressed = () => _video.HideUi;
-        VideoSpike.Record = body => _video.SpikeRecordAsync(framework, body.GetProperty("clip").GetString()!, body.GetProperty("actor").GetInt32(),
-                                                            body.GetProperty("fps").GetDouble(), body.GetProperty("reshade").GetBoolean());
         _windows.AddWindow(_video);
         _main.ToggleVideo = _video.Toggle;
         var idle = new Idle.IdleService(pi, data, framework, sigScanner, log);
@@ -250,7 +247,7 @@ public sealed class Plugin : IDalamudPlugin
     /// <summary>画所有窗口；ReShade 兼容截图期间不画（拷的是屏幕上的最终画面）。</summary>
     private void DrawWindows()
     {
-        if (_composition.HideUi || _video.HideUi) return;
+        if (_composition.HideUi) return;
         _windows.Draw();
         _auxMenu.DrawDialogs();
     }

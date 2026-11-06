@@ -282,13 +282,17 @@ def _session(sid: str) -> Session:
 
 @app.post("/sessions")
 async def create_session(request: Request, name: str = "image", hold: bool = False, parallel: bool = False,
-                         boxes: str | None = None, mask_width: int | None = None, mask_height: int | None = None) -> dict:
+                         boxes: str | None = None, mask_width: int | None = None, mask_height: int | None = None,
+                         focal_mm: float | None = None) -> dict:
     """hold：后面还有同一批的图要识别，这张识别完先不按「立即释放」卸载模型。
     parallel：插件批量队列的请求，可以共享一份模型并行识别（实验，见 parallel_batch.py）。
     boxes：合并模式里选中的人物框「x1,y1,x2,y2;…」（原图像素，通常来自 /detect）；会话里的人物按这个顺序。
     不给时整张图当一个人。
     请求体是图片；带人物遮罩时改用 multipart：image（图片）+ masks（标签图，见 masks.py，mask_width × mask_height），
-    标签 k + 1 为第 k 个框的人。"""
+    标签 k + 1 为第 k 个框的人。
+    focal_mm：用户指定的照片等效焦距（全画幅长边 36mm）；不给时用照片 EXIF 里的，再没有就让深度模型估。"""
+    if focal_mm is not None and not FOCAL_MM_RANGE[0] <= focal_mm <= FOCAL_MM_RANGE[1]:
+        raise HTTPException(400, tr("焦距要在 {low:.0f}～{high:.0f}mm 之间", low=FOCAL_MM_RANGE[0], high=FOCAL_MM_RANGE[1]))
     labels = None
     if request.headers.get("content-type", "").startswith("multipart/form-data"):
         form = await request.form()
@@ -306,7 +310,7 @@ async def create_session(request: Request, name: str = "image", hold: bool = Fal
     if not data:
         raise HTTPException(400, tr("请求体为空"))
     # 识别约几秒，放到线程池里跑，期间 /health 仍能响应
-    rgb, result = await run_in_threadpool(_estimate, data, hold, parallel, boxes, labels)
+    rgb, result, focal_source = await run_in_threadpool(_estimate, data, hold, parallel, boxes, labels, focal_mm)
     humans = []
     for h in result.humans:
         humans.append({"joint_global_rots": h.joint_global_rots, "joint_coords": h.joint_coords,
@@ -314,6 +318,7 @@ async def create_session(request: Request, name: str = "image", hold: bool = Fal
                        "keypoints_2d": h.keypoints_2d, "focal_length": h.focal_length, "cam_t": h.cam_t,
                        "bbox": h.bbox, "image_size": np.array(result.image_size),
                        "vertices": h.extra["vertices"], "rest_vertices": h.extra["rest_vertices"],
+                       "focal_source": focal_source,
                        **({"floor": h.extra["floor"]} if "floor" in h.extra else {})})
     humans = await run_in_threadpool(_refine_hands, rgb, humans)
     session = await run_in_threadpool(_add_session, name, result.image_size, _preview_png(rgb), humans, result.timings_ms["inference"])
@@ -328,8 +333,8 @@ async def create_session(request: Request, name: str = "image", hold: bool = Fal
 DEPTH_WORK_SIDE = 1024   # 深度、遮罩、网格投影在这么大的图上算（原图大时缩小，省时间）
 
 
-def _estimate_with_depth(rgb: np.ndarray, bboxes: np.ndarray, person_masks: np.ndarray | None):
-    """深度帮识别（见 depth.py）。镜头用深度模型的焦距；给了遮罩时按深度修遮罩，变化够大再识别一次；
+def _estimate_with_depth(rgb: np.ndarray, bboxes: np.ndarray, person_masks: np.ndarray | None, known_focal: float | None = None):
+    """深度帮识别（见 depth.py）。镜头用深度模型的焦距（known_focal 给了就用它，深度模型也按它定视角）；给了遮罩时按深度修遮罩，变化够大再识别一次；
     每个人整体缩放到照片深度对应的远近；找地面，结果记在每个人的 "floor"（法线 xyz、d、是否都在地上，相机系、SAM 尺度）。"""
     import cv2
 
@@ -340,11 +345,11 @@ def _estimate_with_depth(rgb: np.ndarray, bboxes: np.ndarray, person_masks: np.n
     size = (max(1, round(W * sc)), max(1, round(H * sc)))
     small = cv2.resize(rgb, size, interpolation=cv2.INTER_AREA) if sc < 1 else rgb
     try:
-        photo = depth.estimate(small, _estimator.active_device or "cpu")
+        photo = depth.estimate(small, _estimator.active_device or "cpu", None if known_focal is None else known_focal * sc)
     except Exception as ex:   # noqa: BLE001 —— 深度只是辅助：深度模型出问题时照常识别，不让整张图失败
         print(tr("深度图出错，这次不用深度：{error}", error=f"{type(ex).__name__}: {ex}"), file=sys.stderr, flush=True)
-        return _estimator.estimate(rgb, bboxes, person_masks)
-    focal = photo.focal / sc
+        return _estimator.estimate(rgb, bboxes, person_masks, focal=known_focal)
+    focal = photo.focal / sc if known_focal is None else known_focal
     faces = _estimator.faces()
     shrink = lambda m: np.stack([cv2.resize(x.astype(np.uint8), size, interpolation=cv2.INTER_NEAREST) for x in m]).astype(bool)
     meshes = lambda r: [(np.asarray(h.extra["vertices"]) + np.asarray(h.cam_t).reshape(1, 3)) * sc for h in r.humans]
@@ -395,9 +400,37 @@ def _add_session(name: str, image_size, preview_png: bytes, humans: list[dict], 
 
 
 def _session_info(s: Session, device: str | None) -> dict:
+    first = s.humans[0] if s.humans else {}
+    focal = float(np.ravel(first["focal_length"])[0]) if "focal_length" in first else None
     return {"sessionId": s.id, "name": s.name, "imageSize": list(s.image_size),
             "inferenceMs": round(s.inference_ms), "device": device,
-            "humans": [{"bbox": [round(float(v), 1) for v in h["bbox"]]} for h in s.humans]}
+            "humans": [{"bbox": [round(float(v), 1) for v in h["bbox"]]} for h in s.humans],
+            # 照片的等效焦距（全画幅，长边 36mm）和来源：manual 手动指定、exif 照片自带、auto 深度模型估 / 默认
+            "focalMm": None if focal is None else round(equivalent_mm(focal, s.image_size), 1),
+            "focalSource": str(first.get("focal_source", "auto"))}
+
+
+FULL_FRAME_LONG_MM = 36.0       # 等效焦距按全画幅长边 36mm 换算（和构图窗口的「等效焦距」一致）
+FULL_FRAME_DIAGONAL_MM = 43.27  # EXIF 的「35mm 等效焦距」按对角线换算
+FOCAL_MM_RANGE = (8.0, 800.0)
+
+
+def equivalent_mm(focal_px: float, size) -> float:
+    return FULL_FRAME_LONG_MM * focal_px / max(size)
+
+
+def _exif_focal_px(data: bytes, size) -> float | None:
+    """照片自带的焦距（EXIF 的 35mm 等效焦距，按对角线换成像素）；没有或读不了时 None。网上转存的图通常没有。"""
+    from PIL import Image
+
+    try:
+        mm = Image.open(io.BytesIO(data)).getexif().get_ifd(0x8769).get(41989)   # FocalLengthIn35mmFilm
+        mm = float(mm) if mm else 0.0
+    except Exception:  # noqa: BLE001
+        return None
+    if not FOCAL_MM_RANGE[0] <= mm <= FOCAL_MM_RANGE[1]:
+        return None
+    return mm * float(np.hypot(*size)) / FULL_FRAME_DIAGONAL_MM
 
 
 @app.get("/sessions/{sid}/archive")
@@ -441,9 +474,16 @@ def _parse_boxes(text: str, width: int, height: int) -> np.ndarray:
 
 
 def _estimate(data: bytes, hold: bool = False, parallel: bool = False, boxes: str | None = None,
-              labels: np.ndarray | None = None):
+              labels: np.ndarray | None = None, focal_mm: float | None = None):
+    """返回 (rgb, 识别结果, 焦距来源 manual / exif / auto)。"""
     global _last_used, _held
     rgb = _decode(data)
+    size = (rgb.shape[1], rgb.shape[0])
+    if focal_mm is not None:
+        known_focal, focal_source = focal_mm / FULL_FRAME_LONG_MM * max(size), "manual"
+    else:
+        known_focal = _exif_focal_px(data, size)
+        focal_source = "auto" if known_focal is None else "exif"
     bboxes = None if boxes is None else _parse_boxes(boxes, rgb.shape[1], rgb.shape[0])
     person_masks = None if labels is None else masks.per_person(labels, (rgb.shape[1], rgb.shape[0]), len(bboxes))
     with _model_lifecycle.inference():
@@ -451,7 +491,7 @@ def _estimate(data: bytes, hold: bool = False, parallel: bool = False, boxes: st
         with _model_lock:
             # 批量并行正在跑时，夹在中间的单张也交给共享模型，内存里不同时放两份模型；
             # 指定了人物框（合并模式）的请求只走串行（共享模型不接收框）
-            shared = bboxes is None and (_parallel.wanted(parallel) or not _parallel.close_if_idle())
+            shared = bboxes is None and known_focal is None and (_parallel.wanted(parallel) or not _parallel.close_if_idle())
             if shared:
                 _estimator.unload()
                 _held = _held or hold
@@ -472,9 +512,9 @@ def _estimate(data: bytes, hold: bool = False, parallel: bool = False, boxes: st
                     raise HTTPException(503, tr("模型加载失败：{error}", error=ex))
                 try:
                     if _use_depth and depth.available():
-                        result = _estimate_with_depth(rgb, bboxes, person_masks)
+                        result = _estimate_with_depth(rgb, bboxes, person_masks, known_focal)
                     else:
-                        result = _estimator.estimate(rgb, bboxes, person_masks)
+                        result = _estimator.estimate(rgb, bboxes, person_masks, focal=known_focal)
                 finally:
                     _last_used = time.monotonic()
                     _held = hold
@@ -482,7 +522,7 @@ def _estimate(data: bytes, hold: bool = False, parallel: bool = False, boxes: st
                         _estimator.unload()
     if not result.humans:
         raise HTTPException(422, tr("未检测到人物"))
-    return rgb, result
+    return rgb, result, focal_source
 
 
 @app.post("/detect")
@@ -938,13 +978,14 @@ class CameraRequest(BaseModel):
     actor: int | None = None
     race: str | None = None
     use_aux: bool = True
+    rotate: int = 0   # 顺旋 / 逆旋：1 照片的上方朝画面左边、-1 朝右边、0 不转（见 camera.rotate_target）
 
 
 @app.post("/sessions/{sid}/camera")
 def session_camera(sid: str, req: CameraRequest) -> dict:
     """需要 Posegraph 的 HTTP 服务在运行（插件会调用本接口，本接口再回调插件读写相机）。"""
     from .bridge import BridgeClient
-    from .camera import framing_error, photo_camera_in_world, solve_gpose_camera
+    from .camera import framing_error, photo_camera_in_world, rotate_target, solve_gpose_camera
 
     s = _session(sid)
     human, _ = _head_from_face(s, req.person, _human(s, req.person, req.use_aux), req.params)
@@ -958,10 +999,12 @@ def session_camera(sid: str, req: CameraRequest) -> dict:
     model = ref.raw["ModelAbsoluteValues"]
     vec = lambda v: np.array([float(x) for x in v.split(",")])
     target = photo_camera_in_world(human, rt, vec(model["Position"]), vec(model["Rotation"]), vec(model["Scale"]),
-                                   load_mhr_rest()[0])
+                                   load_mhr_rest()[0], root_rotation_deg=req.params.root_rotation)
+    rotate = int(np.sign(req.rotate))
+    target = rotate_target(target, rotate)
     log: list[str] = []
     result = solve_gpose_camera(client, target, log=log.append)
-    framing = framing_error(client, human, BrioPose.loads(client.get_pose(req.actor)), load_mhr_rest()[0])
+    framing = framing_error(client, human, BrioPose.loads(client.get_pose(req.actor)), load_mhr_rest()[0], rotate=rotate)
     return {"positionErrorCm": round(result["position_error_cm"], 1),
             "forwardErrorDeg": round(result["forward_error_deg"], 2),
             "fovDeg": round(result["fov_deg"], 1), "targetFovDeg": round(result["target_fov_deg"], 1),

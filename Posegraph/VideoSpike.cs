@@ -17,9 +17,6 @@ public sealed class VideoSpike(IFramework framework, IClientState clientState, I
 {
     private IGameObject? Actor(int? index) => index is { } i ? brio.GetActors().FirstOrDefault(a => a.ObjectIndex == i) : targetManager.GPoseTarget;
 
-    /// <summary>录制测试用：Plugin 接到视频窗口的 SpikeRecordAsync。</summary>
-    public static Func<JsonElement, Task<object>>? Record { get; set; }
-
     public async Task<object> PosesAsync(JsonElement body)
     {
         int? actorIndex = body.TryGetProperty("actor", out var a) ? a.GetInt32() : null;

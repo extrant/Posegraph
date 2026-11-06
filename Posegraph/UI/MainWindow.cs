@@ -631,7 +631,8 @@ public sealed partial class MainWindow : Window, IDisposable
 
     /// <summary>force：忽略缓存重新识别（「重新识别」按钮）。</summary>
     /// <summary>note：识别完成时附在状态后面的提示。</summary>
-    private void Recognize(string path, bool force = false, string? note = null)
+    /// <summary>focalMm：按这个等效焦距重新识别（复刻镜头旁边的焦距按钮）。</summary>
+    private void Recognize(string path, bool force = false, string? note = null, double? focalMm = null)
     {
         if (_recognizing)
         {
@@ -653,7 +654,7 @@ public sealed partial class MainWindow : Window, IDisposable
             {
                 await using var batch = Recognition.Batch();   // 主图和辅助视角只加载一次模型
                 var old = _session;
-                var (info, sha1) = await Recognition.OpenAsync(path, force);
+                var (info, sha1) = await Recognition.OpenAsync(path, force, focalMm);
                 var png = await _client.SessionImageAsync(info.SessionId);
                 var tex = await _textures.CreateFromImageAsync(png);
                 Interlocked.Exchange(ref _newTexture, tex)?.Dispose();
@@ -911,7 +912,8 @@ public sealed partial class MainWindow : Window, IDisposable
         });
     }
 
-    private void ReplicateCamera()
+    /// <summary>复刻镜头。rotate：0 普通、1 顺旋、-1 逆旋（记进配置，构图框、原图参考、截图跟着转）。</summary>
+    private void ReplicateCamera(int rotate)
     {
         if (_session is null) return;
         if (!_server.IsRunning)
@@ -919,11 +921,17 @@ public sealed partial class MainWindow : Window, IDisposable
             SetError(Loc.T("复刻镜头需要 Posegraph HTTP 服务（/posegraph on）"));
             return;
         }
+        if (_config.CameraRotation != rotate)
+        {
+            _config.CameraRotation = rotate;
+            _pi.SavePluginConfig(_config);
+        }
         SetStatus(Loc.T("复刻镜头中…"), Yellow);
         _ = Run(async () =>
         {
-            var r = await _client.CameraAsync(_session.SessionId, _person, _params.Clone(), _actor, _raceOverride ?? _detectedRace, _useAux);
-            SetStatus(Loc.F("镜头已复刻：机位误差 {0:0.0}cm，构图偏差 {1:0.0}%", r.PositionErrorCm, r.FramingErrorPct), Green);
+            var r = await _client.CameraAsync(_session.SessionId, _person, _params.Clone(), _actor, _raceOverride ?? _detectedRace, _useAux, rotate);
+            SetStatus(Loc.F("镜头已复刻：机位误差 {0:0.0}cm，构图偏差 {1:0.0}%", r.PositionErrorCm, r.FramingErrorPct)
+                      + (rotate > 0 ? Loc.T("（顺旋 90°）") : rotate < 0 ? Loc.T("（逆旋 90°）") : ""), Green);
         });
     }
 
@@ -1192,6 +1200,62 @@ public sealed partial class MainWindow : Window, IDisposable
         _fileDialog.Draw();
     }
 
+    private static readonly (double Mm, string Label)[] FocalChoices =
+        [(24, "24mm 广角"), (35, "35mm"), (50, "50mm 标准"), (85, "85mm 人像"), (135, "135mm 长焦")];
+
+    private float _customFocal = 50f;
+
+    /// <summary>
+    /// 照片焦距按钮（底部复刻镜头旁边）：显示这张图识别用的等效焦距（深度模型估的、照片 EXIF 里的或手动指定的），点开可以改。
+    /// 深度模型对贴脸特写、白底棚拍这类缺少透视线索的图会猜偏（常猜成广角），长焦也猜不出来；改了就按新焦距重新识别并覆盖缓存。
+    /// </summary>
+    private void DrawFocalButton()
+    {
+        var info = _mergeSession ? null : _session;
+        var label = info?.FocalMm is { } current ? $"{current:0}mm" : "--mm";
+        var source = info?.FocalSource switch
+        {
+            "manual" => Loc.T("手动指定"),
+            "exif" => Loc.T("照片 EXIF"),
+            _ => Loc.T("自动估计"),
+        };
+        var enabled = info is not null && _imagePath is not null && File.Exists(_imagePath) && !_recognizing;
+        using (ImRaii.Disabled(!enabled))
+        using (ImRaii.PushColor(ImGuiCol.Text, Yellow, info?.FocalSource == "manual"))
+            if (ImGui.Button(label + "##focal"))
+                ImGui.OpenPopup("##focalMenu");
+        if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
+            ImGui.SetTooltip(info is null
+                ? Loc.T("照片焦距（等效全画幅）：识别后显示，可以改")
+                : Loc.F("照片焦距 {0}（{1}）。人物看着变形、复刻的镜头太广角或太长焦时点开改，会按新焦距重新识别", label, source));
+        if (!ImGui.BeginPopup("##focalMenu")) return;
+        ImGui.TextDisabled(Loc.F("现在：{0}（{1}）", label, source));
+        if (ImGui.MenuItem(Loc.T("自动"), "", info?.FocalSource != "manual"))
+        {
+            Recognize(_imagePath!, true);
+            ImGui.CloseCurrentPopup();
+        }
+        if (ImGui.IsItemHovered()) ImGui.SetTooltip(Loc.T("照片带 EXIF 焦距就用它，否则让深度模型从画面估"));
+        foreach (var (mm, text) in FocalChoices)
+            if (ImGui.MenuItem(Loc.T(text), "", info?.FocalSource == "manual" && Math.Abs((info.FocalMm ?? 0) - mm) < 0.5))
+            {
+                Recognize(_imagePath!, focalMm: mm);
+                ImGui.CloseCurrentPopup();
+            }
+        ImGui.Separator();
+        ImGui.SetNextItemWidth(90 * ImGuiHelpers.GlobalScale);
+        ImGui.InputFloat("##customFocal", ref _customFocal, 0, 0, "%.0f mm");
+        _customFocal = Math.Clamp(_customFocal, 8f, 800f);
+        ImGui.SameLine();
+        if (ImGui.Button(Loc.T("用这个焦距")))
+        {
+            Recognize(_imagePath!, focalMm: _customFocal);
+            ImGui.CloseCurrentPopup();
+        }
+        ImGui.TextDisabled(Loc.T("贴脸特写、白底棚拍常被猜成广角；时装、人像大多是 50～135mm"));
+        ImGui.EndPopup();
+    }
+
     private void Tab(int index, string label, Action draw, float footer)
     {
         if (!ImGui.BeginTabItem(label, _selectTab == index ? ImGuiTabItemFlags.SetSelected : ImGuiTabItemFlags.None)) return;
@@ -1350,8 +1414,23 @@ public sealed partial class MainWindow : Window, IDisposable
         if (IconButton("##apply", FontAwesomeIcon.Play, Loc.T("应用到角色"), hasResult && _clientState.IsGPosing))
             ApplyNow();
         ImGui.SameLine();
-        if (IconButton("##camera", FontAwesomeIcon.Video, Loc.T("复刻照片镜头（会改动 GPose 相机）"), _session is not null && _clientState.IsGPosing))
-            ReplicateCamera();
+        if (IconButton("##camera", FontAwesomeIcon.Video, Loc.T("复刻照片镜头（会改动 GPose 相机）：普通 / 顺旋 / 逆旋"), _session is not null && _clientState.IsGPosing))
+            ImGui.OpenPopup("##cameraMenu");
+        if (ImGui.BeginPopup("##cameraMenu"))
+        {
+            var current = Math.Sign(_config.CameraRotation);
+            if (ImGui.MenuItem(Loc.T("普通"), "", current == 0)) ReplicateCamera(0);
+            if (ImGui.IsItemHovered()) ImGui.SetTooltip(Loc.T("按照片原样复刻"));
+            if (ImGui.MenuItem(Loc.T("顺旋"), "", current > 0)) ReplicateCamera(1);
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip(Loc.T("镜头侧倒 90°，游戏里人头朝左，竖照片能占满横屏；截图顺时针转回正的。\n" +
+                                       "拍竖图不用开 ReShade 竖屏模式，SSAO、景深照常"));
+            if (ImGui.MenuItem(Loc.T("逆旋"), "", current < 0)) ReplicateCamera(-1);
+            if (ImGui.IsItemHovered()) ImGui.SetTooltip(Loc.T("和顺旋反过来：游戏里人头朝右，截图逆时针转回正的"));
+            ImGui.EndPopup();
+        }
+        ImGui.SameLine();
+        DrawFocalButton();   // 照片焦距：复刻镜头的视角和远近按它来
         ImGui.SameLine();
         if (IconButton("##restore", FontAwesomeIcon.Undo, Loc.T("还原为第一次应用前的姿势"), _currentSignature is not null && _backups.ContainsKey(_currentSignature) && _clientState.IsGPosing))
             Restore();

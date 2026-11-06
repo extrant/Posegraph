@@ -56,13 +56,14 @@ public sealed partial class RecognitionService(ImageLibrary library, BackendClie
     /// <summary>识别失败的详细信息写进 Dalamud 日志（/xllog）：文件真实格式、后端报错、转码重试的经过（由 Plugin 接上）。</summary>
     public Action<string, Exception?>? Log { get; set; }
 
-    private async Task<SessionInfo> CreateAsync(byte[] bytes, string name, bool parallel = false, string? boxes = null, MaskData? masks = null)
+    private async Task<SessionInfo> CreateAsync(byte[] bytes, string name, bool parallel = false, string? boxes = null, MaskData? masks = null,
+                                                double? focalMm = null)
     {
         var hold = Volatile.Read(ref _batches) > 0;
         if (hold) Interlocked.Exchange(ref _held, 1);
         try
         {
-            return await client.CreateSessionAsync(bytes, name, hold, parallel, boxes, masks);
+            return await client.CreateSessionAsync(bytes, name, hold, parallel, boxes, masks, focalMm);
         }
         catch (BackendException ex) when (ex.StatusCode == 400 && !IsBoxError(ex))
         {
@@ -76,7 +77,7 @@ public sealed partial class RecognitionService(ImageLibrary library, BackendClie
             Log?.Invoke($"[识别] {name}：已用 Windows 解码转成 PNG（{png.Length} 字节），重试", null);
             try
             {
-                return await client.CreateSessionAsync(png, name, hold, parallel, boxes, masks);
+                return await client.CreateSessionAsync(png, name, hold, parallel, boxes, masks, focalMm);
             }
             catch (Exception retry)
             {
@@ -109,9 +110,13 @@ public sealed partial class RecognitionService(ImageLibrary library, BackendClie
 
     public RecognitionStatus? Status(string path) => _status.GetValueOrDefault(path);
 
-    /// <summary>打开一张图：有缓存就恢复，没有（或 force）就识别并写入缓存。返回会话与内容哈希。</summary>
-    public async Task<(SessionInfo Info, string Sha1)> OpenAsync(string path, bool force = false)
+    /// <summary>
+    /// 打开一张图：有缓存就恢复，没有（或 force）就识别并写入缓存。返回会话与内容哈希。
+    /// focalMm：按这个等效焦距重新识别（主窗口的焦距按钮；会忽略缓存并覆盖它，下次打开还是这个焦距）。
+    /// </summary>
+    public async Task<(SessionInfo Info, string Sha1)> OpenAsync(string path, bool force = false, double? focalMm = null)
     {
+        force |= focalMm is not null;
         var bytes = await File.ReadAllBytesAsync(path);
         var sha1 = library.RememberHash(path, bytes);
         var name = Path.GetFileNameWithoutExtension(path);
@@ -126,7 +131,7 @@ public sealed partial class RecognitionService(ImageLibrary library, BackendClie
                 library.DeleteCache(sha1);   // 缓存坏了或格式过时：重新识别
             }
         }
-        var info = await CreateAsync(bytes, name);
+        var info = await CreateAsync(bytes, name, focalMm: focalMm);
         try
         {
             library.WriteCache(sha1, await client.SessionArchiveAsync(info.SessionId));

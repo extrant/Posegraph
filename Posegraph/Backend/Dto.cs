@@ -58,7 +58,9 @@ public sealed class RetargetParams
 
 public sealed record HumanInfo(float[] Bbox);
 
-public sealed record SessionInfo(string SessionId, string Name, int[] ImageSize, int InferenceMs, string? Device, HumanInfo[] Humans);
+/// <summary>FocalMm：照片的等效焦距（全画幅长边 36mm）；FocalSource：manual 手动指定、exif 照片自带、auto 深度模型估（旧版后端为 null）。</summary>
+public sealed record SessionInfo(string SessionId, string Name, int[] ImageSize, int InferenceMs, string? Device, HumanInfo[] Humans,
+                                 double? FocalMm = null, string? FocalSource = null);
 
 /// <summary>合并模式：图里找到的一个人。Bbox 为原图像素 [x1, y1, x2, y2]；Source：photo（真人模型）/ anime（插画模型）。</summary>
 public sealed record DetectedPerson(float[] Bbox, float Score, string Source);

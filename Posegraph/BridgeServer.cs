@@ -13,7 +13,7 @@ namespace Posegraph;
 ///   GET  /pose?actor=N      取角色当前姿势（Brio pose JSON），N 为 ObjectIndex，省略则用 GPose 目标
 ///   POST /pose?actor=N      应用姿势，请求体为 Brio pose JSON；默认先冻结动画，freeze=0 可跳过
 ///   GET  /camera            读取 GPose 相机参数、视图/投影矩阵、帧号（判断相机停稳用），以及 GPose 目标的世界位置与朝向
-///   POST /camera            写入相机参数 {distance, angle[2], pan[2], roll, zoom, delimit}
+///   POST /camera            写入相机参数 {distance, angle[2], pan[2], roll, zoom, delimit, snap}（snap：跳过游戏的平滑过渡）
 /// </summary>
 public sealed class BridgeServer(IFramework framework, IClientState clientState, ITargetManager targetManager, BrioBridge brio, IPluginLog log) : IDisposable
 {
@@ -93,9 +93,6 @@ public sealed class BridgeServer(IFramework framework, IClientState clientState,
                     break;
                 case ("POST", "/camera"):
                     await HandleWriteCamera(ctx);
-                    break;
-                case ("POST", "/spike/record"):
-                    await WriteJson(ctx, 200, VideoSpike.Record is { } record ? await record(await ReadBody(ctx)) : new { error = "no hook" });
                     break;
                 case ("POST", "/spike/poses"):
                     await WriteJson(ctx, 200, await Spike.PosesAsync(await ReadBody(ctx)));
