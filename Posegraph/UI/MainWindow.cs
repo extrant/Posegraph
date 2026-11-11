@@ -82,6 +82,14 @@ public sealed partial class MainWindow : Window, IDisposable
     /// <summary>导出到 Blender（由 Plugin 接上，只有 Debug 版有；没接上时不显示按钮）：返回导出的文件夹，失败时抛异常（消息给用户看）。</summary>
     public Func<Task<string>>? ExportBlender { get; set; }
 
+    /// <summary>姿势编辑器（实验，只有 Debug 版接上）：开始 / 完成 / 取消 / 是否在编辑 / 提示。</summary>
+    public sealed record PoseEditorHooks(Func<int?, Task<string?>> Start, Action Finish, Action Cancel, Func<bool> Active, Action DrawPanel,
+                                         Func<Dictionary<string, float[]>?> Gaze);
+
+    public PoseEditorHooks? PoseEditor { get; set; }
+
+    private bool PoseEditing => PoseEditor?.Active() == true;
+
     private bool _exporting;
 
     /// <summary>识别后端客户端（视频窗口用）。</summary>
@@ -482,7 +490,7 @@ public sealed partial class MainWindow : Window, IDisposable
                    (ramOk ? "" : Loc.F("\n加载模型约需 {0:0.0} GB，当前不足", SystemProbe.RequiredRamMB / 1024f)));
 
         // 右侧：后端开关、模型加载/释放、设置
-        var right = ImGui.GetContentRegionMax().X - 3 * (ImGui.GetFrameHeight() + ImGui.GetStyle().ItemSpacing.X);
+        var right = ImGui.GetContentRegionMax().X - 4 * (ImGui.GetFrameHeight() + ImGui.GetStyle().ItemSpacing.X);
         ImGui.SetCursorPosX(Math.Max(ImGui.GetCursorPosX(), right));
         if (BackendOnline || _process.IsRunning)
         {
@@ -511,6 +519,10 @@ public sealed partial class MainWindow : Window, IDisposable
         }
         else if (IconButton("##load", FontAwesomeIcon.Download, Loc.T("预加载模型"), BackendOnline && _health?.Model.Loading != true))
             _ = Run(async () => { await _client.LoadModelAsync(); SetStatus(Loc.T("模型加载中…")); });
+        ImGui.SameLine();
+        using (ImRaii.PushColor(ImGuiCol.Text, Community.Heart))
+            if (IconButton("##support", FontAwesomeIcon.Heart, Loc.T("交流群与赞助（所有功能免费，赞助自愿）")))
+                ShowSupport?.Invoke();
         ImGui.SameLine();
         if (IconButton("##settings", FontAwesomeIcon.Cog, Loc.T("设置")))
             _selectTab = 4;
@@ -653,6 +665,7 @@ public sealed partial class MainWindow : Window, IDisposable
             try
             {
                 await using var batch = Recognition.Batch();   // 主图和辅助视角只加载一次模型
+                await SaveEditorEditsAsync();
                 var old = _session;
                 var (info, sha1) = await Recognition.OpenAsync(path, force, focalMm);
                 var png = await _client.SessionImageAsync(info.SessionId);
@@ -1103,6 +1116,12 @@ public sealed partial class MainWindow : Window, IDisposable
     /// <summary>打开更新日志窗口（由 Plugin 接上）。</summary>
     public Action? ShowChangelog { get; set; }
 
+    /// <summary>打开「支持 Posegraph」窗口（交流群、赞助；由 Plugin 接上）。</summary>
+    public Action? ShowSupport { get; set; }
+
+    /// <summary>打开姿势编辑器教程（由 Plugin 接上）；参数 true 表示第一次用，要按住 5 秒才能关。</summary>
+    public Action<bool>? ShowEditorTutorial { get; set; }
+
     /// <summary>打开 / 关闭角色列表（由 Plugin 接上）。</summary>
     public Action? ToggleSplit { get; set; }
 
@@ -1255,6 +1274,68 @@ public sealed partial class MainWindow : Window, IDisposable
         ImGui.TextDisabled(Loc.T("贴脸特写、白底棚拍常被猜成广角；时装、人像大多是 50～135mm"));
         ImGui.EndPopup();
     }
+
+    /// <summary>3D 页顶部：在游戏里编辑（实验）。编辑完的改动由「检测到在 Brio 里改了骨骼」提示条收进修正。</summary>
+    private void DrawPoseEditorBar()
+    {
+        if (PoseEditor is not { } editor) return;
+        if (_openEditorTutorial)
+        {
+            _openEditorTutorial = false;
+            ShowEditorTutorial?.Invoke(true);
+        }
+        if (!editor.Active())
+        {
+            using (ImRaii.Disabled(!_clientState.IsGPosing || _poseEditorStarting))
+                if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.HandPointer, Loc.T("在游戏里编辑")))
+                {
+                    _poseEditorStarting = true;
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            var error = await editor.Start(_actor);
+                            if (error is not null) SetError(error);
+                            else
+                            {
+                                SetStatus(Loc.T("拖角色身上的圆点改姿势；改完点「完成」"), Green);
+                                // 第一次用：弹出教程（按住 5 秒才能关）；窗口在界面线程里打开
+                                if (!_config.EditorTutorialSeen) _openEditorTutorial = true;
+                            }
+                        }
+                        finally
+                        {
+                            _poseEditorStarting = false;
+                        }
+                    });
+                }
+            if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
+                ImGui.SetTooltip(_clientState.IsGPosing
+                    ? Loc.T("在 GPose 里直接拖角色身上的控制点摆姿势（全身关键节点，支持 G / R 和 XYZ 锁轴）。改完会提示收进这张图的修正")
+                    : Loc.T("进 GPose 后才能在游戏里编辑"));
+            ImGui.SameLine();
+            if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.BookOpen, Loc.T("教程"))) ShowEditorTutorial?.Invoke(false);
+            ImGui.Separator();
+            return;
+        }
+        if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Check, Loc.T("完成")))
+        {
+            // 完成就直接存进这张图的修正（朝向、整个人的位置、视线），不用再点提示条
+            editor.Finish();
+            _editorEdited = true;
+            _ = Run(SaveEditorEditsAsync);
+        }
+        ImGui.SameLine();
+        if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Undo, Loc.T("取消")))
+            editor.Cancel();
+        ImGui.SameLine();
+        if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.BookOpen, Loc.T("教程"))) ShowEditorTutorial?.Invoke(false);
+        editor.DrawPanel();
+        ImGui.Separator();
+    }
+
+    private volatile bool _poseEditorStarting;
+    private volatile bool _openEditorTutorial;
 
     private void Tab(int index, string label, Action draw, float footer)
     {
@@ -1769,6 +1850,7 @@ public sealed partial class MainWindow : Window, IDisposable
 
     private void DrawStickTab()
     {
+        DrawPoseEditorBar();
         if (_result?.Stick is not { } stick)
         {
             ImGui.TextDisabled(Loc.T("识别后在这里查看 FF14 骨架（拖动旋转、滚轮缩放、点选关节微调）"));
@@ -2344,6 +2426,8 @@ public sealed partial class MainWindow : Window, IDisposable
 
         if (changed) _pi.SavePluginConfig(_config);
 
+        DrawAboutSection();
+
         if (ImGui.CollapsingHeader(Loc.T("后端日志")))
         {
             if (ImGui.SmallButton(Loc.T("复制日志")))
@@ -2353,6 +2437,24 @@ public sealed partial class MainWindow : Window, IDisposable
                 ImGui.TextUnformatted(line);
             if (ImGui.GetScrollY() >= ImGui.GetScrollMaxY()) ImGui.SetScrollHereY(1);
         }
+    }
+
+    /// <summary>设置页「关于与支持」：交流群、赞助、项目主页。</summary>
+    private void DrawAboutSection()
+    {
+        ImGui.Separator();
+        ImGui.TextDisabled(Loc.T("关于与支持"));
+        Wrapped(Loc.T("Posegraph 所有功能都免费，赞助纯属自愿。有问题、想要新功能，欢迎来交流群。"), Grey);
+        Community.LinkButton(FontAwesomeIcon.Users, Loc.T("QQ 群"), Community.QqGroup, Community.QqColor);
+        UiText.SameLineIfFits(UiText.IconButtonWidth("Discord"));
+        Community.LinkButton(FontAwesomeIcon.Comments, "Discord", Community.Discord, Community.DiscordColor);
+        UiText.SameLineIfFits(UiText.IconButtonWidth(Loc.T("爱发电")));
+        Community.LinkButton(FontAwesomeIcon.Heart, Loc.T("爱发电"), Community.Afdian, Community.AfdianColor);
+        UiText.SameLineIfFits(UiText.IconButtonWidth(Loc.T("微信赞赏码")));
+        if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Qrcode, Loc.T("微信赞赏码"))) ShowSupport?.Invoke();
+        UiText.SameLineIfFits(UiText.IconButtonWidth("GitHub"));
+        Community.LinkButton(FontAwesomeIcon.Code, "GitHub", Community.GitHub, new Vector4(0.30f, 0.33f, 0.38f, 1));
+        ImGui.Spacing();
     }
 
     private static void Fit(string text, Vector4 color) => UiText.Fit(text, color);

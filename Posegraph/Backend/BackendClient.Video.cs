@@ -114,6 +114,14 @@ public sealed partial class BackendClient
         return await resp.Content.ReadAsByteArrayAsync();
     }
 
+    /// <summary>舞蹈模组的音乐：path 从 start 到 end 秒（原视频时间，start 为负时前面补静音）按音量编码成 Ogg Vorbis。</summary>
+    public async Task<byte[]> AudioOggAsync(string path, double start, double end, float volume)
+    {
+        using var resp = await _http.PostAsJsonAsync(Url("/audio/ogg"), new { path, start, end, speed = 1f, volume }, Json);
+        await EnsureSuccessAsync(resp);
+        return await resp.Content.ReadAsByteArrayAsync();
+    }
+
     /// <summary>开始录制：后端把之后送来的逐帧画面编码成 path（mp4，宽高会裁成偶数）。</summary>
     /// <param name="music">配音乐：原视频（或音频）文件的完整路径，null 不配；没有音轨时后端找同名的音频文件。</param>
     /// <param name="musicStart">音乐从原视频的第几秒起（片段的起点）。</param>

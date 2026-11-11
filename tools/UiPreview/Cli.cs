@@ -45,6 +45,7 @@ public static class Cli
         Tutorial.Register(Scenes.All);
         MergeScenes.Register(Scenes.All);
         IdleDemo.Register(Scenes.All);
+        EditorScenes.Register(Scenes.All);
         var app = new App(host, lang, demo);
         foreach (var name in scenes.SelectMany(s => s == "all" ? Scenes.All.Keys.Where(k => !k.StartsWith("bench-")).ToList() : [s]))
         {

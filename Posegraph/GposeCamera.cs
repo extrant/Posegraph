@@ -64,6 +64,21 @@ public static unsafe class GposeCamera
         return Matrix4x4.Invert(view, out var world) ? new Vector3(world.M41, world.M42, world.M43) : null;
     }
 
+    /// <summary>
+    /// 镜头的视图 × 投影矩阵（世界 → 裁剪空间，行向量约定）；不在 GPose 时为 null。
+    /// 和 Brio 画骨骼时一样用镜头自己的矩阵：Dalamud 的 IGameGui.WorldToScreen 用的是带抗锯齿抖动的那份，画出来的点每帧晃一点。
+    /// </summary>
+    public static Matrix4x4? ViewProjection()
+    {
+        var cam = Active;
+        if (cam == null) return null;
+        var render = cam->Camera.CameraBase.SceneCamera.RenderCamera;
+        if (render == null) return null;
+        var view = cam->Camera.CameraBase.SceneCamera.ViewMatrix;
+        view.M44 = 1;
+        return view * render->ProjectionMatrix;
+    }
+
     /// <summary>当前的垂直视角（弧度，按投影矩阵）、画面宽高比和 Zoom；不在 GPose 时为 null。</summary>
     public static (float FovY, float Aspect, float Zoom)? Projection()
     {

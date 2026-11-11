@@ -49,6 +49,24 @@ public sealed class PapFile
         return ms.ToArray();
     }
 
+    /// <summary>第 i 个动画的名字（动画表每项 40 字节，前 32 字节是名字）。</summary>
+    public string AnimationName(int i)
+    {
+        var raw = InfoBytes.AsSpan(i * 40, 32);
+        var end = raw.IndexOf((byte)0);
+        return System.Text.Encoding.ASCII.GetString(end < 0 ? raw : raw[..end]);
+    }
+
+    /// <summary>改第 i 个动画的名字（最多 31 个字符）。</summary>
+    public void RenameAnimation(int i, string name)
+    {
+        var bytes = System.Text.Encoding.ASCII.GetBytes(name);
+        if (bytes.Length > 31) throw new ArgumentException("animation name too long", nameof(name));
+        var span = InfoBytes.AsSpan(i * 40, 32);
+        span.Clear();
+        bytes.CopyTo(span);
+    }
+
     /// <summary>.sklb 里的 Havok 数据（骨架）。文件头版本 0x3132 用 16 位偏移，更新的版本用 32 位。</summary>
     public static byte[] SklbHavok(byte[] data)
     {

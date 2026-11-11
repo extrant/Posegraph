@@ -1,7 +1,7 @@
-<Project Sdk="Dalamud.NET.SDK/15.0.0">
+﻿<Project Sdk="Dalamud.NET.SDK/15.0.0">
 
 	<PropertyGroup>
-		<Version>0.7.7.0</Version>
+		<Version>0.8.0.0</Version>
 		<Nullable>enable</Nullable>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 		<ImplicitUsings>enable</ImplicitUsings>
@@ -27,14 +27,23 @@
 	<ItemGroup>
 		<EmbeddedResource Include="Changelog\changelog.json" LogicalName="Posegraph.Changelog.changelog.json" />
 		<EmbeddedResource Include="Changelog\banner.png" LogicalName="Posegraph.Changelog.banner.png" />
+		<EmbeddedResource Include="Support\wechat.jpg" LogicalName="Posegraph.Support.wechat.jpg" />
 	</ItemGroup>
 
-	<!-- 导出到 Blender 还在试，只编进 Debug 版；发布的 Release 版不带 -->
+	<!-- Debug 版也开优化：姿势编辑器的手部吸附是纯计算，不开优化在游戏里慢好几倍 -->
+	<PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+		<Optimize>true</Optimize>
+	</PropertyGroup>
+
+	<!-- 导出到 Blender、导出舞蹈 mod 还在试，只编进 Debug 版；发布的 Release 版不带 -->
 	<ItemGroup Condition="'$(Configuration)' == 'Debug'">
 		<EmbeddedResource Include="Export\posegraph_blender.py" LogicalName="Posegraph.Export.posegraph_blender.py" />
 	</ItemGroup>
 	<ItemGroup Condition="'$(Configuration)' != 'Debug'">
 		<Compile Remove="Export\**" />
+		<!-- 导出舞蹈 mod 还在试，也只编进 Debug 版 -->
+		<Compile Remove="Dance\**" />
+		<Compile Remove="UI\DanceWindow.cs" />
 	</ItemGroup>
 
 </Project>

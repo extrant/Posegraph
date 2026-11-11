@@ -56,6 +56,8 @@ public sealed partial class VideoWindow : Window, IDisposable
     private DateTime _nextBodyCheck;
     private string? _skipBody;
     private readonly ClipAudio _audio;
+    /// <summary>「导出舞蹈 mod…」：片段 + 音乐来源（没有为 null）。</summary>
+    public Action<Clip, string?>? ExportDance { get; set; }
     private (string? Clip, string Path)? _musicOverride;   // 放音乐：某个片段手动选的音乐文件            // 这个体型重算失败过，不再自动重试（换了体型再试）
 
     public VideoWindow(Configuration config, IDalamudPluginInterface pi, IFramework framework, ITextureProvider textures,
@@ -710,6 +712,12 @@ public sealed partial class VideoWindow : Window, IDisposable
                                                 Loc.F("Posegraph 视频片段 {0} 第 {1:0.00} 秒", clip.Name, _player.Time));
                 SetStatus(Loc.F("已存到 {0}", path), Green);
             }
+        if (ExportDance is not null)
+        {
+            UiText.SameLineIfFits(UiText.IconButtonWidth(Loc.T("导出舞蹈 mod…")));
+            if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Music, Loc.T("导出舞蹈 mod…"))) ExportDance(clip, MusicSource(clip));
+            Tip(Loc.T("把这个片段换进游戏的一个循环舞蹈表情（可带音乐），存成 Penumbra 模组"));
+        }
         UiText.SameLineIfFits(UiText.IconButtonWidth(Loc.T("片段文件夹")));
         if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.FolderOpen, Loc.T("片段文件夹")))
         {

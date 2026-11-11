@@ -26,6 +26,7 @@ public sealed class BrioDirectPose
     private Type? _poseFileType;
     private Type? _idType;
     private object? _options;
+    private object? _rotationOptions;   // 同 _options，但只导入旋转
     private bool _resolved;
     private readonly System.Runtime.CompilerServices.ConditionalWeakTable<HashSet<string>, Delegate> _predicates = new();   // 多人同场：每人一组骨骼
 
@@ -36,14 +37,17 @@ public sealed class BrioDirectPose
     public void Invalidate() => _resolved = false;
 
     /// <summary>套姿势：true 已排进这一帧的骨骼更新，false 上一次还没执行（这一帧先不套），null 用不了（改走 IPC）。
-    /// bones：这份姿势里的骨骼名（套之前清它们的旧增量）。</summary>
-    public bool? Apply(IGameObject actor, string poseJson, HashSet<string> bones)
+    /// bones：这份姿势里的骨骼名（套之前清它们的旧增量）。
+    /// rotationOnly：只套旋转（姿势编辑器用）——位置由父骨骼转动带着走，骨长保持游戏里的实际值（体型、Customize+ 都不受影响）。
+    /// fullPoseJson：另一份连位置一起套的姿势（编辑器平移整个人时的根骨骼），先于 poseJson 套；两份里的骨骼不要重复。</summary>
+    public bool? Apply(IGameObject actor, string poseJson, HashSet<string> bones, bool rotationOnly = false, string? fullPoseJson = null)
     {
         try
         {
             if (!_resolved) Resolve();
+            var options = rotationOnly ? _rotationOptions ?? _options : _options;
             if (_skeletonOf is null || _poseInfo is null || _pending is null || _clear is null || _import is null || _poseFileType is null
-                || _idType is null || _options is null)
+                || _idType is null || options is null)
             {
                 Problem ??= "Brio internals not found";
                 return null;
@@ -56,8 +60,16 @@ public sealed class BrioDirectPose
             if (_pending.GetValue(skeleton) is true) return false;
             if (_deserialize?.Invoke(null, [poseJson]) is not { } pose) return null;
             _sanitize?.Invoke(pose, null);
+            object? full = null;
+            if (fullPoseJson is not null)
+            {
+                if (_deserialize.Invoke(null, [fullPoseJson]) is not { } parsed) return null;
+                _sanitize?.Invoke(parsed, null);
+                full = parsed;
+            }
             if (_poseInfo.GetValue(skeleton) is { } poseInfo) _clear.Invoke(poseInfo, [Predicate(bones)]);
-            _import.Invoke(skeleton, [pose, _options, false]);
+            if (full is not null) _import.Invoke(skeleton, [full, _options, false]);
+            _import.Invoke(skeleton, [pose, options, false]);
             return true;
         }
         catch (Exception ex)
@@ -112,6 +124,20 @@ public sealed class BrioDirectPose
             return;
         }
         _options = serviceType.GetProperty("DefaultIPCImporterOptions")?.GetValue(posing[0]);
+        _rotationOptions = null;
+        try
+        {
+            // new PoseImporterOptions(同一个骨骼过滤, TransformComponents.Rotation, applyModelTransform: false)
+            var optionsType = asm.GetType("Brio.Game.Posing.PoseImporterOptions");
+            var componentsType = asm.GetType("Brio.Core.TransformComponents");
+            var filter = optionsType?.GetProperty("BoneFilter")?.GetValue(_options);
+            if (optionsType is not null && componentsType is not null && filter is not null)
+                _rotationOptions = Activator.CreateInstance(optionsType, filter, Enum.Parse(componentsType, "Rotation"), false);
+        }
+        catch (Exception)
+        {
+            _rotationOptions = null;   // 构造不出来就退回全部导入
+        }
         var newId = entityIdType.GetConstructor([typeof(IGameObject)]);
         var tryGetEntity = managerType.GetMethod("TryGetEntity", [entityIdType, entityType.MakeByRefType()]);
         var tryGetCapability = entityType.GetMethods().FirstOrDefault(m => m.Name == "TryGetCapability" && m.IsGenericMethodDefinition && m.GetParameters().Length == 3)

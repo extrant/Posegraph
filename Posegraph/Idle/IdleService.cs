@@ -154,7 +154,8 @@ public sealed class IdleService
         return IdleBaker.Bake(pap, sklb, pose, asStart, place, breath, _tempDir, vtbl, frame0);
     }
 
-    private unsafe nint Vtable()
+    /// <summary>游戏的非压缩交错动画虚表（舞蹈导出也用）；找不到为 0。</summary>
+    internal unsafe nint Vtable()
     {
         if (_vtbl != 0) return _vtbl;
         try

@@ -43,6 +43,23 @@ public static class UiText
         if (shown != text && ImGui.IsItemHovered()) ImGui.SetTooltip(text);
     }
 
+    /// <summary>
+    /// 中文段落换行用：去掉中文和英文 / 数字之间的空格。ImGui 只在空格处折行，中文句子里夹一个空格时，
+    /// 空格后面那一长串会整段挪到下一行（上一行留一大截空白）；去掉后整段按字折行。
+    /// </summary>
+    public static string CjkWrap(string text)
+    {
+        static bool Cjk(char c) => c is >= '\u2E80' and <= '\u9FFF' or >= '\uFF00' and <= '\uFFEF' or >= '\u3000' and <= '\u303F';
+        if (!text.Any(Cjk)) return text;
+        var sb = new System.Text.StringBuilder(text.Length);
+        for (var i = 0; i < text.Length; i++)
+        {
+            if (text[i] == ' ' && i > 0 && i < text.Length - 1 && (Cjk(text[i - 1]) || Cjk(text[i + 1]))) continue;
+            sb.Append(text[i]);
+        }
+        return sb.ToString();
+    }
+
     /// <summary>下一个控件（宽 width）在这一行放得下就接在后面，否则换行。在上一个控件之后调用（窗口窄、英文更长时不会被裁掉）。</summary>
     public static void SameLineIfFits(float width)
     {

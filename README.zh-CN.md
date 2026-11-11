@@ -6,6 +6,8 @@
 
 **第一次用？先看[图文教程](docs/tutorial/README.zh-CN.md)。**
 
+交流：[QQ 群「Posegraph交流」](https://qm.qq.com/q/TGuxNR7auq) · [Discord](https://discord.gg/2z6KdPgacj)　｜　赞助：[爱发电](https://afdian.com/a/Sincraft0515) · [微信赞赏码](#交流与赞助)（所有功能都免费，赞助纯属自愿）
+
 <p>
   <img src="docs/tutorial/images/ingame-wall.jpg" alt="倚墙" width="49%">
   <img src="docs/tutorial/images/ingame-kalaripayattu.jpg" alt="武术腾空" width="49%">
@@ -44,6 +46,10 @@ Posegraph 插件（游戏内 ImGui）  ── HTTP（127.0.0.1）──►  Pose
 - **构图与截图**：构图框、参考线、等效全画幅焦距、叠原图对照，一键截游戏渲染原图。
 - **视频动作（测试）**：逐帧识别视频里的动作、表情和原视频镜头的运动，在 GPose 里播放（跟拍或在场景里走动、多种机位）；多人同场；时间轴修正（Brio 里改骨骼收成关键帧、复制粘贴到别的帧）；同步放原视频的音乐。
 - **转换为 idle**：图库右键把图片姿势做成站着、坐着、打盹时循环的待机动作（选 /cpose 槽位和种族），保留原版的呼吸起伏，存成 Penumbra 模组。
+- **在游戏里摆姿势**：3D 页「在游戏里编辑」，GPose 里直接拖角色身上的控制点——手脚 IK、肘膝朝向、腰胸头转向、手指、视线；
+  G 移动 / R 旋转，X / Y / Z 锁轴（全局或骨骼自身的轴，画方向提示），旋转显示扇形和度数、移动显示厘米，面板里能看和输入 X / Y / Z 角度；
+  钉住、镜像、对称编辑、撤销重做。改完存进这张图的修正。第一次用会弹出图文教程。
+- **手部吸附**：拖手靠近身体（自己或别人）时手掌贴上去、手指顺着表面弯；「贴到部位」（实验）在你粗摆的基础上把手贴到点的地方。
 - **导出** Brio `.pose` 文件。
 - **对低显存友好**：自动 / GPU / CPU 三档，默认识别后立即释放模型；CPU 模式完全不占显存。
 - **中英文界面**，默认跟随游戏客户端语言。
@@ -103,6 +109,12 @@ Posegraph 不在 Dalamud 官方仓库里，从自定义仓库安装：
 4. 看「图像」页叠加层（绿 = 识别骨架，橙 = FF14 骨架）和「3D」页。
 5. 在「调整」页微调，看「提示」页，然后点 **应用**（▶）。相机按钮复刻照片镜头，↶ 还原第一次应用前的姿势，
    磁盘按钮导出 `.pose` 或存到 Brio 姿势库。
+
+### 在游戏里编辑
+
+GPose 里打开 3D 页点「在游戏里编辑」，角色身上出现控制点：单击选中，直接拖是自由模式；选中后按 G 移动、R 旋转，
+按 X / Y / Z 锁轴（第一次是角色的左右 / 上下 / 前后，再按一次是骨骼自身的轴，第三次取消），可直接输入数字。
+P 钉住、M 镜像、Ctrl+Z / Ctrl+Y 撤销重做。点「完成」存进这张图的修正。完整说明见插件里的「教程」。
 
 ### 图库
 
@@ -207,6 +219,19 @@ powershell -ExecutionPolicy Bypass -File packaging\build_backend_package.ps1 `
 `GET|POST /pose?actor=N`、`GET|POST /camera`。后端（127.0.0.1:42430）提供 `GET /health`、`POST /sessions`、
 `GET /sessions/{id}/image`、`POST /sessions/{id}/retarget`、`POST /sessions/{id}/camera`、`POST /model/load|unload|config`、
 `GET /races`、`GET /presets`、`POST /shutdown`。两者都只监听本机。
+
+## 交流与赞助
+
+Posegraph 所有功能都免费，赞助纯属自愿。有问题、想要新功能，欢迎来交流群。
+
+- QQ 群「Posegraph交流」：<https://qm.qq.com/q/TGuxNR7auq>
+- Discord：<https://discord.gg/2z6KdPgacj>
+- 爱发电：<https://afdian.com/a/Sincraft0515>
+- 微信赞赏码：
+
+<img src="docs/images/wechat-sponsor.jpg" alt="微信赞赏码" width="240">
+
+插件里也能找到这些：主窗口工具栏的爱心、设置页「关于与支持」。
 
 ## 许可证
 

@@ -28,6 +28,8 @@ public sealed class RetargetParams
     [JsonPropertyName("face_gains")] public Dictionary<string, float> FaceGains { get; set; } = new();
     /// <summary>头部朝向跟面捕的脸走多少（0 = 只用识别的头，1 = 完全按脸）；不开表情也生效。</summary>
     [JsonPropertyName("face_head")] public float FaceHead { get; set; } = 0.5f;
+    /// <summary>姿势编辑器里拖的视线：眼球骨骼（j_f_eye_l/r）相对头部 j_kao 的旋转（四元数 xyzw）；有值时盖过表情里的视线。</summary>
+    [JsonPropertyName("gaze")] public Dictionary<string, float[]> Gaze { get; set; } = new();
 
     public float FaceGain(string group) => FaceGains.TryGetValue(group, out var v) ? v : 1f;
 
@@ -41,6 +43,7 @@ public sealed class RetargetParams
         Upright = Upright, UprightMaxDeg = UprightMaxDeg, Ground = Ground, FlatFeet = FlatFeet, HelperStrength = HelperStrength,
         RootRotation = (float[])RootRotation.Clone(), RootOffset = (float[])RootOffset.Clone(),
         Face = Face, FaceStrength = FaceStrength, FaceGains = new(FaceGains), FaceHead = FaceHead,
+        Gaze = Gaze.ToDictionary(kv => kv.Key, kv => (float[])kv.Value.Clone()),
     };
 
     public static RetargetParams Preset(string name)
@@ -136,7 +139,8 @@ public sealed record RetargetResult(
     float? HeadFromFaceDeg = null); // 头部按面捕的脸修正时，脸和识别的头差多少度（没用上为 null）
 
 /// <summary>Brio 改动换成的关节偏移：Offsets 是完整的新偏移（替换原来的），Changed 改了哪些骨骼，ResidualDeg 收完后还差的最大角度。</summary>
-public sealed record BrioEditsResult(Dictionary<string, float[]> Offsets, string[] Changed, float ResidualDeg);
+/// <summary>RootOffset：收完之后的整体位移（整个人被挪过时会变；旧后端没有这个字段）。</summary>
+public sealed record BrioEditsResult(Dictionary<string, float[]> Offsets, string[] Changed, float ResidualDeg, float[]? RootOffset = null);
 
 /// <summary>套用照片表情的结果：用的面部骨架、各表情通道的权重；没套上时 Reason 说明原因，NeedsDump 为要先导出游戏表情数据。</summary>
 public sealed record FacePoseInfo(bool Applied, bool NeedsDump, string Reason, string? Skeleton = null,

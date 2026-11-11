@@ -45,6 +45,8 @@ class RetargetParams(BaseModel):
     face_strength: float = 1.0      # 表情强度（各通道权重乘这个数）
     face_gains: dict[str, float] = Field(default_factory=dict)   # 分组权重 face_rig.FACE_GROUPS → 倍数（眼睑、眉、嘴、下巴、视线）
     face_head: float = 0.5          # 头部朝向跟面捕的脸走多少（0 = 只用 SAM，1 = 完全按脸；不开表情也生效）
+    # 姿势编辑器里拖的视线：眼球骨骼（j_f_eye_l/r）相对头部 j_kao 的旋转（四元数 xyzw）；有值时盖过表情里的视线
+    gaze: dict[str, list[float]] = Field(default_factory=dict)
 
 
 # 预设：插画的头颈比例夸张，识别容易把头颈角度估大（游戏实测 0.7 合适）

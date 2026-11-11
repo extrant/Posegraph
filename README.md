@@ -6,6 +6,8 @@ Turn a photo or an illustration into a pose for your FINAL FANTASY XIV character
 
 **New here? Start with the [step-by-step tutorial](docs/tutorial/README.md)** (with screenshots).
 
+Community: [Discord](https://discord.gg/2z6KdPgacj) · [QQ group](https://qm.qq.com/q/TGuxNR7auq)　|　Support: [Afdian](https://afdian.com/a/Sincraft0515) · [WeChat](#community--support) (everything is free; support is entirely optional)
+
 <p>
   <img src="docs/tutorial/images/ingame-wall.jpg" alt="Leaning on a wall" width="49%">
   <img src="docs/tutorial/images/ingame-kalaripayattu.jpg" alt="Martial arts leap" width="49%">
@@ -47,6 +49,13 @@ Posegraph plugin (in game, ImGui)  ── HTTP (127.0.0.1) ──►  Posegraph 
 - **Lighting**: 11 one-click lighting setups plus "Match the photo" (estimates the key light and colors from the photo), placed around the character and camera with full-body coverage, saved with gallery images, and a separate 3D window for adjusting each light and adding effects; several people can share one set of lights or get one each (with any set adjustable on its own).
 - **Framing and screenshots**: framing guide, guides, equivalent full-frame focal length, photo overlay, one-click screenshots of the game's own render.
 - **Video motion (beta)**: recognizes the motion, expressions and camera movement of a video frame by frame and plays it in GPose (camera-following or walking through the scene, several camera styles); several people at once; timeline corrections (keep bones changed in Brio as keyframes, copy and paste them to other frames); the video's music in sync.
+- **Pose in the game**: *Edit in game* on the 3D tab lets you drag control points on the character in GPose — IK for hands and feet,
+  elbow / knee direction, waist / chest / head turning, fingers, gaze; G to move / R to rotate, X / Y / Z axis lock (global or the bone's
+  own axis, with direction guides), a filled wedge with degrees while rotating and centimeters while moving, X / Y / Z angles you can read
+  and type in the panel; pin, mirror, symmetric editing, undo / redo. Edits are saved into the image's corrections. An illustrated tutorial
+  opens the first time.
+- **Hand snapping**: drag a hand near a body (yours or someone else's) and the palm settles on it with the fingers following the surface;
+  *Place on body part* (experimental) places the hand on a clicked spot as a small refinement of your rough pose.
 - **Convert to idle**: right-click a library image to turn its pose into a looping standing, sitting or dozing idle (pick the /cpose slot and races), keeping the original breathing, saved as a Penumbra mod.
 - **Export** Brio `.pose` files.
 - **Low-VRAM friendly**: Auto / GPU / CPU modes, the model is unloaded right after each recognition by default,
@@ -121,6 +130,13 @@ and add `Posegraph.dll` under *Dev Plugin Locations*.
 5. Tune on the *Tuning* tab, read the *Hints* tab, then **Apply** (▶). Use the camera button to match the photo camera,
    ↶ to restore the pose from before the first apply, and the disk button to export a `.pose` file or save it to the
    Brio pose library.
+
+### Edit in game
+
+In GPose, open the 3D tab and click *Edit in game*; control points appear on the character. Click to select, drag for free mode;
+with a point selected press G to move or R to rotate, X / Y / Z to lock an axis (first the character's left-right / up-down / front-back,
+again for the bone's own axis, a third time to unlock), and type numbers directly. P pins, M mirrors, Ctrl+Z / Ctrl+Y undo and redo.
+*Done* saves into the image's corrections. The in-plugin *Tutorial* covers everything.
 
 ### Library
 
@@ -236,6 +252,19 @@ command-line tools: `GET /status`, `GET /actors`, `GET|POST /pose?actor=N`, `GET
 The backend (127.0.0.1:42430) exposes `GET /health`, `POST /sessions`, `GET /sessions/{id}/image`,
 `POST /sessions/{id}/retarget`, `POST /sessions/{id}/camera`, `POST /model/load|unload|config`, `GET /races`, `GET /presets`,
 `POST /shutdown`. Both listen on localhost only.
+
+## Community & support
+
+Everything in Posegraph is free; support is entirely optional. Questions or feature ideas are welcome in the community.
+
+- Discord: <https://discord.gg/2z6KdPgacj>
+- QQ group "Posegraph交流": <https://qm.qq.com/q/TGuxNR7auq>
+- Afdian: <https://afdian.com/a/Sincraft0515>
+- WeChat tip code:
+
+<img src="docs/images/wechat-sponsor.jpg" alt="WeChat tip code" width="240">
+
+In the plugin you find these under the heart in the main toolbar and in *Settings → About & support*.
 
 ## License
 

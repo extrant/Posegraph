@@ -91,15 +91,15 @@ public static unsafe class IdleBaker
     private const float Fps = 30f;
 
     // n_root 会挪动整个角色；n_throw 会弄坏姿势（Brio 也跳过它）
-    private static readonly string[] SkipBones = ["n_root", "n_throw"];
+    internal static readonly string[] SkipBones = ["n_root", "n_throw"];
 
     // 原版所有姿态（站、坐、坐地、打盹）都只靠 n_hara 的平移定身体位置，别的骨骼的平移都是固定骨长
-    private const string BodyBone = "n_hara";
+    internal const string BodyBone = "n_hara";
 
     // 腿（j_asi_a_* 及以下）的末端踩在地上：贴地时和骨盆一起算
     private static readonly string[] PlantedRoots = ["j_asi_a_l", "j_asi_a_r"];
 
-    private sealed record Rig(string?[] Names, short[] Parents, int[] Depths, bool[] Planted, BoneTransform[] Reference);
+    internal sealed record Rig(string?[] Names, short[] Parents, int[] Depths, bool[] Planted, BoneTransform[] Reference);
 
     /// <summary>动画引用的骨骼比这个骨架多（被别的模组改过的 idle 要的骨架不对）：硬采样会写坏内存。</summary>
     public sealed class SkeletonMismatchException() : Exception("animation needs bones this skeleton does not have");
@@ -153,7 +153,7 @@ public static unsafe class IdleBaker
     }
 
     /// <summary>模型空间姿势 → 相对父骨骼。姿势里没有的骨骼按骨架的绑定姿势接在父骨骼上（只用来算子骨骼，不进动画）。</summary>
-    private static Dictionary<string, BoneTransform> LocalPose(Rig rig, IReadOnlyDictionary<string, BoneTransform> pose)
+    internal static Dictionary<string, BoneTransform> LocalPose(Rig rig, IReadOnlyDictionary<string, BoneTransform> pose)
     {
         var n = rig.Names.Length;
         var model = new BoneTransform[n];
@@ -471,7 +471,7 @@ public static unsafe class IdleBaker
     }
 
     /// <summary>骨骼名、父骨骼、层级深度、是不是腿、绑定姿势（Havok 骨架父骨骼在前，一遍就能算出深度）。</summary>
-    private static Rig RigOf(hkaSkeleton* skeleton)
+    internal static Rig RigOf(hkaSkeleton* skeleton)
     {
         var n = skeleton->Bones.Length;
         var names = new string?[n];
@@ -491,7 +491,7 @@ public static unsafe class IdleBaker
         return new Rig(names, parents, depths, planted, reference);
     }
 
-    private static hkaAnimationContainer* LoadAnimations(byte[] havok, List<nint> allocs, out hkResource* resource)
+    internal static hkaAnimationContainer* LoadAnimations(byte[] havok, List<nint> allocs, out hkResource* resource)
     {
         var buffer = Alloc(havok.Length, allocs);
         Marshal.Copy(havok, 0, buffer, havok.Length);
@@ -506,17 +506,17 @@ public static unsafe class IdleBaker
         return anims;
     }
 
-    private static hkRootLevelContainer* LoadRoot(hkResource* resource)
+    internal static hkRootLevelContainer* LoadRoot(hkResource* resource)
     {
         var root = (hkRootLevelContainer*)resource->GetContentsPointer("hkRootLevelContainer", hkBuiltinTypeRegistry.Instance()->GetTypeInfoRegistry());
         if (root == null) throw new InvalidDataException("havok data has no hkRootLevelContainer");
         return root;
     }
 
-    private static byte[] Save(hkRootLevelContainer* container, string tempDir)
+    internal static byte[] Save(hkRootLevelContainer* container, string tempDir)
     {
         Directory.CreateDirectory(tempDir);
-        var path = Path.Combine(tempDir, $"idle_{Environment.CurrentManagedThreadId}.hkx");
+        var path = Path.Combine(tempDir, $"havok_{Environment.CurrentManagedThreadId}.hkx");
         var klass = hkBuiltinTypeRegistry.Instance()->GetClassNameRegistry()->GetClassByName("hkRootLevelContainer");
         if (klass == null) throw new InvalidOperationException("hkRootLevelContainer class not found in the game's registry");
         var stream = stackalloc hkOstream[1];
@@ -538,7 +538,7 @@ public static unsafe class IdleBaker
         return bytes;
     }
 
-    private static nint Alloc(int size, List<nint> allocs)
+    internal static nint Alloc(int size, List<nint> allocs)
     {
         var p = Marshal.AllocHGlobal(Math.Max(1, size));
         allocs.Add(p);
@@ -546,19 +546,19 @@ public static unsafe class IdleBaker
     }
 
     // DontDeallocate：Havok 的析构和序列化不会去释放我们自己分配的内存
-    private static hkArray<T> MakeArray<T>(T* data, int count) where T : unmanaged => new()
+    internal static hkArray<T> MakeArray<T>(T* data, int count) where T : unmanaged => new()
     {
         Data = data,
         Length = count,
         CapacityAndFlags = count | unchecked((int)hkArray<T>.hkArrayFlags.DontDeallocate),
     };
 
-    private static BoneTransform FromHk(in hkQsTransformf t) => new(
+    internal static BoneTransform FromHk(in hkQsTransformf t) => new(
         new Vector3(t.Translation.X, t.Translation.Y, t.Translation.Z),
         new Quaternion(t.Rotation.X, t.Rotation.Y, t.Rotation.Z, t.Rotation.W),
         new Vector3(t.Scale.X, t.Scale.Y, t.Scale.Z));
 
-    private static hkQsTransformf ToHk(in BoneTransform t) => new()
+    internal static hkQsTransformf ToHk(in BoneTransform t) => new()
     {
         Translation = new() { X = t.Translation.X, Y = t.Translation.Y, Z = t.Translation.Z, W = 0f },
         Rotation = new() { X = t.Rotation.X, Y = t.Rotation.Y, Z = t.Rotation.Z, W = t.Rotation.W },
@@ -567,7 +567,7 @@ public static unsafe class IdleBaker
 
     /// <summary>hkaInterleavedUncompressedAnimation（FFXIVClientStructs 没有）：hkaAnimation 基类后面跟变换和浮点两个数组（hk2014 的布局）。</summary>
     [StructLayout(LayoutKind.Sequential)]
-    private struct InterleavedAnimation
+    internal struct InterleavedAnimation
     {
         public hkaAnimation Animation;
         public hkArray<hkQsTransformf> Transforms;
@@ -576,7 +576,7 @@ public static unsafe class IdleBaker
 
     /// <summary>Havok 对象的第一个字段是虚表指针。</summary>
     [StructLayout(LayoutKind.Explicit, Size = 8)]
-    private struct BaseObject
+    internal struct BaseObject
     {
         [FieldOffset(0)] public void* Vfptr;
     }

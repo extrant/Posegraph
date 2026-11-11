@@ -700,6 +700,7 @@ def session_retarget(sid: str, req: RetargetRequest) -> dict:
                     ivcs=ivcs is not False, upright_override=_scene(s).upright)
     warnings, severity = tuning.check(rt, race["code"])
     face_bones, face_info = _face_pose(s, req.person, rt, ref, race["code"], req.params) if req.params.face else ({}, None)
+    face_bones = {**face_bones, **_gaze_bones(rt, ref, req.params)}
     out = {"pose": to_brio_pose_json(rt, face_bones), "warnings": warnings, "severity": severity,
            "compensation": rt.hand_compensation, "race": race, "referenceStale": stale, "ivcs": ivcs, "face": face_info,
            "headFromFaceDeg": None if head_diff is None else round(head_diff, 1)}
@@ -852,7 +853,14 @@ def session_brio_edits(sid: str, req: BrioEditsRequest) -> dict:
         rt = tuning.run(human, s.image_size, params, **options)
         changed.append(name)
     residual = max((angle(n) for n in order), default=0.0)
-    return {"offsets": offsets, "changed": changed, "residualDeg": round(residual, 2)}
+    # 整个人挪了位置（姿势编辑器拖骨盆）：差多少加到整体位移上。朝向都收完之后再比（弯腿后贴地会自己降一点）
+    root_offset = [float(v) for v in params.root_offset]
+    hips, edited_hips = rt.bones.get("n_hara"), edited.get("n_hara")
+    if hips is not None and edited_hips is not None:
+        delta = edited_hips.position - np.asarray(hips[0])
+        if np.linalg.norm(delta) > 0.005:
+            root_offset = [round(a + float(b), 4) for a, b in zip(root_offset, delta)]
+    return {"offsets": offsets, "changed": changed, "residualDeg": round(residual, 2), "rootOffset": root_offset}
 
 
 def _head_from_face(s: Session, person: int, human: dict, params) -> tuple[dict, float | None]:
@@ -869,6 +877,28 @@ def _head_from_face(s: Session, person: int, human: dict, params) -> tuple[dict,
         return human, None
     preview_scale = Image.open(io.BytesIO(s.preview_png)).size[0] / float(s.image_size[0])
     return face.head_from_face(human, result, s.image_size, preview_scale, params.face_head)
+
+
+def _gaze_bones(rt, ref: BrioPose | None, params) -> dict:
+    """姿势编辑器里拖的视线（params.gaze：眼球相对头部的旋转）换成要写进姿势的眼球骨骼。
+    眼球的位置取游戏角色眼球相对头部的位置（脸部骨骼不在重定向里），跟着重定向后的头走。"""
+    if not params.gaze or ref is None:
+        return {}
+    from scipy.spatial.transform import Rotation as R
+
+    head, ref_head = rt.bones.get("j_kao"), ref.get("j_kao")
+    if head is None or ref_head is None:
+        return {}
+    head_p, head_q, _ = head
+    head_r, ref_head_r = R.from_quat(head_q), R.from_quat(ref_head.rotation)
+    out = {}
+    for name, q in params.gaze.items():
+        eye = ref.get(name)
+        if eye is None or len(q) != 4:
+            continue
+        local = ref_head_r.inv().apply(eye.position - ref_head.position)
+        out[name] = (np.asarray(head_p) + head_r.apply(local), (head_r * R.from_quat(q)).as_quat(), eye.scale)
+    return out
 
 
 def _face_pose(s: Session, person: int, rt, ref: BrioPose | None, race: str, params) -> tuple[dict, dict]:
@@ -1150,6 +1180,22 @@ def audio_wav(req: AudioRequest) -> Response:
         raise HTTPException(400, tr("录制参数不对"))
     data = audio.wav(source, req.start, req.end, req.speed, req.volume)
     return Response(data, media_type="audio/wav", headers={"X-Music-Source": source.name.encode("utf-8").hex()})
+
+
+@app.post("/audio/ogg")
+def audio_ogg(req: AudioRequest) -> Response:
+    """舞蹈模组的音乐：原视频 start~end 秒按音量编码成 Ogg Vorbis（start 可以是负数：前面补静音）。"""
+    from . import audio
+
+    if not audio.available():
+        raise HTTPException(503, tr("没装音频组件（PyAV），放不了音乐"))
+    source = audio.find_source(Path(req.path))
+    if source is None:
+        raise HTTPException(404, tr("没找到音乐：{name} 里没有声音，同一文件夹里也没有同名的音频文件", name=Path(req.path).name))
+    if req.end <= req.start:
+        raise HTTPException(400, tr("录制参数不对"))
+    data = audio.ogg(source, req.start, req.end, req.volume)
+    return Response(data, media_type="audio/ogg", headers={"X-Music-Source": source.name.encode("utf-8").hex()})
 
 
 @app.post("/videos")

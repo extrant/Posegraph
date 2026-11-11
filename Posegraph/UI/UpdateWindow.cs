@@ -22,8 +22,10 @@ public sealed class UpdateWindow : Window, IDisposable
 
     private static readonly (string Label, string Url, Vector4 Color)[] Links =
     [
-        ("Discord", "https://discord.gg/2z6KdPgacj", new(0.35f, 0.40f, 0.86f, 1)),
-        ("GitHub", "https://github.com/extrant/Posegraph", new(0.30f, 0.33f, 0.38f, 1)),
+        ("Discord", Community.Discord, Community.DiscordColor),
+        ("QQ 群", Community.QqGroup, Community.QqColor),
+        ("爱发电", Community.Afdian, Community.AfdianColor),
+        ("GitHub", Community.GitHub, new(0.30f, 0.33f, 0.38f, 1)),
         ("问题反馈", "https://github.com/extrant/Posegraph/issues", new(0.18f, 0.55f, 0.51f, 1)),
         ("全部版本", "https://github.com/extrant/Posegraph/releases", new(0.26f, 0.40f, 0.62f, 1)),
     ];

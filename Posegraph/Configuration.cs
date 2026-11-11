@@ -1,4 +1,4 @@
-using Dalamud.Configuration;
+﻿using Dalamud.Configuration;
 using Posegraph.Backend;
 
 namespace Posegraph;
@@ -86,6 +86,9 @@ public class Configuration : IPluginConfiguration
 
     /// <summary>看过更新日志的插件版本：与当前版本不同时，第一次打开主窗口弹出更新日志。</summary>
     public string LastChangelog { get; set; } = "";
+
+    /// <summary>姿势编辑器（游戏内编辑）的教程看完了没有：第一次用时弹出，要按住 5 秒才能关。</summary>
+    public bool EditorTutorialSeen { get; set; }
 
     // ---- 拆分模式（角色列表）
     /// <summary>角色列表贴在主窗口右边跟着移动。</summary>

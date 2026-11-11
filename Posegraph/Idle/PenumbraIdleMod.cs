@@ -101,15 +101,17 @@ public sealed class PenumbraIdleMod
     }
 
     /// <summary>写进一个选项（folder = ResolveFolder 的结果，group = 种族名，option = 槽位名）：files 是 游戏路径 → pap 内容。</summary>
-    public void Write(string root, string folder, string group, string option, string description, Dictionary<string, byte[]> files)
+    public void Write(string root, string folder, string group, string option, string description, Dictionary<string, byte[]> files,
+                      string? modDescription = null)
     {
         var dir = Path.Combine(root, folder);
         Directory.CreateDirectory(Path.Combine(dir, FilesDir));
         var map = new JsonObject();
         foreach (var (gamePath, bytes) in files)
         {
-            var race = gamePath.Split('/') is { Length: > 2 } parts ? parts[2] : "all";
-            var name = $"{race}_{Path.GetFileNameWithoutExtension(gamePath)}.{Convert.ToHexString(SHA256.HashData(bytes))[..8].ToLowerInvariant()}.pap";
+            // 种族的动画加种族前缀，别的（共用的时间轴、声音）用 all
+            var race = gamePath.Split('/') is { Length: > 2 } parts && parts[1] == "human" ? parts[2] : "all";
+            var name = $"{race}_{Path.GetFileNameWithoutExtension(gamePath)}.{Convert.ToHexString(SHA256.HashData(bytes))[..8].ToLowerInvariant()}{Path.GetExtension(gamePath)}";
             File.WriteAllBytes(Path.Combine(dir, FilesDir, name), bytes);
             map[gamePath] = $"{FilesDir}\\{name}";
         }
@@ -135,7 +137,7 @@ public sealed class PenumbraIdleMod
             ["FileVersion"] = 3,
             ["Name"] = folder,
             ["Author"] = Author,
-            ["Description"] = Loc.T("Posegraph 从图片姿势生成的待机动作。每个种族一组，每个槽位一个选项，可以在这里单独开关或删除。"),
+            ["Description"] = modDescription ?? Loc.T("Posegraph 从图片姿势生成的待机动作。每个种族一组，每个槽位一个选项，可以在这里单独开关或删除。"),
             ["Version"] = "1.0",
             ["Website"] = "https://github.com/extrant/Posegraph",
             ["ModTags"] = new JsonArray("Posegraph", "animation"),
@@ -197,7 +199,7 @@ public sealed class PenumbraIdleMod
     }
 
     /// <summary>注册或重新载入模组，在自己角色所用的合集里启用这个选项，重绘角色。返回提示（失败原因），成功为 null。</summary>
-    public string? Publish(string folder, string group, string option)
+    public string? Publish(string folder, string group, string option, bool exclusive = false)
     {
         // 按 Penumbra 的模组列表判断有没有载入过（GetAvailableModSettings 对没有选项组的模组也会返回空，不可靠）
         if (!ModList().ContainsKey(folder) && !Knows(folder))
@@ -219,6 +221,8 @@ public sealed class PenumbraIdleMod
         _trySetMod.InvokeFunc(collection, folder, "", true);
         var (code, data) = _currentSettings.InvokeFunc(collection, folder, "", false);
         var enabled = code == 0 && data is { } d && d.Item3.TryGetValue(group, out var cur) ? cur : [];
+        // exclusive：同一组里只开这一个（舞蹈：几个选项改的是同一批文件，同时开会互相盖）
+        if (exclusive && enabled.Any(o => o != option)) enabled = [];
         if (!enabled.Contains(option))
         {
             enabled.Add(option);
@@ -267,7 +271,7 @@ public sealed class PenumbraIdleMod
         foreach (var file in Directory.GetFiles(filesDir))
         {
             var name = Path.GetFileName(file);
-            if (!System.Text.RegularExpressions.Regex.IsMatch(name, @"^(all|c\d{4})_.+\.[0-9a-f]{8}\.pap$")) continue;
+            if (!System.Text.RegularExpressions.Regex.IsMatch(name, @"^(all|c\d{4})_.+\.[0-9a-f]{8}\.(pap|tmb|scd)$")) continue;
             if (!referenced.Contains($"{FilesDir}/{name}")) File.Delete(file);
         }
     }

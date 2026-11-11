@@ -5,6 +5,36 @@
   },
   "entries": [
     {
+      "version": "0.8.0",
+      "date": "2026-11-11",
+      "title": {
+        "zh": "在游戏里直接摆姿势：姿势编辑器、方向提示、手部吸附",
+        "en": "Pose right in the game: pose editor, direction guides, hand snapping"
+      },
+      "items": {
+        "zh": [
+          "3D 页新增「在游戏里编辑」：GPose 里直接拖角色身上的控制点摆姿势——手脚 IK、肘膝朝向、腰胸头转向、骨盆平移、手指弯曲、视线；G 移动 / R 旋转，X / Y / Z 锁轴（再按一次换成骨骼自身的轴），可直接输入数字；钉住、镜像、对称编辑、撤销重做。点「完成」存进这张图的修正",
+          "方向提示：锁轴时画出贯穿画面的辅助线（全局实线、骨骼自身虚线）和这组轴的三个方向，箭头指着正方向，写明是角色的左右 / 上下 / 前后还是骨骼自身的轴",
+          "旋转时节点周围画圈、扇形填充转过的角度并写上度数；移动时虚线连着起点、写着移了多少厘米；鼠标旁显示 X / Y / Z 各改了多少",
+          "面板里显示选中骨骼的 X / Y / Z 角度，按住拖动调整或 Ctrl+单击直接输入",
+          "手部吸附：拖手靠近身体（自己或别人）时手掌贴上去、手指顺着表面弯，不穿进身体；「贴到部位…」（实验）点一下身上的地方手就贴过去，只在你粗摆的基础上做小修正，肘自然下垂；够不着或要拧着才够得着时不动并说明原因",
+          "第一次用编辑器时弹出图文教程（按住 5 秒关闭），之后在 3D 页点「教程」随时再看",
+          "新增交流与赞助入口：主窗口工具栏的爱心、设置页「关于与支持」、更新日志顶部的 QQ 群 / 爱发电按钮。所有功能都免费，赞助纯属自愿",
+          "视频动作平滑时骨长不再变短（快速转动处前臂、手掌以前会被平滑「抄近路」缩短）"
+        ],
+        "en": [
+          "New \"Edit in game\" on the 3D tab: pose the character in GPose by dragging control points on the body — IK for hands and feet, elbow / knee direction, waist / chest / head turning, pelvis moving, finger curling, gaze; G to move / R to rotate, X / Y / Z axis lock (press again for the bone's own axis), typed values; pin, mirror, symmetric editing, undo / redo. \"Done\" saves into this image's corrections",
+          "Direction guides: with an axis locked, a guide line runs across the screen (global solid, the bone's own dashed) and the three directions of that set of axes are drawn, with an arrow on the positive side and a label saying whether it's the character's left / right, up / down, front / back or the bone's own axis",
+          "While rotating, a circle with a filled wedge shows the angle turned in degrees; while moving, a dashed line goes back to the start with the distance in cm; next to the mouse you see how much X / Y / Z changed",
+          "The panel shows the selected bone's X / Y / Z angles; drag to adjust or Ctrl+click to type",
+          "Hand snapping: drag a hand near a body (yours or someone else's) and the palm settles on it with the fingers following the surface, without sinking in. \"Place on body part…\" (experimental) places the hand on a clicked spot as a small refinement of your rough pose, with the elbow hanging naturally; when the spot is out of reach or needs a twisted arm it doesn't move and tells you why",
+          "An illustrated tutorial opens the first time you use the editor (hold 5 seconds to close); open it again any time with \"Tutorial\" on the 3D tab",
+          "Community & support: a heart in the main toolbar, \"About & support\" in Settings, and QQ group / Afdian buttons at the top of the changelog. Everything is free; support is entirely optional",
+          "Smoothing video motion no longer shortens bones (fast turns used to shrink forearms and hands)"
+        ]
+      }
+    },
+    {
       "version": "0.7.7",
       "date": "2026-11-06",
       "title": {

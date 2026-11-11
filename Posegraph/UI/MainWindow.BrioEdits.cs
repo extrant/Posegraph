@@ -42,7 +42,7 @@ public sealed partial class MainWindow
     /// <summary>每帧调用：在 GPose 里、推送过当前图当前人的姿势时，隔一会读回角色姿势比一比。</summary>
     private void PollBrioEdits()
     {
-        if (_pushed is not { } pushed || _brioPolling || _brioAbsorbing || _rtBusy || !_clientState.IsGPosing) return;
+        if (_pushed is not { } pushed || _brioPolling || _brioAbsorbing || _rtBusy || !_clientState.IsGPosing || PoseEditing) return;
         if (pushed.Actor != _actor || pushed.Sid != _session?.SessionId || pushed.Person != _person) return;
         if (DateTime.UtcNow - _brioPolledAt < BrioEditPollInterval) return;
         _brioPolledAt = DateTime.UtcNow;
@@ -106,14 +106,80 @@ public sealed partial class MainWindow
         if (ImGui.SmallButton(Loc.T("忽略")))
         {
             // 以现在的姿势为准，之后再改才提示
+            _editorEdited = false;
             _pushed = _pushed with { Pose = _brioEdited };
             _brioEdited = null;
             _brioEditCount = 0;
         }
     }
 
+    private volatile bool _editorEdited;   // 姿势编辑器点了「完成」、改动还没收进修正也没忽略
+
+    /// <summary>
+    /// 姿势编辑器点「完成」时，以及编辑中 / 编辑完还没存就换图时调用：结束编辑，把角色身上的改动存进这张图的修正——
+    /// 骨骼朝向换成关节偏移、整个人挪的位置加到整体位移、拖过的视线存成眼球相对头部的朝向。
+    /// 换图时这一步在新图打开之前做（会话、参数都还是这张图的），不然新图的姿势一套上，改动就丢了。失败不挡换图，只提示。
+    /// </summary>
+    private async Task SaveEditorEditsAsync()
+    {
+        var editing = PoseEditing;
+        if (!editing && !_editorEdited) return;
+        if (editing) PoseEditor?.Finish();
+        _editorEdited = false;
+        var gaze = PoseEditor?.Gaze();
+        if (_pushed is not { } pushed || pushed.Sha1 is not { } sha1)
+        {
+            SetStatus(Loc.T("这个姿势不是从当前图应用的，改动只留在角色身上，没存进图库"), Yellow);
+            return;
+        }
+        _brioAbsorbing = true;
+        try
+        {
+            await Task.Delay(400);   // 等编辑器最后一下写进游戏
+            if (await _applier.GetPoseAsync(pushed.Actor) is not { } now) return;
+            var r = await _client.BrioEditsAsync(pushed.Sid, pushed.Person, pushed.Params, pushed.Reference, _raceOverride ?? _detectedRace,
+                                                 pushed.Trust, _useAux, now);
+            var moved = r.RootOffset is { Length: 3 } offset && !offset.SequenceEqual(pushed.Params.RootOffset);
+            if (r.Changed.Length == 0 && !moved && gaze is null)
+            {
+                SetStatus(Loc.T("姿势编辑器里没有可存的改动"), Yellow);
+                return;
+            }
+            var current = sha1 == _imageSha1;
+            var p = current ? _params : pushed.Params.Clone();
+            p.Offsets = new Dictionary<string, float[]>(r.Offsets);
+            if (moved) p.RootOffset = (float[])r.RootOffset!.Clone();
+            if (gaze is not null) p.Gaze = gaze.ToDictionary(kv => kv.Key, kv => (float[])kv.Value.Clone());
+            Library.WriteCorrection(sha1, new SavedCorrection(_preset, p.Clone(), DateTime.Now));
+            if (current)
+            {
+                _savedFix = FullSnapshot(_preset, _params);
+                _pushed = pushed with { Pose = now, Params = _params.Clone() };
+                RequestRetarget(false);   // 3D 页、调整页跟着更新；不重新推送（角色身上已经是这个姿势）
+            }
+            _brioEdited = null;
+            _brioEditCount = 0;
+            var parts = new List<string>();
+            if (r.Changed.Length > 0) parts.Add(Loc.F("{0} 根骨骼的朝向", r.Changed.Length));
+            if (moved) parts.Add(Loc.T("整体位置"));
+            if (gaze is not null) parts.Add(Loc.T("视线"));
+            var what = string.Join(Loc.T("、"), parts);
+            SetStatus(current ? Loc.F("已把姿势编辑器的改动（{0}）存进这张图的修正", what) : Loc.F("已把姿势编辑器的改动（{0}）存进上一张图的修正", what),
+                      Green);
+        }
+        catch (Exception ex)
+        {
+            SetError(Loc.F("姿势编辑器的改动没能存进图库：{0}", ex.Message));
+        }
+        finally
+        {
+            _brioAbsorbing = false;
+        }
+    }
+
     private void AbsorbBrioEdits()
     {
+        _editorEdited = false;
         if (_pushed is not { } pushed || _brioEdited is not { } edited) return;
         _brioAbsorbing = true;
         SetStatus(Loc.T("正在把 Brio 里的改动收进修正…"), Yellow);

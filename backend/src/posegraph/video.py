@@ -442,14 +442,55 @@ def smooth_quats(q: np.ndarray, sigma: float) -> np.ndarray:
     return s / np.linalg.norm(s, axis=-1, keepdims=True).clip(1e-9)
 
 
-def smooth_frames(frames: np.ndarray, valid: np.ndarray, sigma: float) -> np.ndarray:
-    """骨骼帧 (T, 骨骼数, 10)：补空帧后，位置 / 旋转平滑，缩放不动。"""
+def smooth_frames(frames: np.ndarray, valid: np.ndarray, sigma: float, names: list[str] | None = None,
+                  race: str | None = None) -> np.ndarray:
+    """骨骼帧 (T, 骨骼数, 10)：补空帧后平滑，缩放不动。
+    给了骨骼名和种族时骨长不变：只平滑相对父骨骼的旋转和局部偏移，位置按正向运动学从根骨骼重新算
+    （位置、旋转各自平滑时，快速转动处骨段会「抄近路」缩短：2026-11-08 实测一段舞蹈前臂 26 → 11.5 cm、手腕到指根 9.4 → 3.5 cm）。
+    不在身体骨架里的骨骼（脸）挂在头上算；找不到父骨骼的按根骨骼处理（位置、朝向直接平滑）。"""
     filled = fill_gaps(frames, valid)
     for t in np.flatnonzero(~valid):   # 插值出来的四元数归一化
         filled[t, :, 3:7] /= np.linalg.norm(filled[t, :, 3:7], axis=-1, keepdims=True).clip(1e-9)
     out = filled.copy()
-    out[:, :, 0:3] = smooth(filled[:, :, 0:3], sigma)
-    out[:, :, 3:7] = smooth_quats(filled[:, :, 3:7], sigma)
+    if names is None or race is None or len(filled) < 2:
+        out[:, :, 0:3] = smooth(filled[:, :, 0:3], sigma)
+        out[:, :, 3:7] = smooth_quats(filled[:, :, 3:7], sigma)
+        return out
+    from scipy.spatial.transform import Rotation
+
+    from .retarget.ffxiv import load_ffxiv_skeleton
+
+    sk = load_ffxiv_skeleton(race)
+    where = {b: i for i, b in enumerate(names)}
+    head = where.get("j_kao")
+    parent: list[int | None] = []
+    for b in names:
+        p = None
+        if b in sk.names:
+            j = sk.parents[sk.index(b)]
+            while j >= 0 and sk.names[j] not in where:   # 父骨骼不在片段里就往上找
+                j = sk.parents[j]
+            p = where[sk.names[j]] if j >= 0 else None
+        elif head is not None and b != "j_kao":
+            p = head
+        parent.append(p)
+    # 父骨骼在前：身体骨架的顺序，其余（脸）放最后
+    order = sorted(range(len(names)), key=lambda i: (names[i] not in sk.names, sk.index(names[i]) if names[i] in sk.names else i))
+    rot = [Rotation.from_quat(filled[:, i, 3:7]) for i in range(len(names))]
+    new_rot: list = [None] * len(names)
+    for i in order:
+        p = parent[i]
+        if p is None or new_rot[p] is None:
+            out[:, i, 0:3] = smooth(filled[:, i, 0:3], sigma)
+            out[:, i, 3:7] = smooth_quats(filled[:, i, 3:7], sigma)
+            new_rot[i] = Rotation.from_quat(out[:, i, 3:7])
+            continue
+        local_q = (rot[p].inv() * rot[i]).as_quat()
+        local_t = smooth(rot[p].inv().apply(filled[:, i, 0:3] - filled[:, p, 0:3]), sigma)
+        new_rot[i] = new_rot[p] * Rotation.from_quat(smooth_quats(local_q, sigma))
+        q = new_rot[i].as_quat()
+        out[:, i, 3:7] = np.where(np.sum(q * filled[:, i, 3:7], axis=1, keepdims=True) < 0, -q, q)
+        out[:, i, 0:3] = out[:, p, 0:3] + new_rot[p].apply(local_t)
     return out
 
 
@@ -862,7 +903,7 @@ def build_clip(raw: Raw, people: list[PersonSpec], smooth_amount: float, retarge
         if names[p] is None:
             clip_people.append({"bones": [], "frames": [], "missing": [True] * n, "race": people[p].race})
             continue
-        sm = smooth_frames(frames[p], valid_frames[p], sigma)
+        sm = smooth_frames(frames[p], valid_frames[p], sigma, names[p], people[p].race)
         clip_people.append({"bones": names[p], "frames": np.round(sm.reshape(n, -1), 6).tolist(),
                             "missing": (~valid_frames[p]).tolist(), "race": people[p].race,
                             "face": {"enabled": want_face[p], "frames": face_frames[p]}})
@@ -922,7 +963,7 @@ def _clip_window(raw: Raw, people: list[PersonSpec], face: FaceHooks | None, nam
             added = _add_face(face, p, face_locals[p][w], fr, bones, valid[p][w], max(sigma, FACE_MIN_SIGMA_SECONDS * raw.fps))
             if added is not None:
                 fr, bones, _ = added
-        sm = smooth_frames(fr, valid[p][w], sigma)[a:b]
+        sm = smooth_frames(fr, valid[p][w], sigma, bones, people[p].race)[a:b]
         out.append({"bones": bones, "frames": np.round(sm.reshape(len(sm), -1), 6).tolist(), "race": people[p].race})
     return {"range": list(keep), "people": out}
 

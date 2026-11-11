@@ -165,3 +165,36 @@ def wav(source: Path, start: float, end: float, speed: float = 1.0, volume: floa
         w.setframerate(PLAY_RATE)
         w.writeframes(seg.tobytes())
     return buf.getvalue()
+
+
+def ogg(source: Path, start: float, end: float, volume: float = 1.0, quality_kbps: int = 160) -> bytes:
+    """source 从 start 到 end 秒的一段编码成 Ogg Vorbis（44.1kHz 立体声），舞蹈模组的音乐用（游戏的 scd 只认 Vorbis）。
+    比整首短时末尾不补静音；start 为负时前面补静音（音乐比动作晚开始）。"""
+    import io
+
+    import av
+
+    data = pcm(source)
+    a = int(round(start * PLAY_RATE))
+    b = int(np.clip(round(end * PLAY_RATE), 0, len(data)))
+    lead = max(0, -a)
+    seg = data[max(0, a):b].astype(np.float32) / 32768.0
+    if lead:
+        seg = np.concatenate([np.zeros((lead, 2), np.float32), seg])
+    seg = np.clip(seg * float(np.clip(volume, 0.0, 2.0)), -1.0, 1.0)
+    buf = io.BytesIO()
+    with av.open(buf, "w", format="ogg") as dst:
+        stream = dst.add_stream("libvorbis", rate=PLAY_RATE)
+        stream.layout = "stereo"
+        stream.bit_rate = quality_kbps * 1000
+        planar = np.ascontiguousarray(seg.T)
+        step = 4096
+        for i in range(0, planar.shape[1], step):
+            frame = av.AudioFrame.from_ndarray(np.ascontiguousarray(planar[:, i:i + step]), format="fltp", layout="stereo")
+            frame.sample_rate = PLAY_RATE
+            frame.pts = i
+            for p in stream.encode(frame):
+                dst.mux(p)
+        for p in stream.encode(None):
+            dst.mux(p)
+    return buf.getvalue()

@@ -25,6 +25,7 @@ public sealed class Plugin : IDalamudPlugin
     private readonly SplitWindow _split;
     private readonly MaskEditorWindow _masks;
     private readonly UpdateWindow _update;
+    private readonly SupportWindow _support;
     private bool _changelogChecked;   // 本次加载后第一次打开主窗口时检查一次是否要弹更新日志
     private readonly IDragDropManager _dragDrop;
     private readonly IFramework _framework;
@@ -35,6 +36,7 @@ public sealed class Plugin : IDalamudPlugin
     private readonly Lighting.LightingService _lighting;
     private readonly LightingWindow _lightingWindow;
     private readonly CompositionWindow _composition;
+    private readonly Editor.PoseEditor _poseEditor;
     private readonly VideoWindow _video;
     private bool _openedByGpose;
     private bool _shotRequested;
@@ -55,6 +57,7 @@ public sealed class Plugin : IDalamudPlugin
         IGameGui gameGui,
         IDataManager data,
         ISigScanner sigScanner,
+        IKeyState keyState,
         IPluginLog log)
     {
         _data = data;
@@ -89,6 +92,12 @@ public sealed class Plugin : IDalamudPlugin
         _update = new UpdateWindow(_config, pi, textures);
         _windows.AddWindow(_update);
         _main.ShowChangelog = () => _update.IsOpen = true;
+        _support = new SupportWindow(textures);
+        _windows.AddWindow(_support);
+        _main.ShowSupport = () => _support.IsOpen = true;
+        var tutorial = new EditorTutorialWindow(_config, pi);
+        _windows.AddWindow(tutorial);
+        _main.ShowEditorTutorial = tutorial.Show;
         _main.ToggleLibrary = _library.Toggle;
         _lighting = new Lighting.LightingService(framework, clientState, applier, _config, gameGui);
         _lighting.CurrentImage = () => _main.CurrentImageSha1 is { } sha ? (sha, _main.Library.ReadLighting(sha)) : null;
@@ -113,10 +122,20 @@ public sealed class Plugin : IDalamudPlugin
         _windows.AddWindow(_idleWindow);
         _library.ConvertToIdle = _idleWindow.Open;
 #if DEBUG
-        // 导出到 Blender 还在试，只有 Debug 版有（Release 版不编 Export 目录，主窗口也不显示按钮）
+        // 导出到 Blender、导出舞蹈 mod 还在试，只有 Debug 版有（Release 版不编 Export / Dance 目录，也不显示按钮）
         var blender = new Export.BlenderExport(framework, clientState, applier, _lighting, () => _main.Actors);
         _main.ExportBlender = blender.ExportAsync;
+        var danceWindow = new DanceWindow(new Dance.DanceService(pi, data, framework, log, idle), () => _main.Client);
+        _windows.AddWindow(danceWindow);
+        _video.ExportDance = danceWindow.Open;
 #endif
+        // 姿势编辑器：GPose 里拖角色身上的控制点
+        _poseEditor = new Editor.PoseEditor(framework, clientState, gameGui, keyState, data, log, applier, brio);
+        _main.PoseEditor = new MainWindow.PoseEditorHooks(_poseEditor.StartAsync, _poseEditor.Finish, _poseEditor.Cancel,
+                                                          () => _poseEditor.Active, _poseEditor.DrawPanel,
+                                                          () => _poseEditor.Gaze);
+        framework.Update += _poseEditor.Update;
+        pi.UiBuilder.Draw += _poseEditor.Draw;
         _main.DumpFaceData = DumpFaceAnimations;
         _main.LibraryDragged = () => _library.DraggedImages;
         _main.Closed = () => _library.IsOpen = _split.IsOpen = _masks.IsOpen = _lightingWindow.IsOpen = _composition.IsOpen = false;
@@ -287,6 +306,9 @@ public sealed class Plugin : IDalamudPlugin
         _pi.UiBuilder.Draw -= DrawWindows;
         _pi.UiBuilder.Draw -= DrawDragSource;
         _pi.UiBuilder.Draw -= _composition.DrawOverlay;
+        _poseEditor.Cancel();
+        _framework.Update -= _poseEditor.Update;
+        _pi.UiBuilder.Draw -= _poseEditor.Draw;
         _pi.UiBuilder.Draw -= DrawPendingShot;
         _pi.UiBuilder.OpenMainUi -= ToggleManually;
         _pi.UiBuilder.OpenConfigUi -= _main.OpenSettings;
@@ -296,6 +318,7 @@ public sealed class Plugin : IDalamudPlugin
         _split.Dispose();
         _masks.Dispose();
         _update.Dispose();
+        _support.Dispose();
         _auxMenu.Dispose();
         _main.Dispose();
         _server.Dispose();
