@@ -7,14 +7,15 @@
     {"at": [110, 118], "zh": "要摆姿势的角色（默认 GPose 目标）", "en": "Character to pose (GPose target by default)"},
     {"at": [36, 635], "zh": "应用到角色", "en": "Apply to the character", "dir": "down"},
     {"at": [69, 635], "zh": "复刻照片镜头", "en": "Match the photo's camera", "dir": "down"},
-    {"at": [391, 60], "zh": "启动 / 停止识别后端", "en": "Start / stop the backend", "dir": "down-right"},
-    {"at": [460, 60], "zh": "设置", "en": "Settings", "dir": "down-right"},
+    {"at": [349, 60], "zh": "启动 / 停止识别后端", "en": "Start / stop the backend", "dir": "down-right"},
+    {"at": [453, 60], "zh": "设置", "en": "Settings", "dir": "down-right"},
     {"at": [181, 90], "zh": "角色列表：多个角色各绑一张图", "en": "Character list: one image per character"},
     {"at": [385, 118], "zh": "种族骨架（按角色外貌自动识别）", "en": "Race skeleton (detected from the character)"},
     {"box": [24, 137, 232, 157], "zh": "图像 / 3D / 调整 / 提示 / 设置", "en": "Image / 3D / Tuning / Hints / Settings"},
     {"at": [245, 400], "zh": "把图片拖到这里，或点一下从图库选", "en": "Drop an image here, or click to pick from the library"},
     {"at": [138, 635], "zh": "导出 .pose / 存到 Brio 姿势库", "en": "Export .pose / save to the Brio pose library", "dir": "down"},
-    {"at": [171, 635], "zh": "勾上：松开滑杆自动应用", "en": "Checked: apply when you release a slider", "dir": "down"}
+    {"at": [171, 635], "zh": "勾上：松开滑杆自动应用", "en": "Checked: apply when you release a slider", "dir": "down"},
+    {"at": [419, 60], "zh": "交流群与赞助（所有功能免费，赞助自愿）", "en": "Community & support (everything is free)", "dir": "down-right"}
   ],
   "tut-image": [
     {"at": [262, 452], "zh": "绿线：从照片识别出的骨架", "en": "Green: skeleton recognized from the photo"},
@@ -25,10 +26,12 @@
     {"box": [22, 652, 190, 670], "zh": "识别用时；同一张图再打开直接读缓存", "en": "Recognition time; reopening the same image uses the cache"}
   ],
   "tut-3d": [
-    {"at": [36, 176], "zh": "保存修正：偏移和调整页的数值跟着这张图走", "en": "Save correction: offsets and tuning values stay with this image"},
-    {"at": [210, 266], "zh": "点关节选中，下方出现微调滑杆", "en": "Click a joint to select it and show fine-tuning sliders"},
-    {"at": [256, 262], "zh": "黄 / 红点：角度超出游戏常见范围", "en": "Yellow / red dots: angles outside the usual in-game range"},
-    {"at": [330, 450], "zh": "拖动旋转，滚轮缩放，双击复位", "en": "Drag to rotate, scroll to zoom, double-click to reset"},
+    {"box": [22, 166, 122, 188], "zh": "在游戏里编辑：GPose 里直接拖角色身上的点（见第 18 节）", "en": "Edit in game: drag points on the character in GPose (section 18)"},
+    {"box": [126, 166, 186, 188], "zh": "编辑器教程", "en": "Editor tutorial", "box_en": [126, 166, 204, 188]},
+    {"at": [36, 208], "zh": "保存修正：偏移和调整页的数值跟着这张图走", "en": "Save correction: offsets and tuning values stay with this image", "dir": "left"},
+    {"at": [212, 401], "zh": "点关节选中，下方出现微调滑杆", "en": "Click a joint to select it and show fine-tuning sliders"},
+    {"at": [254, 299], "zh": "黄 / 红点：角度超出游戏常见范围", "en": "Yellow / red dots: angles outside the usual in-game range"},
+    {"at": [340, 470], "zh": "拖动旋转，滚轮缩放，双击复位", "en": "Drag to rotate, scroll to zoom, double-click to reset"},
     {"at": [36, 606], "zh": "叠加显示识别骨架做对比", "en": "Overlay the recognized skeleton to compare"}
   ],
   "tut-tuning": [
@@ -48,10 +51,10 @@
     {"at": [88, 231], "zh": "第一次使用：选择后端一键包解压后的目录", "en": "First time: choose the folder you unzipped the backend package to"},
     {"box": [22, 305, 170, 365], "zh": "路径有效、后端已是最新", "en": "Path valid, backend up to date"},
     {"at": [36, 438], "zh": "插件加载时自动启动后端", "en": "Start the backend when the plugin loads"},
-    {"at": [338, 175], "zh": "更新日志", "en": "Changelog"},
+    {"at": [371, 176], "zh": "更新日志", "en": "Changelog"},
     {"box": [22, 456, 244, 480], "zh": "识别设备：自动会在显存不够时改用 CPU", "en": "Device: Auto falls back to CPU when VRAM is short"},
     {"at": [120, 497], "zh": "模型释放：常驻更快，立即释放省显存", "en": "Model release: keep loaded is faster, release saves VRAM"},
-    {"at": [391, 60], "zh": "启动后端", "en": "Start the backend"}
+    {"at": [349, 60], "zh": "启动后端", "en": "Start the backend"}
   ],
   "tut-library": [
     {"at": [39, 89], "zh": "导入图片（复制进当前文件夹）", "en": "Import images (copied into this folder)", "dir": "down"},
@@ -75,5 +78,14 @@
     {"box": [22, 22, 368, 60], "box_en": [22, 22, 684, 60], "zh": "最好是约 90° 的侧面；背面、角度相近的帮助不大", "en": "A ~90° side view works best; back views and similar angles help little"},
     {"at": [60, 112], "zh": "从文件添加（复制，不进图库网格）", "en": "Add from files (copied, kept out of the library grid)"},
     {"at": [60, 130], "zh": "或粘贴剪切板里的图", "en": "Or paste from the clipboard"}
+  ],
+  "tut-editor": [
+    {"box": [22, 166, 200, 188], "zh": "完成：改动存进这张图的修正；取消：放弃这次的全部改动；教程：随时再看", "en": "Done: edits go into this image's corrections; Cancel: discard this session's edits; Tutorial: open it any time", "box_en": [22, 166, 238, 188]},
+    {"box": [22, 194, 92, 210], "zh": "状态：选中了谁、手贴不上时的原因", "en": "Status: what is selected, why a hand could not be placed", "box_en": [22, 194, 140, 210]},
+    {"box": [22, 210, 470, 232], "zh": "对称编辑、限制在正常范围内、一直显示手指", "en": "Symmetric editing, keep within normal range, always show fingers"},
+    {"box": [22, 242, 286, 265], "zh": "手部吸附：拖手靠近身体时手掌贴上去；贴合度从松到压紧", "en": "Hand snapping: the palm settles on a body you drag the hand near; fit goes from loose to pressed in", "box_en": [22, 242, 290, 265]},
+    {"at": [348, 253], "zh": "贴到部位：实验功能（黄色感叹号）", "en": "Place on body part: experimental (yellow mark)", "at_en": [440, 253]},
+    {"box": [22, 322, 312, 348], "zh": "选中骨骼的 X / Y / Z 角度：左右拖调整，Ctrl+单击输入", "en": "X / Y / Z angles of the selected bone: drag, or Ctrl+click to type", "box_en": [22, 322, 352, 348]},
+    {"at": [36, 363], "zh": "操作说明（快捷键一览）", "en": "How to use (shortcut list)", "dir": "left"}
   ]
 }

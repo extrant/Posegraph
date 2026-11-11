@@ -3,7 +3,7 @@
 **English** | [简体中文](README.zh-CN.md)
 
 This tutorial takes you from installation to putting a photo's pose on your GPose character, then covers the image
-library, extra views and posing several characters. The numbers in each screenshot match the notes on its right.
+library, extra views, posing several characters, lighting, video motion and posing right in the game (pose editor, hand snapping). The numbers in each screenshot match the notes on its right.
 The UI screenshots are made with the [offline screenshot tool](../../tools/UiPreview); the sample photos are credited at the end.
 
 **Results**: the tutorial's four sample photos recognized and put on an in-game character (Midlander male, with the photo's camera matched):
@@ -46,8 +46,11 @@ The UI screenshots are made with the [offline screenshot tool](../../tools/UiPre
 15. [Framing and screenshots](#15-framing-and-screenshots)
 16. [Video motion (beta)](#16-video-motion-beta)
 17. [Convert to idle](#17-convert-to-idle)
-18. [Updates](#18-updates)
-19. [FAQ](#19-faq)
+18. [Edit in game (pose editor)](#18-edit-in-game-pose-editor)
+19. [Hand snapping and "Place on body part" (experimental)](#19-hand-snapping-and-place-on-body-part-experimental)
+20. [Updates](#20-updates)
+21. [FAQ](#21-faq)
+22. [Community & support](#22-community--support)
 
 ---
 
@@ -86,7 +89,7 @@ VRAM and RAM. All green means you're ready. Hover over an icon for details.
 
 ![Main window](images/en/tut-empty.png)
 
-The toolbar has three rows: status and the backend switch; tools (library, save to library, extra views, character list, lighting, composition and screenshots);
+The toolbar has three rows: status, the backend switch and the heart at the top right (community & support, see [section 22](#22-community--support)); tools (library, save to library, extra views, character list, lighting, composition and screenshots);
 and the **character to pose**, the person in the image and the **race skeleton**. The race is detected from the
 character's appearance, so you rarely need to change it.
 
@@ -122,6 +125,8 @@ Tips:
 - Yellow / red dots mark joints whose angles are outside the usual in-game range and may clip.
 - When you're happy, click **Save correction** at the top left: the offsets and the Tuning tab's values are stored with this
   image and restored the next time you open it.
+- **Edit in game** at the top of the tab lets you drag points on the character right in GPose, and **Tutorial** explains it with
+  pictures; see [section 18](#18-edit-in-game-pose-editor).
 
 ## 6. Tuning tab: amplitude and corrections
 
@@ -241,6 +246,9 @@ If you rotate bones in Brio after applying a pose, the main window shows "Detect
   no longer wipes them, and you can keep fine-tuning them on the 3D tab.
 - **Ignore** takes the current pose as the new baseline; you'll be told again only after further edits.
 
+Poses changed with "Edit in game" ([section 18](#18-edit-in-game-pose-editor)) are saved into the correction as soon as you click
+"Done"; you don't need this bar for them.
+
 Only body bone rotations are kept. Face bones and bone positions or scale are not; helper bones such as shoulders and elbows follow their
 main bones automatically, so edits to helper bones alone can't be kept either.
 
@@ -356,7 +364,80 @@ Turns the pose of a library image into an idle that loops while your character s
 Switch to that pose in game (use `/cpose` for standing) to see it. In Penumbra the mod has one group per race and one option per slot, so each can be turned on or off or deleted.
 Facial expressions aren't part of the idle; other players only see it through a sync plugin such as Mare.
 
-## 18. Updates
+## 18. Edit in game (pose editor)
+
+When a recognized pose is almost right, you don't have to fix it on the small stick figure of the 3D tab: drag points on the
+character right in the game. Enter GPose, select the character and click **Edit in game** at the top of the **3D tab**. A set of
+dots (control points) appears on the character and the editor panel opens in the main window. An illustrated tutorial opens the
+first time (hold its button for 5 seconds to close it); open it again any time with **Tutorial**.
+
+![Editor panel](images/en/tut-editor.png)
+
+**Control points**
+
+- **Blue** are hands and feet: drag one and the whole arm / leg follows (IK). **Green** are elbows and knees: which way they bend.
+  **White** are pelvis, waist, chest and head: waist / chest / head turn toward the mouse, the pelvis moves the whole body.
+  **Purple** are shoulders and toes.
+- Selecting a hand shows its five finger points: drag a fingertip toward the palm to curl, outward to straighten. Selecting the head
+  shows the gaze point; drag it to change where the eyes look.
+- A dot turning yellow / red means the joint is beyond the usual range of game animations; tick "Keep within normal range" to limit it.
+
+**Controls**
+
+- **Click** to select (an orange ring appears), **press and drag** for free mode. Hold Shift while dragging for fine control;
+  right-click cancels the drag.
+- With a point selected press **G to move** or **R to rotate**, then move the mouse; left-click or Enter confirms, right-click or Esc
+  cancels. You can type a number: centimeters for moving, degrees for rotating (e.g. R, Z, 9, 0 turns 90° around Z).
+- **P** pins the selected hand / foot (square marker; it stays put when the body moves; both feet are pinned by default), **M** mirrors
+  this side to the other, "Symmetric editing" moves both sides together. **Ctrl+Z / Ctrl+Y** undo / redo, **Esc** deselects.
+- Click **Done** when finished: the edits are saved into this image's correction (joint rotations, the whole-body position and the
+  gaze) and come back the next time you open it. **Cancel** discards all edits of this session.
+
+**Axis lock and direction guides**
+
+During G or R, press **X / Y / Z** to lock an axis. A direction guide is then drawn:
+
+- **The first press is the global axis (solid line)**: X is the character's left / right, Y up / down, Z front / back, no matter how
+  the bone is tilted.
+- **Pressing the same key again uses the bone's own axis (dashed line)**: it follows the bone's orientation, e.g. twisting the wrist
+  along the forearm. A third press unlocks.
+- A guide line runs across the screen, and next to the point the three directions of that set of axes are drawn (red X, green Y,
+  blue Z); the locked one has an arrow and a "+" on its positive side, with a label saying which kind of axis it is.
+
+![Axis lock: global or the bone's own](images/en/tut-editor-help.png)
+
+**Reading and typing angles**
+
+- While rotating, a circle is drawn around the point and the filled wedge is the angle turned, labeled in degrees; while moving, a
+  dashed line goes back to the start with the distance in cm. Next to the mouse you also see how much X / Y / Z changed.
+- With a point selected, **Rotate X / Y / Z** in the panel are the bone's current angles (relative to its parent bone; X first, then Y,
+  then Z). Drag a number left / right to adjust it or Ctrl+click to type; it can be undone like R.
+
+The editor saves into the image's correction through the backend: after a plugin update click **Update backend** in Settings,
+otherwise the gaze and the whole-body position can't be saved.
+
+## 19. Hand snapping and "Place on body part" (experimental)
+
+Touching a face, a hand on a shoulder or the hip, holding someone's arm... poses where a hand rests on a body are hard to recognize
+from a single photo. The editor has two ways to put the hand there:
+
+- **Hand snapping**: with it ticked, drag a hand near a body (yours or another character in GPose) and the palm settles on it while
+  the fingers follow the surface; hand and fingers don't sink in. The small green circle marks the contact. Hold Alt while dragging to
+  toggle it temporarily. **Fit** goes from "Loose" (a small gap) to "Pressed" (palm and finger pads press into the skin a little);
+  soft areas such as the buttocks, chest, belly and thighs are pressed a bit more automatically.
+- **Place on body part…** (experimental, yellow exclamation mark next to the button): select a hand, click it, move the mouse over a
+  body to highlight the part under the cursor, and click; the hand places itself there. Esc or right-click cancels.
+
+Recommended use of "Place on body part": **first pose the hand roughly near the spot with the palm facing it, then click
+"Place on body part"**. It only refines your pose, keeping your hand direction and elbow as much as possible with the elbow hanging
+naturally; it moves only that arm and never bends or turns the body. When the spot is out of reach, or only reachable by twisting the
+wrist / shoulder unnaturally, nothing moves and the status line explains why (e.g. use the other hand, move the two closer, pose the
+hand roughly there first). Not happy? Ctrl+Z.
+
+While a hand rests on a surface, **P** pins it to the surface (diamond marker): on your own body the hand then follows when you turn
+the chest or bend over.
+
+## 20. Updates
 
 - **Plugin**: updates automatically through the plugin repository. The changelog pops up the first time you open the main window after an update.
 - **Backend**: after a plugin update the Settings tab shows the backend version. When it's older, click the download button next to it:
@@ -369,7 +450,7 @@ Facial expressions aren't part of the idle; other players only see it through a 
 
 ![Changelog](images/en/tut-changelog.png)
 
-## 19. FAQ
+## 21. FAQ
 
 **Recognition is slow / not enough VRAM**
 Keep the device on Auto; with less than 3 GB of VRAM it uses the CPU automatically. CPU recognition takes about 10–20 s
@@ -382,7 +463,16 @@ Windows has run out of memory including virtual memory (the game alone takes ove
 system-managed, or restart the game and close programs you don't need before recognizing.
 
 **Hands go into the body / don't reach the head**
-"Hand contact compensation" on the Tuning tab keeps contact; try a larger "Full effect" distance. Otherwise select the joint on the 3D tab and adjust it by hand.
+"Hand contact compensation" on the Tuning tab keeps contact; try a larger "Full effect" distance. Otherwise drag the hand there with
+"Edit in game" and let hand snapping or "Place on body part" put it on ([section 19](#19-hand-snapping-and-place-on-body-part-experimental)),
+or select the joint on the 3D tab and adjust it by hand.
+
+**"Place on body part" does nothing and the status line says it can't reach / turn**
+It moves only that arm and never bends the body or twists joints to get there. Use the other hand, or pose the hand roughly near the
+spot with the palm facing it first.
+
+**G / R do nothing in the editor**
+Click a point first to select it (orange ring); while a text box of the game or another plugin has focus, keys go to that box.
 
 **A leg or arm points the wrong way front/back**
 That's the depth ambiguity of a single photo. A side view as an extra view fixes it best; you can also adjust it on the 3D tab.
@@ -396,7 +486,19 @@ Pick it manually in the race dropdown at the right of the third toolbar row (hap
 **Fingers are off**
 Fingers are more accurate with the IVCS skeleton. Without it the IVCS icon is yellow and the third finger joint's bend is folded into the second.
 
-More questions? Ask on [Discord](https://discord.gg/2z6KdPgacj) or open a [GitHub issue](https://github.com/extrant/Posegraph/issues).
+More questions? Ask on [Discord](https://discord.gg/2z6KdPgacj), in the [QQ group](https://qm.qq.com/q/TGuxNR7auq) or open a [GitHub issue](https://github.com/extrant/Posegraph/issues).
+
+## 22. Community & support
+
+Everything in Posegraph is free; support is entirely optional. In the plugin, click the **heart** at the top right of the main
+window or **About & support** at the bottom of Settings:
+
+![Support Posegraph](images/en/tut-support.png)
+
+- Discord: <https://discord.gg/2z6KdPgacj>
+- QQ group "Posegraph交流": <https://qm.qq.com/q/TGuxNR7auq>
+- Afdian: <https://afdian.com/a/Sincraft0515>
+- WeChat tip code: scan it in the "Support Posegraph" window
 
 ---
 

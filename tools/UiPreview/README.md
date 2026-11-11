@@ -37,6 +37,9 @@ dotnet run -c Release -- tut-empty tut-image tut-3d tut-tuning tut-hints tut-set
 python annotate.py shots_zh ..\..\docs\tutorial\images\zh --lang zh
 ```
 
+编辑器相关的三张（`tut-editor` 编辑面板、`tut-editor-help` 编辑器教程窗口、`tut-support` 支持窗口）接在 `tut-image` 后面一起跑；
+`tut-editor` 要一份姿势：环境变量 `POSEGRAPH_SKELETON`（骨架 JSON，含 names / parents）和 `POSEGRAPH_POSE`（Brio 姿势文件）。
+
 英文把 `zh` 换成 `en`。`--demo` 用临时目录里的图库和识别缓存（不碰自己的图库，个人图片不会被拍进教程），GPose 里放几个假角色。
 `tut-image` 要在 `tut-3d`、`tut-tuning`、`tut-hints`、`tut-split` 之前（它们沿用同一个识别结果）。
 `tut-idle`（转换为 idle 窗口）离线没有游戏的 Havok：青色是后端真实算出的姿势，灰色「原版」是骨架绑定姿势放下手臂的示意站姿。

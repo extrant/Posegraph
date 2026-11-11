@@ -33,6 +33,37 @@ public static class EditorScenes
                 app.Shot(path, () => Host.DrawWindow(w), [w.WindowName], frames: 6);
             };
         }
+        // 教程用：示例图识别后（先跑 tut-image），3D 页在编辑中、选中右手
+        scenes["tut-editor"] = (app, path) =>
+        {
+            var editor = MakeEditor(app);
+            App.FakeActors = Demo.Actors;
+            app.Gposing = true;
+            app.Main.IsOpen = true;
+            app.Main.Position = new Vector2(40, 40);
+            app.Main.Size = new Vector2(460, 660);
+            app.Main.SizeCondition = Dalamud.Bindings.ImGui.ImGuiCond.Always;
+            var hooks = app.Main.PoseEditor;
+            app.Main.PoseEditor = new MainWindow.PoseEditorHooks(_ => Task.FromResult<string?>(null), () => { }, () => { },
+                                                                 () => editor.Active, editor.DrawPanel, () => null);
+            app.SelectTab(1);
+            app.Shot(path, () => Host.DrawWindow(app.Main), [app.Main.WindowName], frames: 6);
+            app.Main.PoseEditor = hooks;
+        };
+        scenes["tut-editor-help"] = (app, path) =>
+        {
+            var w = new EditorTutorialWindow(app.Config, Services.PluginInterface(() => []));
+            w.Show(true);
+            App.Set(w, "_page", 3);
+            app.Shot(path, () => Host.DrawWindow(w), [w.WindowName], frames: 6);
+        };
+        scenes["tut-support"] = (app, path) =>
+        {
+            var w = new SupportWindow(Services.Textures(app.Host.Renderer));
+            w.IsOpen = true;
+            w.OnOpen();
+            app.Shot(path, () => Host.DrawWindow(w), [w.WindowName], frames: 6);
+        };
         scenes["editor-panel"] = (app, path) =>
         {
             var editor = MakeEditor(app);
@@ -65,7 +96,7 @@ public static class EditorScenes
         App.Set(editor, "_tips", PoseNodes.Tips(pose, nodes));
         App.Set(editor, "_selected", Environment.GetEnvironmentVariable("POSEGRAPH_SELECT") ?? "hand_r");
         App.Set(editor, "_selfParts", new List<BodyMesh.Part>());
-        App.Set(editor, "_meshStatus", "身体网格：自己 7 个模型，另外 2 个角色（13 个模型），共 21.5 万个三角形");
+        App.Set(editor, "_meshStatus", Loc.F("身体网格：自己 {0} 个模型，另外 {1} 个角色，共 {2} 个三角形", 7, 2, 215360));
         return editor;
     }
 }

@@ -138,6 +138,9 @@ public sealed class App
                                            new Posegraph.Backend.Segment([180, 400], [120, 700], "l"),
                                            new Posegraph.Backend.Segment([180, 400], [330, 690], "r")]);
         Main.ToggleComposition = Composition.Toggle;
+        // 和插件一样接上姿势编辑器（没在编辑）：3D 页顶部有「在游戏里编辑」「教程」
+        Main.PoseEditor = new MainWindow.PoseEditorHooks(_ => Task.FromResult<string?>(null), () => { }, () => { }, () => false, () => { },
+                                                         () => null);
     }
 
     public CompositionWindow Composition { get; }

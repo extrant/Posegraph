@@ -136,7 +136,7 @@ and add `Posegraph.dll` under *Dev Plugin Locations*.
 In GPose, open the 3D tab and click *Edit in game*; control points appear on the character. Click to select, drag for free mode;
 with a point selected press G to move or R to rotate, X / Y / Z to lock an axis (first the character's left-right / up-down / front-back,
 again for the bone's own axis, a third time to unlock), and type numbers directly. P pins, M mirrors, Ctrl+Z / Ctrl+Y undo and redo.
-*Done* saves into the image's corrections. The in-plugin *Tutorial* covers everything.
+*Done* saves into the image's corrections. The in-plugin *Tutorial* and [sections 18–19 of the tutorial](docs/tutorial/README.md#18-edit-in-game-pose-editor) cover everything.
 
 ### Library
 
