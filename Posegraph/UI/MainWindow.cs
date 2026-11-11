@@ -489,8 +489,19 @@ public sealed partial class MainWindow : Window, IDisposable
                    Loc.F("内存可用 {0:0.0} / {1:0.0} GB", _probe.RamAvailMB / 1024f, _probe.RamTotalMB / 1024f) +
                    (ramOk ? "" : Loc.F("\n加载模型约需 {0:0.0} GB，当前不足", SystemProbe.RequiredRamMB / 1024f)));
 
-        // 右侧：后端开关、模型加载/释放、设置
-        var right = ImGui.GetContentRegionMax().X - 4 * (ImGui.GetFrameHeight() + ImGui.GetStyle().ItemSpacing.X);
+        // 右侧：后端开关、模型加载/释放、交流与赞助、设置。按实际图标宽度靠右（图标按钮宽 = 图标宽 + 两边内边距，
+        // 比控件行高宽的图标按行高算会把最右边的设置按钮挤出窗口）
+        FontAwesomeIcon[] rightIcons =
+        [
+            BackendOnline || _process.IsRunning ? FontAwesomeIcon.PowerOff : FontAwesomeIcon.Plug,
+            ModelReady ? FontAwesomeIcon.Eject : FontAwesomeIcon.Download,
+            FontAwesomeIcon.Heart, FontAwesomeIcon.Cog,
+        ];
+        var rightWidth = (rightIcons.Length - 1) * ImGui.GetStyle().ItemSpacing.X;
+        using (ImRaii.PushFont(UiBuilder.IconFont))
+            foreach (var rightIcon in rightIcons)
+                rightWidth += ImGui.CalcTextSize(rightIcon.ToIconString()).X + ImGui.GetStyle().FramePadding.X * 2;
+        var right = ImGui.GetContentRegionMax().X - rightWidth;
         ImGui.SetCursorPosX(Math.Max(ImGui.GetCursorPosX(), right));
         if (BackendOnline || _process.IsRunning)
         {
