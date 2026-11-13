@@ -23,7 +23,7 @@ The UI screenshots are made with the [offline screenshot tool](../../tools/UiPre
   </tr>
   <tr>
     <td align="center">Sitting on a ledge</td>
-    <td align="center">Martial arts leap (two people in the photo; the whole image is treated as one person for now, and it picked the one in the air)</td>
+    <td align="center">Martial arts leap (two people in the photo; only the one in the air is posed here - use merge mode to pose both, see section 10)</td>
   </tr>
 </table>
 
@@ -188,7 +188,9 @@ When generating a side view with AI, ask for "exactly the same pose, the same ha
 ## 10. Several characters: the character list
 
 The "character list" button in the second toolbar row opens this window, docked to the right of the main window.
-"Merge" at the top (splitting the people of one image across several characters) is still being polished; it's grayed out in this version and opens in the next one.
+The top of the window has two modes: **Split** (one image per character) and **Merge** (the people in one image go to several characters).
+
+### Split: one image per character
 
 ![Character list](images/en/tut-split.png)
 
@@ -202,6 +204,19 @@ Bindings only last for the current GPose session.
 Three characters, one image each, after "Apply all":
 
 ![Several characters posed together](images/ingame-split.jpg)
+
+### Merge: several people in one image
+
+1. Open the group photo in the main window. When it finds two or more people, the character list opens on "Merge" by itself; you can also click **Merge** at the top.
+2. Mark out each person, either way:
+   - **Auto draft**: pick the detector next to it (Auto / Photo / Illustration) and click "Auto draft". It finds the people, recognizes them and turns the result into paint; then fix mistakes in the paint window.
+   - **Paint**: open the paint window. Each person gets a layer; paint a rough area (the visible part plus the hidden part) and the painted area becomes that person's box. Rough is fine, but cover the whole person, including visible hands and feet.
+3. Tick the people to recognize and click **Recognize (N)**: they are recognized together with the same image and camera.
+4. Pick a GPose actor for each person and click **Apply all (N)**.
+5. To fine-tune one person, click **Edit** on their row: the main window switches to them, and each person keeps their own adjustments.
+6. Tick **Replicate positions** to place them as in the photo; you can set one person as the position base (their actor stays put and the others are placed around them).
+
+If the group comes out tilted, fix it with the overall rotation / offset on the Adjust tab, or click bones to fix them. If the backend says it is too old for merge mode, update it on the settings tab and restart it.
 
 ## 11. Camera matching, export and restore
 

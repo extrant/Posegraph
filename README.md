@@ -192,7 +192,7 @@ merged into the second, and the IVCS icon in the status bar turns yellow.
   sink into the belly in high-knee poses.
 - Very strong elbow flexion creases more than in-game animations (~145° vs ~130°).
 - Jumping / airborne images are pulled to the ground unless *Snap to ground* is turned off.
-- Several people in one image (merge mode) is still being polished and is off in this version; the whole image is treated as one person (videos can have several people).
+- Several people in one image (merge mode) needs each person painted first (or an auto draft); when people are tightly packed or overlap, who is in front can come out wrong and needs fixing by hand.
 - Video: fingers come straight from the recognition model and are often wrong for small or blurry hands - fix them with timeline corrections; for videos with cuts, select one continuous shot; motion and expressions get worse when the person is small in the frame.
 - Facial expressions: sticking out the tongue isn't possible; a one-eyed wink and a squinting smile are sometimes confused; faces in illustrations are rarely found.
 - The CPU mode speed depends heavily on the CPU (measured ~10 s per image on a 20-thread laptop CPU).
