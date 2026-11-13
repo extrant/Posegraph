@@ -113,7 +113,7 @@ public static class MergeScenes
             var svc = typeof(Posegraph.Lighting.LightingService);
             var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
             var face = new Vector3(0, 1.55f, 0);
-            svc.GetField("_subject", flags)!.SetValue(app.Lighting, (Posegraph.Lighting.Subject?)new Posegraph.Lighting.Subject(face, Vector3.UnitZ, Vector3.UnitY, 1f));
+            svc.GetField("_people", flags)!.SetValue(app.Lighting, new List<Posegraph.Lighting.Subject> { new(face, Vector3.UnitZ, Vector3.UnitY, 1f) });
             List<(Vector3, Vector3)> body =
             [
                 (new(0, 0.95f, 0), new(0, 1.25f, 0)), (new(0, 1.25f, 0), new(0, 1.45f, 0)), (new(0, 1.45f, 0), new(0, 1.6f, 0)),
